@@ -96,6 +96,10 @@ app:
     connect-timeout: ${INTERAKT_CONNECT_TIMEOUT:5s}
     read-timeout: ${INTERAKT_READ_TIMEOUT:10s}
     rate-limit-per-minute: ${INTERAKT_RATE_LIMIT_PER_MINUTE:300}
+  email:
+    webhook-secret: ${EMAIL_WEBHOOK_SECRET:}
+  sms:
+    webhook-secret: ${SMS_WEBHOOK_SECRET:}
   automation:
     # Phase 6 Module 1 — hard bounds the validator applies to every definition.
     max-steps-per-workflow: ${AUTOMATION_MAX_STEPS_PER_WORKFLOW:30}

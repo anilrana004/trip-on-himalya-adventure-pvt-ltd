@@ -13,6 +13,7 @@ import com.securetravels.crm.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +28,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Local/dev convenience: seeds the five demo accounts and a starter set of
- * demo leads once when the corresponding tables are empty and
- * app.bootstrap-demo-data=true (production sets it false — real data is
- * provisioned via proper admin flows in Phase 2+).
+ * Local convenience for the {@code dev} profile. Seeds demo accounts only when
+ * {@code app.bootstrap-demo-data} is true and {@link ProductionBoot} says this
+ * is not Railway or the prod profile. A true flag on Railway is ignored.
  */
 @Component
 public class DemoDataSeeder implements CommandLineRunner {
@@ -38,6 +38,7 @@ public class DemoDataSeeder implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoDataSeeder.class);
 
     private final AppProperties props;
+    private final Environment environment;
     private final UserRepository users;
     private final TripRepository trips;
     private final LeadRepository leads;
@@ -45,10 +46,11 @@ public class DemoDataSeeder implements CommandLineRunner {
     private final FollowUpAutomation automation;
     private final PasswordEncoder passwordEncoder;
 
-    public DemoDataSeeder(AppProperties props, UserRepository users, TripRepository trips,
+    public DemoDataSeeder(AppProperties props, Environment environment, UserRepository users, TripRepository trips,
                           LeadRepository leads, TaskRepository tasks, FollowUpAutomation automation,
                           PasswordEncoder passwordEncoder) {
         this.props = props;
+        this.environment = environment;
         this.users = users;
         this.trips = trips;
         this.leads = leads;
@@ -60,7 +62,12 @@ public class DemoDataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (!props.isBootstrapDemoData()) return;
+        if (!ProductionBoot.allowDemoSeed(props.isBootstrapDemoData(), ProductionBoot.detected(environment))) {
+            if (ProductionBoot.detected(environment)) {
+                log.info("[demo-data] skipped: Railway and the prod profile never seed demo users");
+            }
+            return;
+        }
         seedUsersIfEmpty();
         seedTripsIfEmpty();
         seedLeadsIfEmpty();
@@ -82,8 +89,8 @@ public class DemoDataSeeder implements CommandLineRunner {
     }
 
     private void seedUsersIfEmpty() {
-        if (users.count() > 0) return;
-
+        // Finance is created earlier by BootstrapFinanceUserRunner, so a
+        // count() > 0 check would skip every other demo login on a fresh DB.
         List<User> demo = List.of(
                 new User("admin@securetravels.in", password("admin123"), "Admin Admin", Role.ADMIN, "9876000001"),
                 new User("manager@securetravels.in", password("manager123"), "Manager Manager", Role.MANAGER, "9876000002"),
@@ -91,8 +98,12 @@ public class DemoDataSeeder implements CommandLineRunner {
                 new User("sales.meera@securetravels.in", password("sales123"), "Meera Joshi", Role.SALES, "9876000004"),
                 new User("ops.suresh@securetravels.in", password("ops123"), "Suresh Rawat", Role.OPS, "9876000005"),
                 new User("finance@securetravels.in", password("finance123"), "Finance Officer", Role.FINANCE, "9876000006"));
-        users.saveAll(demo);
-        log.info("[demo-data] seeded 6 demo users including FINANCE (bcrypt strength 12)");
+        List<User> missing = demo.stream()
+                .filter(u -> !users.existsByEmailIgnoreCase(u.getEmail()))
+                .toList();
+        if (missing.isEmpty()) return;
+        users.saveAll(missing);
+        log.info("[demo-data] seeded {} demo users (bcrypt strength 12)", missing.size());
     }
 
     private void seedTripsIfEmpty() {

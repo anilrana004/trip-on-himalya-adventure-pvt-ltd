@@ -25,7 +25,8 @@ public class AppProperties {
     private final FeatureFlags featureFlags = new FeatureFlags();
     private final Commission commission = new Commission();
     private final Meta meta = new Meta();
-    private boolean bootstrapDemoData = true;
+    /** Off unless a profile opts in. Production and Railway must never inherit a true default. */
+    private boolean bootstrapDemoData = false;
 
     public Jwt getJwt() { return jwt; }
     public Cors getCors() { return cors; }

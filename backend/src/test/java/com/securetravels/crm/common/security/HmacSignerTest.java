@@ -54,6 +54,17 @@ class HmacSignerTest {
     }
 
     @Test
+    @DisplayName("a blank secret is never a valid signature, even of the empty key")
+    void blankSecretIsRejected() {
+        byte[] body = "stop".getBytes(StandardCharsets.UTF_8);
+        String signedWithEmptyKey = HmacSigner.sign("", body);
+        assertThat(HmacSigner.verified("", signedWithEmptyKey, body)).isFalse();
+        assertThat(HmacSigner.verified("   ", signedWithEmptyKey, body)).isFalse();
+        assertThat(HmacSigner.verified(null, signedWithEmptyKey, body)).isFalse();
+        assertThat(HmacSigner.verified(SECRET, HmacSigner.sign(SECRET, body), body)).isTrue();
+    }
+
+    @Test
     @DisplayName("an empty body still signs deterministically")
     void emptyBody() {
         byte[] empty = new byte[0];

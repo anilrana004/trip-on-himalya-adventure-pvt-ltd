@@ -9,5 +9,6 @@ restartPolicyType = "ON_FAILURE"
 # Let the image ENTRYPOINT run (java -jar /app/app.jar). Do not override.
 
 [variables]
+SPRING_PROFILES_ACTIVE = "prod"
 MESSAGING_MODE = "INLINE"
 WHATSAPP_MODE = "SANDBOX"

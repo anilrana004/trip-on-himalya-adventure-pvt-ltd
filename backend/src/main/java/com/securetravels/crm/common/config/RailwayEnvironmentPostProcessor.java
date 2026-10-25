@@ -10,8 +10,6 @@ import org.springframework.core.env.MapPropertySource;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,14 +18,12 @@ import java.util.Map;
  * This app expects {@code DB_URL} / {@code DB_USER} / {@code DB_PASSWORD}. Map the
  * Railway form early so the datasource can boot when only the plugin vars exist.
  *
- * <p>Also bridges a missing {@code JWT_SECRET} on Railway with an ephemeral value so
- * the container does not crash-loop before operators paste Variables (sessions
- * reset on each redeploy until a real secret is set).
+ * <p>A missing {@code JWT_SECRET} is not invented here. {@link ProdSecretsValidator}
+ * refuses the boot on Railway so a redeploy cannot silently rotate every session
+ * onto a secret that was never stored.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor {
-
-    private static final String DEV_JWT = "securetravels-phase1-jwt-secret-change-me-32b-plus";
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
@@ -60,29 +56,9 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             }
         }
 
-        boolean onRailway = !isBlank(environment.getProperty("RAILWAY_ENVIRONMENT"))
-                || !isBlank(environment.getProperty("RAILWAY_PROJECT_ID"));
-        String jwt = firstNonBlank(
-                environment.getProperty("JWT_SECRET"),
-                environment.getProperty("app.jwt.secret"));
-        if (onRailway && (isBlank(jwt) || DEV_JWT.equals(jwt))) {
-            String ephemeral = generateSecret(48);
-            extras.put("JWT_SECRET", ephemeral);
-            extras.put("app.jwt.secret", ephemeral);
-            System.err.println(
-                    "[railway] JWT_SECRET was missing — using an ephemeral secret for this boot. "
-                            + "Set JWT_SECRET in Railway Variables to keep logins stable across deploys.");
-        }
-
         if (!extras.isEmpty()) {
             environment.getPropertySources().addFirst(new MapPropertySource("railwayDbMapping", extras));
         }
-    }
-
-    private static String generateSecret(int bytes) {
-        byte[] buf = new byte[bytes];
-        new SecureRandom().nextBytes(buf);
-        return Base64.getEncoder().encodeToString(buf);
     }
 
     static MappedDb mapDatabaseUrl(String raw) {

@@ -84,8 +84,7 @@ public class EmailWebhookService {
     @Transactional
     public int handle(byte[] rawBody, String providedSignature) {
         String secret = props.getEmail().getWebhookSecret();
-        if (secret != null && !secret.isBlank()
-                && !HmacSigner.matches(providedSignature, secret, rawBody)) {
+        if (!HmacSigner.verified(secret, providedSignature, rawBody)) {
             log.warn("[email] rejected SES notification with invalid or missing signature");
             throw new WebhookSignatureException("Invalid email webhook signature");
         }

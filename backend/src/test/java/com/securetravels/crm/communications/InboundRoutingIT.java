@@ -1,6 +1,7 @@
 package com.securetravels.crm.communications;
 
 import com.securetravels.crm.BaseIT;
+import com.securetravels.crm.common.security.HmacSigner;
 import com.securetravels.crm.communications.consent.ConsentService;
 import com.securetravels.crm.communications.consent.ConsentStatus;
 import com.securetravels.crm.communications.email.SesEmailGateway;
@@ -168,15 +169,19 @@ class InboundRoutingIT extends BaseIT {
     // ------------------------------------------------------------------ helpers
 
     private org.springframework.test.web.servlet.ResultActions webhookSms(String json) throws Exception {
+        byte[] body = json.getBytes(StandardCharsets.UTF_8);
         return mockMvc.perform(post("/api/v1/webhooks/sms")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json.getBytes(StandardCharsets.UTF_8)));
+                .header("X-SecureTravels-Signature", HmacSigner.sign("test-sms-webhook-secret", body))
+                .content(body));
     }
 
     private org.springframework.test.web.servlet.ResultActions webhookEmail(String raw) throws Exception {
+        byte[] body = raw.getBytes(StandardCharsets.UTF_8);
         return mockMvc.perform(post("/api/v1/webhooks/email")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(raw.getBytes(StandardCharsets.UTF_8)));
+                .header("X-SecureTravels-Signature", HmacSigner.sign("test-email-webhook-secret", body))
+                .content(body));
     }
 
     private String smsReply(String mobile, String messageId, String text) throws Exception {

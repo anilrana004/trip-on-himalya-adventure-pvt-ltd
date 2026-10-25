@@ -75,8 +75,7 @@ public class SmsWebhookService {
     @Transactional
     public int handle(byte[] rawBody, String providedSignature) {
         String secret = props.getSms().getWebhookSecret();
-        if (secret != null && !secret.isBlank()
-                && !HmacSigner.matches(providedSignature, secret, rawBody)) {
+        if (!HmacSigner.verified(secret, providedSignature, rawBody)) {
             log.warn("[sms] rejected webhook with invalid or missing signature");
             throw new WebhookSignatureException("Invalid SMS webhook signature");
         }

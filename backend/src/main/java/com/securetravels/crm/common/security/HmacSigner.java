@@ -49,6 +49,15 @@ public final class HmacSigner {
         return MessageDigest.isEqual(expected, provided.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Fail closed. A blank secret must not accept a body, including one signed
+     * with the empty string. Callers turn a false result into 401.
+     */
+    public static boolean verified(String secret, String provided, byte[] payload) {
+        if (secret == null || secret.isBlank()) return false;
+        return matches(provided, secret, payload);
+    }
+
     private static String toHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
         for (byte b : bytes) {

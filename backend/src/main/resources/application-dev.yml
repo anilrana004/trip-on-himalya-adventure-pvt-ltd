@@ -1,0 +1,4 @@
+# Opt-in local profile. Docker Compose sets this by default.
+# Railway must use the prod profile and must not copy this file's flag.
+app:
+  bootstrap-demo-data: true

@@ -16,6 +16,10 @@ app:
       refill-per-window: 10000
       window-minutes: 1
   bootstrap-demo-data: false
+  email:
+    webhook-secret: test-email-webhook-secret
+  sms:
+    webhook-secret: test-sms-webhook-secret
   whatsapp:
     mode: SANDBOX
     webhook-secret: test-interakt-webhook-secret

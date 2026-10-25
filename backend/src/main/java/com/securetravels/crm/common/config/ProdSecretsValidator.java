@@ -4,23 +4,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Production secret hygiene. Logs loudly when operators still need to set
- * Railway Variables; does not crash the process (crash-loops hide the real
- * database / networking errors on first deploy).
+ * Refuses a Railway or {@code prod} boot that is still on checked-in secrets,
+ * or that leaves the public email and SMS webhooks without a signing secret.
+ * Logs never include secret values. A missing secret used to be a warning so
+ * the process could stay up; that left {@code admin}-equivalent webhook
+ * forgery available on the public port.
  */
 @Component
-@Profile("prod")
 public class ProdSecretsValidator implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ProdSecretsValidator.class);
 
-    private static final String DEV_JWT = "securetravels-phase1-jwt-secret-change-me-32b-plus";
-    private static final String DEV_WEBHOOK = "dev-webhook-secret-insecure-change-me";
+    static final String DEV_JWT = "securetravels-phase1-jwt-secret-change-me-32b-plus";
+    static final String DEV_WEBHOOK = "dev-webhook-secret-insecure-change-me";
 
     private final Environment env;
 
@@ -30,52 +33,39 @@ public class ProdSecretsValidator implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        String jwt = firstNonBlank(env.getProperty("JWT_SECRET"), env.getProperty("app.jwt.secret"), "");
-        String webhook = firstNonBlank(env.getProperty("WEBHOOK_SECRET"), env.getProperty("app.webhook.secret"), "");
-
-        if (jwt.isBlank() || jwt.equals(DEV_JWT) || jwt.length() < 32) {
-            log.error(
-                    "[prod-secrets] Set JWT_SECRET in Railway Variables (openssl rand -base64 48). "
-                            + "Without it, logins reset on every redeploy.");
+        if (!ProductionBoot.detected(env)) {
+            return;
         }
-        if (webhook.isBlank() || webhook.equals(DEV_WEBHOOK)) {
-            log.warn(
-                    "[prod-secrets] Set WEBHOOK_SECRET in Railway Variables before enabling webhooks");
-        } else if (jwt.length() >= 32 && !jwt.equals(DEV_JWT)) {
-            log.info("[prod-secrets] JWT_SECRET and WEBHOOK_SECRET look configured");
+        List<String> missing = problems();
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(
+                    "Refusing to boot: set " + String.join(", ", missing)
+                            + ". Checked-in defaults and blank email/SMS webhook secrets are not allowed "
+                            + "on Railway or the prod profile.");
         }
-
-        // Meta: presence only — never log values. Detailed summary is MetaConfigReporter.
-        boolean metaToken = present(env.getProperty("META_ACCESS_TOKEN"))
-                || present(env.getProperty("app.meta.access-token"));
-        if (!metaToken) {
-            log.warn(
-                    "[prod-secrets] META_ACCESS_TOKEN unset — Meta Ads/Campaigns APIs unavailable until configured");
-        }
-
-        String allowlist = firstNonBlank(
-                env.getProperty("META_AD_ACCOUNT_IDS"),
-                env.getProperty("app.meta.ad-account-ids"),
-                "");
-        if (metaToken && allowlist.isBlank()) {
-            log.warn(
-                    "[prod-secrets] META_AD_ACCOUNT_IDS unset — any ad account visible to the system-user "
-                            + "token is readable by MANAGER/ADMIN/CEO; set an allowlist in production");
-        }
-
-        String cors = firstNonBlank(
-                env.getProperty("CORS_ALLOWED_ORIGINS"),
-                env.getProperty("app.cors.allowed-origins"),
-                "");
-        if (cors.contains("localhost") || cors.contains("127.0.0.1")) {
-            log.warn(
-                    "[prod-secrets] CORS_ALLOWED_ORIGINS still includes localhost/127.0.0.1 — "
-                            + "set it to your Vercel origin(s) in production");
-        }
+        log.info("[prod-secrets] JWT_SECRET, WEBHOOK_SECRET, and email/SMS webhook secrets are set");
     }
 
-    private static boolean present(String value) {
-        return value != null && !value.isBlank();
+    List<String> problems() {
+        List<String> missing = new ArrayList<>();
+        String jwt = firstNonBlank(env.getProperty("JWT_SECRET"), env.getProperty("app.jwt.secret"));
+        String webhook = firstNonBlank(env.getProperty("WEBHOOK_SECRET"), env.getProperty("app.webhook.secret"));
+        String email = firstNonBlank(env.getProperty("EMAIL_WEBHOOK_SECRET"), env.getProperty("app.email.webhook-secret"));
+        String sms = firstNonBlank(env.getProperty("SMS_WEBHOOK_SECRET"), env.getProperty("app.sms.webhook-secret"));
+
+        if (jwt.isBlank() || jwt.equals(DEV_JWT) || jwt.length() < 32) {
+            missing.add("JWT_SECRET");
+        }
+        if (webhook.isBlank() || webhook.equals(DEV_WEBHOOK)) {
+            missing.add("WEBHOOK_SECRET");
+        }
+        if (email.isBlank()) {
+            missing.add("EMAIL_WEBHOOK_SECRET");
+        }
+        if (sms.isBlank()) {
+            missing.add("SMS_WEBHOOK_SECRET");
+        }
+        return missing;
     }
 
     private static String firstNonBlank(String... values) {
