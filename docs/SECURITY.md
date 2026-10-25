@@ -39,10 +39,12 @@ Out of scope for the threat model here: third-party SaaS, multi-branch/org tenan
 | **JWT access token, 15-minute** expiry (stateless, HS256 via `jjwt`) | `JwtService`, `JwtAuthenticationFilter` |
 | **Refresh token, 7-day** expiry, **rotated on every use** (old token revoked, replaced) | `AuthService`, `RefreshToken` entity |
 | Refresh tokens persisted as **SHA-256 hash** only (plaintext never stored) | `refresh_tokens.token_hash` |
-| Refresh reuse detection (replay of a rotated token rejected) | `AuthService.refresh` |
+| Refresh reuse detection: replaying a rotated token revokes every live session for that user. Logout of one session does not | `AuthService.refresh`, `RefreshTokenRepository.revokeActiveByUserId` |
+| The signed-in user can list and revoke their own refresh sessions. The token hash is not returned | `GET/DELETE /api/auth/sessions` |
 | Logout revokes the refresh token server-side | `AuthService.logout` |
 | `ROLE_` claim namespacing; stateless filter, no server-side session | JWT filter |
-| Tokens never exposed in `localStorage` for the server (kept client-side for SPA, cleared on 401) | `frontend/src/lib/api.ts` |
+| Access token stays in memory. Refresh token is the HttpOnly `toh_refresh` cookie, path `/api/auth` | `frontend/src/lib/api.ts`, `RefreshCookie` |
+| API responses send `nosniff`, `DENY` framing, `no-referrer`, a `default-src 'none'` policy, and HSTS on HTTPS | `SecurityConfig` |
 | Login recovery: 401 for both unknown-email and wrong-password (no user enumeration) | `GlobalExceptionHandler` |
 
 ### Authorization (RBAC)

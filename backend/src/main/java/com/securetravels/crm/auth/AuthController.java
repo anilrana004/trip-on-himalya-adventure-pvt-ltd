@@ -10,11 +10,16 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -65,6 +70,25 @@ public class AuthController {
     @GetMapping("/me")
     public AuthResponse.UserInfo me(@CurrentUser UserPrincipal principal) {
         return new AuthResponse.UserInfo(principal.id(), principal.email(), principal.fullName(), principal.role());
+    }
+
+    @Operation(summary = "Live refresh sessions for the current user", security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/sessions")
+    public List<SessionResponse> sessions(@CurrentUser UserPrincipal principal, HttpServletRequest httpRequest) {
+        return authService.sessions(principal.id(), RefreshCookie.read(httpRequest));
+    }
+
+    @Operation(summary = "Revoke one of the current user's refresh sessions", security = @SecurityRequirement(name = "bearerAuth"))
+    @DeleteMapping("/sessions/{id}")
+    public void revokeSession(@CurrentUser UserPrincipal principal,
+                              @PathVariable UUID id,
+                              HttpServletRequest httpRequest,
+                              HttpServletResponse httpResponse) {
+        boolean current = authService.revokeSession(principal.id(), id, RefreshCookie.read(httpRequest));
+        if (current) {
+            RefreshCookie.clear(httpResponse, secure(httpRequest),
+                    props.getCookie().getSameSite(), props.getCookie().getDomain());
+        }
     }
 
     private void writeRefresh(HttpServletRequest request, HttpServletResponse response, String token) {

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -40,7 +41,8 @@ public class AuthService {
         return issuePair(user);
     }
 
-    @Transactional
+    /** The reuse revoke must commit. A rollback-on-401 would leave the stolen successor alive. */
+    @Transactional(noRollbackFor = BadCredentialsException.class)
     public AuthResponse refresh(String rawToken) {
         Claims claims = jwtService.parse(rawToken);
         if (claims == null || !JwtService.TYPE_REFRESH.equals(claims.get(JwtService.CLAIM_TYPE, String.class))) {
@@ -49,7 +51,15 @@ public class AuthService {
         String hash = jwtService.sha256Hex(rawToken);
         RefreshToken stored = refreshTokens.findByTokenHash(hash)
                 .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
-        if (stored.isRevoked() || stored.getExpiresAt().isBefore(Instant.now())) {
+        if (stored.isRevoked()) {
+            // A rotated token presented again means the earlier copy leaked.
+            // Logout (replacedBy == null) stays a single-session revoke.
+            if (stored.getReplacedBy() != null) {
+                refreshTokens.revokeActiveByUserId(stored.getUserId());
+            }
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+        if (stored.getExpiresAt().isBefore(Instant.now())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
         User user = users.findById(stored.getUserId())
@@ -72,6 +82,32 @@ public class AuthService {
                 "Bearer",
                 jwtService.accessTtlSeconds(),
                 toUserInfo(user));
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionResponse> sessions(UUID userId, String rawCurrent) {
+        String currentHash = rawCurrent == null || rawCurrent.isBlank() ? null : jwtService.sha256Hex(rawCurrent);
+        return refreshTokens.findByUserIdAndRevokedFalseOrderByCreatedAtDesc(userId).stream()
+                .map(token -> new SessionResponse(
+                        token.getId(),
+                        token.getCreatedAt(),
+                        token.getExpiresAt(),
+                        currentHash != null && currentHash.equals(token.getTokenHash())))
+                .toList();
+    }
+
+    /** Revokes one of the caller's sessions. Returns true when that row was the presented cookie. */
+    @Transactional
+    public boolean revokeSession(UUID userId, UUID sessionId, String rawCurrent) {
+        RefreshToken token = refreshTokens.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new NotFoundException("Session not found"));
+        String currentHash = rawCurrent == null || rawCurrent.isBlank() ? null : jwtService.sha256Hex(rawCurrent);
+        boolean current = currentHash != null && currentHash.equals(token.getTokenHash());
+        if (!token.isRevoked()) {
+            token.revoke(null);
+            refreshTokens.save(token);
+        }
+        return current;
     }
 
     @Transactional
