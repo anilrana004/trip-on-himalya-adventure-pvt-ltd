@@ -2,7 +2,44 @@
 
 > **Status: ratified since Phase 1 Prompt 3; verified at Prompt 4.** This file grows as the
 > topology grows (single VPS → managed/managed-Postgres → multi-region in
-> Phase 12).
+> Phase 12). The Railway section below is the current target. The VPS section
+> is the earlier plan and is not what `railway.toml` deploys.
+
+---
+
+## 0. Railway + Vercel (current)
+
+Official behaviour, from Railway's healthcheck docs (checked 2026-10-25): Railway
+queries `healthcheckPath` until it gets any HTTP 2xx, then marks the new
+deployment active and the previous one inactive. It does not keep polling after
+that. `railway.toml` sets the path to `/actuator/health` and the timeout to 300
+seconds. The app must listen on the `PORT` Railway injects (`server.port` does).
+A failed healthcheck does not receive traffic, so a boot that refuses bad
+secrets stays on the previous deployment.
+
+Rollback after a release that did become active: in the Railway service, redeploy
+the previous successful deployment. The frontend is a separate Vercel project;
+roll that back by promoting the previous Vercel deployment. Do not roll one back
+and leave the other on an incompatible API.
+
+Do not attach a volume to the API service. Railway documents downtime on
+redeploy when a volume is mounted. Postgres stays the Railway Postgres plugin.
+
+Custom domains: `app.<domain>` on Vercel, `api.<domain>` on Railway. Set
+`CORS_ALLOWED_ORIGINS` to the exact app origin, for example
+`https://app.example.com`. No wildcard. The prod profile refuses to boot if
+that value is blank, `*`, or localhost.
+
+The browser talks to the Vercel origin. Next proxies `/api` to Railway
+(`API_PROXY_TARGET`). The refresh cookie is host-only on the app host
+(`SameSite=Lax`, `HttpOnly`, `Secure` when the request is HTTPS). Leave
+`COOKIE_DOMAIN` empty while the proxy is in front. Setting it to the API host
+makes the browser drop the cookie, because the response the browser sees comes
+from the app host. `SameSite=None` is not the setup: `*.vercel.app` calling
+`*.up.railway.app` is cross-site, and browsers are dropping those cookies.
+
+Logs on the prod profile are ECS JSON on stdout (`logging.structured.format.console`).
+`SPRING_PROFILES_ACTIVE=staging` is the prod group plus the name `staging`.
 
 ---
 

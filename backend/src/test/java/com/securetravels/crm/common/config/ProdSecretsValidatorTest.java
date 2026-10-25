@@ -43,6 +43,7 @@ class ProdSecretsValidatorTest {
         env.setProperty("WEBHOOK_SECRET", ProdSecretsValidator.DEV_WEBHOOK);
         env.setProperty("EMAIL_WEBHOOK_SECRET", "email-secret");
         env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret");
+        env.setProperty("CORS_ALLOWED_ORIGINS", "https://app.example.com");
 
         assertThat(new ProdSecretsValidator(env).problems()).containsExactly("WEBHOOK_SECRET");
     }
@@ -55,6 +56,7 @@ class ProdSecretsValidatorTest {
         env.setProperty("WEBHOOK_SECRET", "a-real-webhook-secret-not-the-default");
         env.setProperty("EMAIL_WEBHOOK_SECRET", "email-secret");
         env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret");
+        env.setProperty("CORS_ALLOWED_ORIGINS", "https://app.example.com");
         new ProdSecretsValidator(env).run(new DefaultApplicationArguments());
     }
 

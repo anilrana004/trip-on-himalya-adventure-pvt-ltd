@@ -468,23 +468,51 @@ export function formatApiError(err: unknown, fallback = "Request failed"): strin
   return fallback;
 }
 
-const TOKENS = {
-  access: "st_access",
-  refresh: "st_refresh",
-};
+const LEGACY_TOKENS = ["st_access", "st_refresh"];
 
+let accessToken: string | null = null;
+let refreshInFlight: Promise<string | null> | null = null;
+
+/** Access token lives in memory. The refresh token is an HttpOnly cookie. */
 export const tokenStore = {
-  getAccess: () => (typeof window === "undefined" ? null : localStorage.getItem(TOKENS.access)),
-  getRefresh: () => (typeof window === "undefined" ? null : localStorage.getItem(TOKENS.refresh)),
-  set: (access: string, refresh: string) => {
-    localStorage.setItem(TOKENS.access, access);
-    localStorage.setItem(TOKENS.refresh, refresh);
+  getAccess: () => accessToken,
+  setAccess: (token: string | null) => {
+    accessToken = token;
+  },
+  forgetLegacy: () => {
+    if (typeof window === "undefined") return;
+    for (const key of LEGACY_TOKENS) localStorage.removeItem(key);
   },
   clear: () => {
-    localStorage.removeItem(TOKENS.access);
-    localStorage.removeItem(TOKENS.refresh);
+    accessToken = null;
+    if (typeof window === "undefined") return;
+    for (const key of LEGACY_TOKENS) localStorage.removeItem(key);
   },
 };
+
+export function refreshAccess(): Promise<string | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (!refreshInFlight) {
+    refreshInFlight = fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const data = (await res.json()) as LoginResponse;
+        if (!data.accessToken) return null;
+        tokenStore.setAccess(data.accessToken);
+        return data.accessToken;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
 
 export class ApiClientError extends Error {
   status: number;
@@ -497,18 +525,23 @@ export class ApiClientError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const access = tokenStore.getAccess();
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
   if (access) headers.set("Authorization", `Bearer ${access}`);
-  const res = await fetch(path, { ...init, headers });
+  const res = await fetch(path, { ...init, headers, credentials: "include" });
+
+  if (res.status === 401 && !retried && !path.startsWith("/api/auth/")) {
+    const renewed = await refreshAccess();
+    if (renewed) return request(path, init, true);
+    tokenStore.clear();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+  }
 
   if (!res.ok) {
-    if (res.status === 401) {
-      tokenStore.clear();
-      if (typeof window !== "undefined") window.location.href = "/login";
-    }
     let body: ApiErrorBody = {};
     try {
       body = await res.json();

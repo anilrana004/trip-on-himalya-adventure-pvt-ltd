@@ -1,6 +1,12 @@
 spring:
   application:
     name: securetravels
+  profiles:
+    group:
+      # Staging is prod with a different name so Railway preview can say which
+      # environment it is. Secrets, demo-user refusal, and hidden metrics follow prod.
+      staging:
+        - prod
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/securetravels_crm}
     username: ${DB_USER:postgres}
@@ -28,6 +34,9 @@ spring:
 
 server:
   port: ${PORT:8080}
+  # Railway terminates TLS. Trust X-Forwarded-Proto so the refresh cookie
+  # is marked Secure only when the browser connection actually is.
+  forward-headers-strategy: framework
   error:
     include-stacktrace: never
     include-message: never
@@ -39,8 +48,13 @@ app:
     refresh-days: 7
   cors:
     # Patterns so local Next.js on any port (3000, 3020, …) works through the
-    # /api rewrite that forwards the browser Origin header. Override in prod.
+    # /api rewrite that forwards the browser Origin header. Prod must set an
+    # exact https origin. A wildcard or localhost value refuses the prod boot.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+  cookie:
+    same-site: ${COOKIE_SAMESITE:Lax}
+    domain: ${COOKIE_DOMAIN:}
+    secure: ${COOKIE_SECURE:false}
   login-rate-limit:
     capacity: 5
     refill-per-window: 5

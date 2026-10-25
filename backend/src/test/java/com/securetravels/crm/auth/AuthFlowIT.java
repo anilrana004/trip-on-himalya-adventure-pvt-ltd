@@ -2,8 +2,9 @@ package com.securetravels.crm.auth;
 
 import com.securetravels.crm.BaseIT;
 import com.securetravels.crm.user.Role;
-import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 
 import java.util.Map;
 import java.util.UUID;
@@ -29,7 +30,8 @@ class AuthFlowIT extends BaseIT {
                 .andExpect(jsonPath("$.user.email").value("admin@securetravels.in"))
                 .andExpect(jsonPath("$.user.role").value("ADMIN"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists(HttpHeaders.SET_COOKIE));
     }
 
     @Test
@@ -49,25 +51,22 @@ class AuthFlowIT extends BaseIT {
         createUser("ops@securetravels.in", "Suresh", Role.OPS, "ops123");
         String refresh = loginGetRefresh("ops@securetravels.in", "ops123");
 
-        String rotated = mockMvc.perform(post("/api/auth/refresh")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(Map.of("refreshToken", refresh))))
+        var rotated = mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie(RefreshCookie.NAME, refresh)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andReturn().getResponse().getContentAsString();
-        String newRefresh = objectMapper.readTree(rotated).get("refreshToken").asText();
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andReturn();
+        String newRefresh = refreshFrom(rotated.getResponse().getHeader(HttpHeaders.SET_COOKIE));
 
-        // old token is dead after rotation
+        // old token is dead after rotation, whether it arrives as a cookie or a body
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(Map.of("refreshToken", refresh))))
                 .andExpect(status().isUnauthorized());
 
-        // new token still works
         mockMvc.perform(post("/api/auth/refresh")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(Map.of("refreshToken", newRefresh))))
+                        .cookie(new Cookie(RefreshCookie.NAME, newRefresh)))
                 .andExpect(status().isOk());
     }
 
@@ -87,22 +86,27 @@ class AuthFlowIT extends BaseIT {
         String refresh = loginGetRefresh("ops@securetravels.in", "ops123");
 
         mockMvc.perform(post("/api/auth/logout")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(Map.of("refreshToken", refresh))))
+                        .cookie(new Cookie(RefreshCookie.NAME, refresh)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/refresh")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(Map.of("refreshToken", refresh))))
+                        .cookie(new Cookie(RefreshCookie.NAME, refresh)))
                 .andExpect(status().isUnauthorized());
     }
 
     private String loginGetRefresh(String email, String password) throws Exception {
-        String body = mockMvc.perform(post("/api/auth/login")
+        var result = mockMvc.perform(post("/api/auth/login")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(Map.of("email", email, "password", password))))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return objectMapper.readTree(body).get("refreshToken").asText();
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andReturn();
+        return refreshFrom(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+    }
+
+    private static String refreshFrom(String setCookie) {
+        assertThat(setCookie).contains(RefreshCookie.NAME + "=");
+        String pair = setCookie.split(";", 2)[0];
+        return pair.substring((RefreshCookie.NAME + "=").length());
     }
 }

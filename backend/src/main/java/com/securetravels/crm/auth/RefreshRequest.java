@@ -1,9 +1,7 @@
 package com.securetravels.crm.auth;
 
-import jakarta.validation.constraints.NotBlank;
-
-public record RefreshRequest(
-        @NotBlank(message = "refreshToken is required")
-        String refreshToken
-) {
-}
+/**
+ * Optional body for non-browser clients. The web app sends the refresh token
+ * in the {@code toh_refresh} cookie and an empty JSON object.
+ */
+public record RefreshRequest(String refreshToken) {}

@@ -7,7 +7,7 @@ function backendOrigin(): string {
   const raw =
     process.env.API_PROXY_TARGET ||
     process.env.NEXT_PUBLIC_API_BASE_URL ||
-    "";
+    (process.env.NODE_ENV === "development" ? "http://localhost:8080" : "");
   if (!raw.trim()) return "";
   return raw.replace(/\/+$/, "").replace(/\/api$/, "");
 }
@@ -30,8 +30,10 @@ async function proxy(req: NextRequest, pathSegments: string[]) {
   const headers = new Headers();
   const contentType = req.headers.get("content-type");
   const authorization = req.headers.get("authorization");
+  const cookie = req.headers.get("cookie");
   if (contentType) headers.set("content-type", contentType);
   if (authorization) headers.set("authorization", authorization);
+  if (cookie) headers.set("cookie", cookie);
 
   const init: RequestInit = {
     method: req.method,
@@ -74,6 +76,10 @@ async function proxy(req: NextRequest, pathSegments: string[]) {
 
   const outHeaders = new Headers();
   if (upstreamType) outHeaders.set("content-type", upstreamType);
+  const setCookies = upstream.headers.getSetCookie?.() ?? [];
+  for (const setCookie of setCookies) {
+    outHeaders.append("set-cookie", setCookie);
+  }
 
   return new NextResponse(bodyText, {
     status: upstream.status,

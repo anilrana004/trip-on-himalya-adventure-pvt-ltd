@@ -160,7 +160,8 @@ public class SecurityConfig {
             }
         }
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        cfg.setAllowedHeaders(List.of("*"));
+        // Credentials reject Access-Control-Allow-Headers: *. Name the headers the browser sends.
+        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
         cfg.setExposedHeaders(List.of("Retry-After", "Location"));
         cfg.setAllowCredentials(true);
         cfg.setMaxAge(3600L);

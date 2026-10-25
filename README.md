@@ -38,6 +38,12 @@ npm install
 npm run dev
 ```
 
+The browser keeps the access token in memory. The refresh token is an HttpOnly
+cookie named `toh_refresh`, sent only to `/api/auth`. Next.js proxies `/api` and
+forwards that cookie to the API. On `https://app.<domain>` and
+`https://api.<domain>`, set `CORS_ALLOWED_ORIGINS` to the exact app origin.
+Leave `COOKIE_DOMAIN` empty while the proxy is in front.
+
 A boot with no profile does not seed demo users. The `prod` profile and any
 Railway boot never seed them, even if `app.bootstrap-demo-data` is set true.
 Railway (`railway.toml`) sets `SPRING_PROFILES_ACTIVE=prod`. That boot refuses

@@ -65,6 +65,10 @@ public class ProdSecretsValidator implements ApplicationRunner {
         if (sms.isBlank()) {
             missing.add("SMS_WEBHOOK_SECRET");
         }
+        String cors = firstNonBlank(env.getProperty("CORS_ALLOWED_ORIGINS"), env.getProperty("app.cors.allowed-origins"));
+        if (cors.isBlank() || cors.contains("*") || cors.contains("localhost") || cors.contains("127.0.0.1")) {
+            missing.add("CORS_ALLOWED_ORIGINS");
+        }
         return missing;
     }
 

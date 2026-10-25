@@ -25,6 +25,7 @@ public class AppProperties {
     private final FeatureFlags featureFlags = new FeatureFlags();
     private final Commission commission = new Commission();
     private final Meta meta = new Meta();
+    private final Cookie cookie = new Cookie();
     /** Off unless a profile opts in. Production and Railway must never inherit a true default. */
     private boolean bootstrapDemoData = false;
 
@@ -43,8 +44,26 @@ public class AppProperties {
     public FeatureFlags getFeatureFlags() { return featureFlags; }
     public Commission getCommission() { return commission; }
     public Meta getMeta() { return meta; }
+    public Cookie getCookie() { return cookie; }
     public boolean isBootstrapDemoData() { return bootstrapDemoData; }
     public void setBootstrapDemoData(boolean bootstrapDemoData) { this.bootstrapDemoData = bootstrapDemoData; }
+
+    /**
+     * Refresh-token cookie. Domain stays empty so the cookie is host-only on
+     * whoever the browser called (the Next.js origin, when /api is proxied).
+     */
+    public static class Cookie {
+        private String sameSite = "Lax";
+        private String domain = "";
+        private boolean secure = false;
+
+        public String getSameSite() { return sameSite; }
+        public void setSameSite(String sameSite) { this.sameSite = sameSite; }
+        public String getDomain() { return domain; }
+        public void setDomain(String domain) { this.domain = domain; }
+        public boolean isSecure() { return secure; }
+        public void setSecure(boolean secure) { this.secure = secure; }
+    }
 
     public static class Jwt {
         private String secret;

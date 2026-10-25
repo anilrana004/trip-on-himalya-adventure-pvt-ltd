@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { components } from "@/openapi/generated";
-import { api, tokenStore } from "@/lib/api";
+import { api, refreshAccess, tokenStore } from "@/lib/api";
 import { homePathForRole, loginPathForRole } from "@/lib/rbac";
 
 type User = components["schemas"]["UserInfo"];
@@ -23,14 +23,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = tokenStore.getAccess();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    api
-      .me()
-      .then(setUser)
+    tokenStore.forgetLegacy();
+    refreshAccess()
+      .then((token) => (token ? api.me() : null))
+      .then((me) => setUser(me))
       .catch(() => tokenStore.clear())
       .finally(() => setLoading(false));
   }, []);
@@ -38,8 +34,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       const res = await api.login(email, password);
-      if (!res.accessToken || !res.refreshToken) throw new Error("Login response missing tokens");
-      tokenStore.set(res.accessToken, res.refreshToken);
+      if (!res.accessToken) throw new Error("Login response missing access token");
+      tokenStore.setAccess(res.accessToken);
       setUser(res.user ?? null);
       router.replace(homePathForRole(res.user?.role));
     },
@@ -49,11 +45,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     const role = user?.role;
     try {
-      const refresh = tokenStore.getRefresh();
-      if (refresh) await fetch("/api/auth/logout", {
+      await fetch("/api/auth/logout", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: refresh }),
+        body: "{}",
       });
     } finally {
       tokenStore.clear();
