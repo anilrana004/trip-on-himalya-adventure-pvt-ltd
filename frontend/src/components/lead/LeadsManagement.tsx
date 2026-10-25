@@ -35,34 +35,29 @@ import {
 
 const AUTOMATIONS = [
   {
-    key: "capture",
-    title: "Auto Lead Capture",
-    body: "Website, ads and WhatsApp intake into one pipeline.",
+    key: "first-call",
+    title: "First call",
+    body: "A new lead creates a first-call task for its owner, due five minutes later.",
   },
   {
-    key: "notify",
-    title: "Instant Notifications",
-    body: "Alert owners when a new high-intent lead arrives.",
+    key: "interested",
+    title: "Interested",
+    body: "Interested schedules follow-ups on day 1, 3, 8, and 15. Open ones are replaced, not duplicated.",
   },
   {
-    key: "followups",
-    title: "Auto Follow Ups",
-    body: "WhatsApp / email / task reminders on stage changes.",
+    key: "quotation",
+    title: "Quotation",
+    body: "A quotation schedules one follow-up, two days after the lead was created.",
   },
   {
-    key: "scoring",
-    title: "Lead Scoring",
-    body: "Hot / Warm / Cold scoring prioritises trek enquiries.",
+    key: "booking",
+    title: "Booking",
+    body: "A confirmed booking cancels the open follow-ups on that lead.",
   },
   {
-    key: "tasks",
-    title: "Task Automation",
-    body: "Create call tasks from follow-up dates automatically.",
-  },
-  {
-    key: "integrations",
-    title: "CRM Integrations",
-    body: "Webhook, WhatsApp hub and Finance ERP stay connected.",
+    key: "assignment",
+    title: "Assignment",
+    body: "Website, Meta, and a new WhatsApp number go to the next sales owner.",
   },
 ];
 
@@ -152,41 +147,6 @@ function FunnelBars({ stages }: { stages: { label: string; count: number; color:
   );
 }
 
-function Sparkline({ series }: { series: { label: string; values: number[]; color: string }[] }) {
-  const w = 280;
-  const h = 110;
-  const max = Math.max(...series.flatMap((s) => s.values), 1);
-  const n = Math.max(...series.map((s) => s.values.length), 2);
-  const pathFor = (values: number[]) =>
-    values
-      .map((v, i) => {
-        const x = (i / (n - 1)) * (w - 16) + 8;
-        const y = h - 12 - (v / max) * (h - 24);
-        return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-      })
-      .join(" ");
-  return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-28 w-full">
-        {[0.25, 0.5, 0.75].map((g) => (
-          <line key={g} x1="8" x2={w - 8} y1={12 + g * (h - 24)} y2={12 + g * (h - 24)} stroke="#e2e8f0" />
-        ))}
-        {series.map((s) => (
-          <path key={s.label} d={pathFor(s.values)} fill="none" stroke={s.color} strokeWidth="2.2" />
-        ))}
-      </svg>
-      <div className="flex flex-wrap gap-2 text-[10px] text-slate-500">
-        {series.map((s) => (
-          <span key={s.label} className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
-            {s.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function LeadsManagement() {
   const { user } = useAuth();
   const canWrite = canWriteLeads(user?.role);
@@ -210,10 +170,6 @@ export function LeadsManagement() {
   const [showFilters, setShowFilters] = useState(false);
   const [heatFilter, setHeatFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [automationOn, setAutomationOn] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(AUTOMATIONS.map((a) => [a.key, true])),
-  );
-
   const tripsById = useMemo(
     () => new Map((trips as (Trip & { id?: string })[]).filter((t) => t.id).map((t) => [t.id as string, t])),
     [trips],
@@ -323,24 +279,12 @@ export function LeadsManagement() {
     }));
   }, [funnel, leads]);
 
-  const sparkSeries = useMemo(() => {
-    return ["INSTAGRAM", "GOOGLE_ADS", "FACEBOOK_ADS"].map((key) => {
-      const base = bySource.find((s) => s.key === key)?.value ?? 4;
-      return {
-        label: SOURCE_LABEL[key] ?? key,
-        values: [base * 0.55, base * 0.75, base * 0.65, base * 1.05, base * 0.9, base].map((n) => Math.round(n)),
-        color: SOURCE_COLORS[key],
-      };
-    });
-  }, [bySource]);
-
   const campaigns = useMemo(() => {
     const ranked = [...bySource].sort((a, b) => b.value - a.value).slice(0, 5);
     const max = Math.max(...ranked.map((r) => r.value), 1);
     return ranked.map((r) => ({
-      name: r.label.replace(" Ads", " Campaign"),
+      name: r.label,
       leads: r.value,
-      conv: r.value > 0 ? Math.min(28, 4 + (r.value / max) * 18) : 0,
       color: r.color,
       width: (r.value / max) * 100,
     }));
@@ -352,19 +296,18 @@ export function LeadsManagement() {
   const qualified = Number(summary?.interested ?? 0);
   const booked = Number(summary?.bookingConfirmed ?? funnelTotals?.booked ?? 0);
   const conv = totalLeads > 0 ? (booked / totalLeads) * 100 : Number(funnelTotals?.overallConversionPct ?? 0);
-  const revenue = Number(summary?.revenue ?? booked * 10000);
+  const revenue = Number(summary?.revenue ?? 0);
 
   const kpis = [
-    { label: "Total Leads", value: totalLeads.toLocaleString("en-IN"), delta: "+24%", up: true },
-    { label: "New Leads (This Month)", value: newLeads.toLocaleString("en-IN"), delta: "+32%", up: true },
-    { label: "Qualified Leads", value: qualified.toLocaleString("en-IN"), delta: "+18%", up: true },
+    { label: "Total Leads", value: totalLeads.toLocaleString("en-IN"), note: "In the current book" },
+    { label: "New Leads (This Month)", value: newLeads.toLocaleString("en-IN"), note: "Status NEW" },
+    { label: "Qualified Leads", value: qualified.toLocaleString("en-IN"), note: "Status interested" },
     {
       label: "Converted to Bookings",
       value: booked.toLocaleString("en-IN"),
-      delta: `+28% · ${formatPct(conv)} conv.`,
-      up: true,
+      note: `${formatPct(conv)} of these leads`,
     },
-    { label: "Total Revenue from Leads", value: inr(revenue), delta: "+36%", up: true },
+    { label: "Total Revenue from Leads", value: inr(revenue), note: summary?.revenue == null ? "No revenue recorded" : "Recorded on the book" },
   ];
 
   function toggleAll() {
@@ -469,9 +412,7 @@ export function LeadsManagement() {
               <div key={k.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{k.label}</div>
                 <div className="mt-1 text-xl font-bold text-slate-900">{k.value}</div>
-                <div className={`mt-1 text-xs font-semibold ${k.up ? "text-emerald-600" : "text-rose-600"}`}>
-                  {k.delta} vs last month
-                </div>
+                <div className="mt-1 text-xs font-medium text-slate-500">{k.note}</div>
               </div>
             ))}
           </div>
@@ -479,7 +420,7 @@ export function LeadsManagement() {
           <div className="grid gap-4 xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Leads by Source</h3>
-              <Donut slices={bySource.length ? bySource : [{ key: "OTHER", label: "No data", value: 1, color: "#cbd5e1" }]} />
+              {bySource.length ? <Donut slices={bySource} /> : <p className="text-xs text-slate-400">No leads in this view.</p>}
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Leads Funnel</h3>
@@ -487,7 +428,7 @@ export function LeadsManagement() {
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Lead Trend</h3>
-              <Sparkline series={sparkSeries} />
+              <p className="text-xs text-slate-400">Daily history is not stored yet. The counts above are the current book.</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Top Performing Campaigns</h3>
@@ -497,9 +438,7 @@ export function LeadsManagement() {
                   <li key={c.name}>
                     <div className="mb-1 flex items-center justify-between text-[11px]">
                       <span className="truncate font-medium text-slate-700">{c.name}</span>
-                      <span className="shrink-0 text-slate-500">
-                        {c.leads} · {formatPct(c.conv)}
-                      </span>
+                      <span className="shrink-0 text-slate-500">{c.leads} leads</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100">
                       <div className="h-1.5 rounded-full" style={{ width: `${c.width}%`, background: c.color }} />
@@ -738,37 +677,11 @@ export function LeadsManagement() {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {AUTOMATIONS.map((a) => (
                 <div key={a.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="text-sm font-semibold text-slate-900">{a.title}</div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={automationOn[a.key]}
-                      onClick={() => setAutomationOn((m) => ({ ...m, [a.key]: !m[a.key] }))}
-                      className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-                        automationOn[a.key] ? "bg-emerald-500" : "bg-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
-                          automationOn[a.key] ? "left-4" : "left-0.5"
-                        }`}
-                      />
-                    </button>
-                  </div>
+                  <div className="mb-2 text-sm font-semibold text-slate-900">{a.title}</div>
                   <p className="mb-3 text-xs leading-relaxed text-slate-500">{a.body}</p>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-[11px] font-semibold ${
-                        automationOn[a.key] ? "text-emerald-600" : "text-slate-400"
-                      }`}
-                    >
-                      {automationOn[a.key] ? "Active" : "Paused"}
-                    </span>
-                    <Link href="/automations" className="text-[11px] font-semibold text-sky-700 hover:underline">
-                      Configure
-                    </Link>
-                  </div>
+                  <Link href="/automations" className="text-[11px] font-semibold text-sky-700 hover:underline">
+                    Open the queue
+                  </Link>
                 </div>
               ))}
             </div>

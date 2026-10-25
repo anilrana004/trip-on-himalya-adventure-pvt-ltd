@@ -69,25 +69,6 @@ function nextStopFor(tripName: string): string {
   return `${tripName.split(/\s/)[0] || "Trek"} · next camp`;
 }
 
-const CAL_EVENTS = [
-  { hour: "06:00", title: "Pickup", detail: "Batch departure vehicles" },
-  { hour: "08:00", title: "Gear Check", detail: "Issue inventory to batches" },
-  { hour: "09:00", title: "Permit Verification", detail: "Forest desk clearance" },
-  { hour: "11:00", title: "Driver Briefing", detail: "Route + weather update" },
-  { hour: "14:00", title: "Base Camp Arrival", detail: "Live batches check-in" },
-  { hour: "16:00", title: "Headcount", detail: "Confirm manifests" },
-  { hour: "18:00", title: "Evening Report", detail: "Ops status to managers" },
-];
-
-const FALLBACK_TASKS = [
-  { id: "t1", title: "Verify permit for active batch", priority: "High", due: "Today 10:00", done: false },
-  { id: "t2", title: "Confirm transport for tomorrow departures", priority: "High", due: "Today 12:00", done: false },
-  { id: "t3", title: "Issue sleeping bags from inventory", priority: "Medium", due: "Today 15:00", done: false },
-  { id: "t4", title: "Guide briefing — altitude protocol", priority: "High", due: "Today 17:00", done: false },
-  { id: "t5", title: "Hotel confirmation call — base camp", priority: "Medium", due: "Tomorrow", done: false },
-  { id: "t6", title: "Update live tracker for on-route batches", priority: "Medium", due: "Today 20:00", done: false },
-];
-
 export function OpsDashboard() {
   const { user } = useAuth();
   const [batches, setBatches] = useState<UpcomingBatch[]>([]);
@@ -148,21 +129,17 @@ export function OpsDashboard() {
 
   const travellers = batches.reduce((s, b) => s + (b.seatsBooked || 0), 0);
   const startingTodayCount = enriched.filter((e) => e.startingToday).length;
-  const openTasks = tasks.length || FALLBACK_TASKS.length;
-  const incidents = 2;
-
+  const openTasks = tasks.length;
   const kpis = [
-    { label: "Active Departures", value: String(batches.length || 24), delta: "+20%", up: true },
-    { label: "Total Travellers", value: String(travellers || 286), delta: "+14%", up: true },
+    { label: "Active Departures", value: String(batches.length), note: batches.length ? "Loaded departures" : "No departures yet" },
+    { label: "Total Travellers", value: String(travellers), note: "Seats booked on those departures" },
     {
       label: "Trips Starting Today",
-      value: String(startingTodayCount || 6),
-      delta: "On schedule",
-      up: true,
+      value: String(startingTodayCount),
+      note: startingTodayCount ? "Departing today" : "None today",
     },
-    { label: "On-Trip Completion Rate", value: "98.5%", delta: "+2.3%", up: true },
-    { label: "Open Operational Tasks", value: String(openTasks), delta: "−32%", up: false },
-    { label: "Incidents / Issues", value: String(incidents), delta: "−60%", up: false, danger: true },
+    { label: "Open Operational Tasks", value: String(openTasks), note: openTasks ? "From the task list" : "No open tasks" },
+    { label: "Incidents / Issues", value: "Log", note: "Open Incident Management", danger: false },
   ];
 
   const filteredTrips = useMemo(() => {
@@ -192,20 +169,17 @@ export function OpsDashboard() {
   const liveBatch = todayDepartures[0]?.batch ?? batches[0];
 
   const opsTasks = useMemo(() => {
-    if (tasks.length > 0) {
-      return tasks.slice(0, 12).map((t) => {
-        const type = String(t.type || "OPS").replaceAll("_", " ");
-        const overdue = String(t.status || "").toUpperCase() === "OVERDUE";
-        return {
-          id: String(t.id),
-          title: t.notes?.trim() || `${type}${t.customerName ? ` — ${t.customerName}` : ""}`,
-          priority: overdue || t.type === "OPS" ? "High" : "Medium",
-          due: t.dueAt ? relativeDue(String(t.dueAt)) : "Today",
-          done: String(t.status || "").toUpperCase() === "COMPLETED",
-        };
-      });
-    }
-    return FALLBACK_TASKS;
+    return tasks.slice(0, 12).map((t) => {
+      const type = String(t.type || "OPS").replaceAll("_", " ");
+      const overdue = String(t.status || "").toUpperCase() === "OVERDUE";
+      return {
+        id: String(t.id),
+        title: t.notes?.trim() || `${type}${t.customerName ? ` — ${t.customerName}` : ""}`,
+        priority: overdue || t.type === "OPS" ? "High" : "Medium",
+        due: t.dueAt ? relativeDue(String(t.dueAt)) : "Today",
+        done: String(t.status || "").toUpperCase() === "COMPLETED",
+      };
+    });
   }, [tasks]);
 
   const visibleTasks = opsTasks.filter((t) => {
@@ -224,17 +198,17 @@ export function OpsDashboard() {
   };
 
   const resources = [
-    { title: "Transportation", value: "12/15 Vehicles On Trip", pct: 80, href: "/operations/transport" },
-    { title: "Stay & Accommodation", value: "18/24 Locations Booked", pct: 75, href: "/operations/stay" },
+    { title: "Transportation", value: handoffs.length ? `${handoffs.length} handoffs` : "No handoffs yet", pct: null as number | null, href: "/operations/transport" },
+    { title: "Stay & Accommodation", value: "Open the stay desk", pct: null as number | null, href: "/operations/stay" },
     {
       title: "Guide & Staff",
-      value: `${Math.max(guides.length, 42)}/50 Active on Field`,
-      pct: 84,
+      value: guides.length ? `${guides.length} on the roster` : "No guides yet",
+      pct: null as number | null,
       href: "/guides",
     },
-    { title: "Equipment & Inventory", value: "78% Items Issued", pct: 78, href: "/inventory" },
-    { title: "Permits & Compliance", value: "12 Active · 2 Expiring", pct: 85, href: "/operations/permits" },
-    { title: "Incidents & Support", value: "2 Open · 0 Critical", pct: 20, href: "/operations/incidents" },
+    { title: "Equipment & Inventory", value: "Open the inventory desk", pct: null as number | null, href: "/inventory" },
+    { title: "Permits & Compliance", value: "Open the permit desk", pct: null as number | null, href: "/operations/permits" },
+    { title: "Incidents & Support", value: "Open the incident log", pct: null as number | null, href: "/operations/incidents" },
   ];
 
   return (
@@ -249,9 +223,7 @@ export function OpsDashboard() {
             className="min-w-[200px] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-sky-500"
           />
           <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 md:flex">
-            <span>⛰ Uttarakhand</span>
-            <span className="text-sky-400">|</span>
-            <span>18°C · Clear</span>
+            <span>Uttarakhand desk</span>
           </div>
           <Link
             href="/batches"
@@ -311,12 +283,8 @@ export function OpsDashboard() {
               <div key={k.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{k.label}</div>
                 <div className="mt-1 text-xl font-bold text-slate-900">{loading ? "…" : k.value}</div>
-                <div
-                  className={`mt-1 text-xs font-semibold ${
-                    k.danger ? "text-rose-600" : k.up ? "text-emerald-600" : "text-orange-600"
-                  }`}
-                >
-                  {k.delta}
+                <div className={`mt-1 text-xs font-medium ${k.danger ? "text-rose-600" : "text-slate-500"}`}>
+                  {k.note}
                 </div>
               </div>
             ))}
@@ -439,12 +407,17 @@ export function OpsDashboard() {
                 </div>
               </div>
               <ol className="max-h-64 space-y-2 overflow-y-auto">
-                {(calView === "month" ? CAL_EVENTS.slice(0, 3) : CAL_EVENTS).map((e) => (
-                  <li key={e.hour} className="flex gap-3 rounded-lg border border-slate-100 px-2 py-2">
-                    <div className="w-12 shrink-0 text-[11px] font-bold text-sky-700">{e.hour}</div>
+                {batches.length === 0 && (
+                  <li className="rounded-lg border border-dashed border-slate-200 px-2 py-3 text-xs text-slate-500">
+                    No departures loaded. The calendar shows batches from the API, not a sample day.
+                  </li>
+                )}
+                {(calView === "month" ? batches.slice(0, 3) : batches.slice(0, 8)).map((b) => (
+                  <li key={b.id} className="flex gap-3 rounded-lg border border-slate-100 px-2 py-2">
+                    <div className="w-20 shrink-0 text-[11px] font-bold text-sky-700">{b.departureDate}</div>
                     <div>
-                      <div className="text-sm font-medium text-slate-800">{e.title}</div>
-                      <div className="text-[11px] text-slate-500">{e.detail}</div>
+                      <div className="text-sm font-medium text-slate-800">{b.tripName}</div>
+                      <div className="text-[11px] text-slate-500">{b.seatsBooked ?? 0} seats booked</div>
                     </div>
                   </li>
                 ))}
@@ -597,10 +570,14 @@ export function OpsDashboard() {
                   </Link>
                 </div>
                 <div className="mb-2 text-[11px] text-slate-500">{r.value}</div>
-                <div className="h-1.5 rounded-full bg-slate-100">
-                  <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${r.pct}%` }} />
-                </div>
-                <div className="mt-1 text-right text-[10px] font-semibold text-slate-400">{formatPct(r.pct)}</div>
+                {r.pct != null && (
+                  <>
+                    <div className="h-1.5 rounded-full bg-slate-100">
+                      <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${r.pct}%` }} />
+                    </div>
+                    <div className="mt-1 text-right text-[10px] font-semibold text-slate-400">{formatPct(r.pct)}</div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -629,6 +606,11 @@ export function OpsDashboard() {
             ))}
           </div>
           <ul className="space-y-2">
+            {visibleTasks.length === 0 && (
+              <li className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-500">
+                No operational tasks. New bookings create the follow-up list.
+              </li>
+            )}
             {visibleTasks.map((t) => (
               <li key={t.id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
                 <label className="flex cursor-pointer gap-2">
