@@ -14,22 +14,26 @@ management:
   endpoints:
     web:
       exposure:
-        # Phase 3 Module 5. health stays first because the VPS load balancer
-        # polls it on the app port; prometheus is scraped from the host network
-        # only and must be denied at Nginx (docs/OBSERVABILITY.md) -- this
-        # endpoint has no authentication of its own and reveals queue names,
-        # pool sizes and route paths.
-        include: health,prometheus
+        # Health only. Prometheus and Swagger describe the API and the JVM.
+        # They stay on for the dev and test profiles. A public Railway port
+        # has no Nginx in front of it, so they are not published here.
+        include: health
   metrics:
     tags:
       application: securetravels
   prometheus:
     metrics:
       export:
-        enabled: true
+        enabled: false
   endpoint:
     health:
       show-details: never
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 logging:
   level:

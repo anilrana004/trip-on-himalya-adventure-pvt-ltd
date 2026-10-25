@@ -5,6 +5,7 @@ import com.securetravels.crm.common.dto.ApiError;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,11 +16,14 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -45,12 +49,8 @@ public class SecurityConfig {
             "/api/v1/webhooks/email/**",
             "/api/v1/webhooks/sms/**",
             "/actuator/health",
-            // Phase 3 Module 5. Prometheus scrapes without credentials by
-            // default, so requiring a JWT here means the module silently scrapes
-            // nothing. This is permitted in the same way /actuator/health is, and
-            // is therefore REQUIRED to be denied at the reverse proxy in
-            // production: it has no authentication of its own and discloses
-            // queue names, pool sizes and route paths. See docs/OBSERVABILITY.md.
+            // Dev and test only. permittedMatchers() drops these when the prod
+            // profile is active. application-prod.yml also stops exposing them.
             "/actuator/prometheus",
             "/api/health",
             "/v3/api-docs/**",
@@ -63,13 +63,32 @@ public class SecurityConfig {
     private final RateLimitingFilter rateLimitFilter;
     private final AppProperties props;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
 
     public SecurityConfig(JwtAuthenticationFilter jwtFilter, RateLimitingFilter rateLimitFilter,
-                          AppProperties props, ObjectMapper objectMapper) {
+                          AppProperties props, ObjectMapper objectMapper, Environment environment) {
         this.jwtFilter = jwtFilter;
         this.rateLimitFilter = rateLimitFilter;
         this.props = props;
         this.objectMapper = objectMapper;
+        this.environment = environment;
+    }
+
+    /** Prod does not publish metrics or the API map without a logged-in user. */
+    static String[] permittedMatchers(boolean productionProfile) {
+        if (!productionProfile) {
+            return PERMITTED;
+        }
+        return Arrays.stream(PERMITTED)
+                .filter(path -> !isStaffOnlySurface(path))
+                .toArray(String[]::new);
+    }
+
+    static boolean isStaffOnlySurface(String path) {
+        return path.startsWith("/actuator/prometheus")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/docs")
+                || path.startsWith("/swagger-ui");
     }
 
     @Bean
@@ -79,8 +98,26 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PERMITTED).permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers(permittedMatchers(productionProfile())).permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/operations",
+                                "/api/operations/**",
+                                "/api/vendors",
+                                "/api/vendors/**",
+                                "/api/notifications",
+                                "/api/notifications/**"
+                        ).authenticated()
+                        .anyRequest().access((authentication, context) -> {
+                            Authentication current = authentication.get();
+                            if (current == null || !current.isAuthenticated()) {
+                                return new AuthorizationDecision(false);
+                            }
+                            boolean partner = current.getAuthorities().stream().anyMatch(authority ->
+                                    "ROLE_TRANSPORT".equals(authority.getAuthority())
+                                            || "ROLE_VENDOR".equals(authority.getAuthority()));
+                            return new AuthorizationDecision(!partner);
+                        }))
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> {
                             res.setStatus(HttpStatus.UNAUTHORIZED.value());
@@ -100,6 +137,10 @@ public class SecurityConfig {
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    private boolean productionProfile() {
+        return Arrays.stream(environment.getActiveProfiles()).anyMatch("prod"::equals);
     }
 
     @Bean
