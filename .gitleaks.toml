@@ -1,0 +1,11 @@
+title = "Trip On Himalaya"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local placeholders. Prod boot refuses these exact values."
+regexes = [
+  '''securetravels-phase1-jwt-secret-change-me-32b-plus''',
+  '''dev-webhook-secret-insecure-change-me''',
+]
