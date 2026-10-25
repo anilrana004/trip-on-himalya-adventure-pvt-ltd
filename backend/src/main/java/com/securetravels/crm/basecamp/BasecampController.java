@@ -75,7 +75,9 @@ public class BasecampController {
                 StaffLeaveRequest.LeaveType.valueOf(body.get("leaveType").toString()),
                 LocalDate.parse(body.get("fromDate").toString()),
                 LocalDate.parse(body.get("toDate").toString()),
-                body.get("reason") != null ? body.get("reason").toString() : null);
+                body.get("reason") != null ? body.get("reason").toString() : null,
+                body.get("portion") != null
+                        ? StaffLeaveRequest.Portion.valueOf(body.get("portion").toString()) : null);
     }
 
     @PostMapping(value = "/leave/{id}/review", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -84,6 +86,12 @@ public class BasecampController {
                                            @CurrentUser UserPrincipal caller) {
         return basecamp.reviewLeave(id, StaffLeaveRequest.Status.valueOf(body.get("status")),
                 body.get("note"), caller);
+    }
+
+    @PostMapping(value = "/leave/{id}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('SALES','OPS','MANAGER','ADMIN','CEO')")
+    public Map<String, Object> cancelLeave(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
+        return basecamp.cancelLeave(id, caller);
     }
 
     @GetMapping(value = "/payroll", produces = MediaType.APPLICATION_JSON_VALUE)

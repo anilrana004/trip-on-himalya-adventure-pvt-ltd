@@ -17,4 +17,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findAllByRoleOrderByCreatedAtAsc(Role role);
 
     List<User> findAllByOrderByFullNameAsc();
+
+    List<User> findByReportsToOrderByFullNameAsc(UUID reportsTo);
+
+    List<User> findByIsActiveTrueAndRoleIn(java.util.Collection<Role> roles);
 }

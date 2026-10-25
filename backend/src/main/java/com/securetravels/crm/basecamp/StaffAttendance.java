@@ -19,7 +19,10 @@ import java.util.UUID;
 @Table(name = "staff_attendance", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "work_date"}))
 public class StaffAttendance extends Auditable {
 
-    public enum Status { PRESENT, ABSENT, HALF_DAY, ON_LEAVE, WFH }
+    public enum Status {
+        PRESENT, ABSENT, HALF_DAY, ON_LEAVE, WFH,
+        HALF_DAY_LEAVE, HOLIDAY, WEEKLY_OFF, INCOMPLETE
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

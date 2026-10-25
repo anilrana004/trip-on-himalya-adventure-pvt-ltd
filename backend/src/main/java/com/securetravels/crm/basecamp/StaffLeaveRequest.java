@@ -20,6 +20,7 @@ public class StaffLeaveRequest extends Auditable {
 
     public enum LeaveType { CASUAL, SICK, EARNED, UNPAID, COMP_OFF }
     public enum Status { PENDING, APPROVED, REJECTED, CANCELLED }
+    public enum Portion { FULL, FIRST_HALF, SECOND_HALF }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,6 +38,10 @@ public class StaffLeaveRequest extends Auditable {
 
     @Column(name = "to_date", nullable = false)
     private LocalDate toDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Portion portion = Portion.FULL;
 
     @Column(columnDefinition = "text")
     private String reason;
@@ -68,6 +73,7 @@ public class StaffLeaveRequest extends Auditable {
     public LeaveType getLeaveType() { return leaveType; }
     public LocalDate getFromDate() { return fromDate; }
     public LocalDate getToDate() { return toDate; }
+    public Portion getPortion() { return portion; }
     public String getReason() { return reason; }
     public Status getStatus() { return status; }
     public UUID getReviewedBy() { return reviewedBy; }
@@ -75,6 +81,7 @@ public class StaffLeaveRequest extends Auditable {
     public String getReviewNote() { return reviewNote; }
 
     public void setReason(String reason) { this.reason = reason; }
+    public void setPortion(Portion portion) { this.portion = portion == null ? Portion.FULL : portion; }
     public void setStatus(Status status) { this.status = status; }
     public void setReviewedBy(UUID reviewedBy) { this.reviewedBy = reviewedBy; }
     public void setReviewedAt(Instant reviewedAt) { this.reviewedAt = reviewedAt; }

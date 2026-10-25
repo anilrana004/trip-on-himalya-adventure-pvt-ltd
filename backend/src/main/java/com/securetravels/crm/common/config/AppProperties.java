@@ -26,6 +26,7 @@ public class AppProperties {
     private final Commission commission = new Commission();
     private final Meta meta = new Meta();
     private final Cookie cookie = new Cookie();
+    private final Attendance attendance = new Attendance();
     /** Off unless a profile opts in. Production and Railway must never inherit a true default. */
     private boolean bootstrapDemoData = false;
 
@@ -45,8 +46,20 @@ public class AppProperties {
     public Commission getCommission() { return commission; }
     public Meta getMeta() { return meta; }
     public Cookie getCookie() { return cookie; }
+    public Attendance getAttendance() { return attendance; }
     public boolean isBootstrapDemoData() { return bootstrapDemoData; }
     public void setBootstrapDemoData(boolean bootstrapDemoData) { this.bootstrapDemoData = bootstrapDemoData; }
+
+    /** Punch review limits. A clock difference is flagged and the punch is kept. */
+    public static class Attendance {
+        private int clockSkewMinutes = 5;
+        private String closeCron = "0 30 0 * * *";
+
+        public int getClockSkewMinutes() { return clockSkewMinutes; }
+        public void setClockSkewMinutes(int clockSkewMinutes) { this.clockSkewMinutes = clockSkewMinutes; }
+        public String getCloseCron() { return closeCron; }
+        public void setCloseCron(String closeCron) { this.closeCron = closeCron; }
+    }
 
     /**
      * Refresh-token cookie. Domain stays empty so the cookie is host-only on

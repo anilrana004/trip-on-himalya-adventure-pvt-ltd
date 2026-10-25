@@ -37,7 +37,7 @@ public abstract class BaseIT {
     @BeforeEach
     void truncateAll() {
         jdbcTemplate.execute("""
-TRUNCATE audit_log, leads, customer360, trips, vendors, batches, bookings,
+TRUNCATE attendance_events, staff_attendance, attendance_period_locks, audit_log, leads, customer360, trips, vendors, batches, bookings,
                          travellers, seat_holds, payments, operations_handoffs, refresh_tokens,
                          users, tasks, notifications, sales_targets, webhook_logs, assignment_state,
                          documents, traveller_checklists,
@@ -52,6 +52,13 @@ consent_records, consent_suppressions,
                  opportunities,
                  meta_leadgen_events, meta_api_call_log, meta_ad_accounts
                   RESTART IDENTITY CASCADE""");
+        jdbcTemplate.update("DELETE FROM holidays");
+        jdbcTemplate.update("DELETE FROM attendance_rules WHERE version > 1");
+        jdbcTemplate.update("DELETE FROM weekly_off_rules WHERE day_of_week <> 7");
+        jdbcTemplate.update("""
+                INSERT INTO weekly_off_rules (id, day_of_week)
+                SELECT '11111111-1111-4111-8111-111111111382', 7
+                WHERE NOT EXISTS (SELECT 1 FROM weekly_off_rules WHERE day_of_week = 7)""");
         // NB: whatsapp_templates is deliberately NOT truncated. It is reference
         // data seeded by V12; emptying it would make every outbound-send test
         // fail on "no enabled template" rather than on the behaviour under test.

@@ -1,5 +1,9 @@
 package com.securetravels.crm.basecamp;
 
+import com.securetravels.crm.attendance.AttendanceEventType;
+import com.securetravels.crm.attendance.AttendanceService;
+import com.securetravels.crm.attendance.dto.AttendanceDayResponse;
+import com.securetravels.crm.attendance.dto.PunchRequest;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.exception.NotFoundException;
@@ -27,17 +31,18 @@ public class BasecampService {
 
     private static final Set<Role> MANAGERS = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO);
     private static final Set<Role> OPS = EnumSet.of(Role.OPS, Role.MANAGER, Role.ADMIN, Role.CEO);
+    private static final Set<Role> INVENTORY_READ = EnumSet.of(Role.OPS, Role.MANAGER, Role.ADMIN, Role.CEO, Role.FINANCE);
     private static final Set<Role> PAYROLL = EnumSet.of(Role.ADMIN, Role.CEO);
     private static final Set<Role> SETTINGS = EnumSet.of(Role.ADMIN, Role.CEO);
     /** Non-secret company profile — readable by all CRM staff (sales screenshot). */
     private static final Set<Role> SETTINGS_READ = EnumSet.of(
-            Role.SALES, Role.OPS, Role.MANAGER, Role.ADMIN, Role.CEO);
+            Role.SALES, Role.OPS, Role.MANAGER, Role.ADMIN, Role.CEO, Role.FINANCE);
     private static final Set<String> ALLOWED_SETTINGS = Set.of(
             "company.legal_name", "company.trade_name", "company.gstin",
             "company.support_email", "company.support_phone", "company.timezone",
             "company.address", "company.website");
 
-    private final StaffAttendanceRepository attendance;
+    private final AttendanceService attendance;
     private final StaffLeaveRequestRepository leaves;
     private final StaffPayrollRepository payroll;
     private final InventoryItemRepository inventory;
@@ -45,7 +50,7 @@ public class BasecampService {
     private final CompanySettingRepository settings;
     private final UserRepository users;
 
-    public BasecampService(StaffAttendanceRepository attendance, StaffLeaveRequestRepository leaves,
+    public BasecampService(AttendanceService attendance, StaffLeaveRequestRepository leaves,
                            StaffPayrollRepository payroll, InventoryItemRepository inventory,
                            VisitorLogRepository visitors, CompanySettingRepository settings,
                            UserRepository users) {
@@ -60,35 +65,34 @@ public class BasecampService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listAttendance(UserPrincipal caller, LocalDate from, LocalDate to) {
-        requireStaff(caller);
-        LocalDate f = from != null ? from : LocalDate.now().minusDays(14);
-        LocalDate t = to != null ? to : LocalDate.now();
-        Map<UUID, String> names = userNames();
-        return attendance.findByWorkDateBetweenOrderByWorkDateDesc(f, t).stream()
-                .filter(a -> MANAGERS.contains(caller.role()) || a.getUserId().equals(caller.id()))
-                .map(a -> attendanceMap(a, names))
-                .toList();
+        return attendance.listDays(caller, from, to).stream().map(this::attendanceMap).toList();
     }
 
+    /**
+     * Legacy punch body. The work date and status are ignored: the server
+     * dates the punch in Asia/Kolkata and appends an event instead of
+     * overwriting the day.
+     */
     @Transactional
     public Map<String, Object> upsertAttendance(UserPrincipal caller, UUID userId, LocalDate workDate,
                                                 StaffAttendance.Status status, String notes,
                                                 boolean checkIn, boolean checkOut) {
-        requireStaff(caller);
-        UUID target = userId != null ? userId : caller.id();
-        if (!target.equals(caller.id()) && !MANAGERS.contains(caller.role())) {
-            throw new ForbiddenException("Only managers can mark attendance for others");
+        if (!checkIn && !checkOut) {
+            throw new BadRequestException("Check in or check out is required");
         }
-        LocalDate day = workDate != null ? workDate : LocalDate.now();
-        StaffAttendance.Status initial = status != null ? status : StaffAttendance.Status.PRESENT;
-        StaffAttendance row = attendance.findByUserIdAndWorkDate(target, day)
-                .orElseGet(() -> new StaffAttendance(target, day, initial));
-        if (status != null) row.setStatus(status);
-        if (checkIn) row.setCheckInAt(Instant.now());
-        if (checkOut) row.setCheckOutAt(Instant.now());
-        row.setNotes(XssSanitizer.text(notes));
-        row.setRecordedBy(caller.id());
-        return attendanceMap(attendance.save(row), userNames());
+        AttendanceDayResponse day = null;
+        if (checkIn) {
+            day = attendance.punch(caller, new PunchRequest(
+                    userId, AttendanceEventType.CHECK_IN, null, null, notes));
+        }
+        if (checkOut) {
+            day = attendance.punch(caller, new PunchRequest(
+                    userId, AttendanceEventType.CHECK_OUT, null, null, notes));
+        }
+        if (day == null) {
+            throw new BadRequestException("Check in or check out is required");
+        }
+        return attendanceMap(day);
     }
 
     @Transactional(readOnly = true)
@@ -103,12 +107,18 @@ public class BasecampService {
 
     @Transactional
     public Map<String, Object> createLeave(UserPrincipal caller, StaffLeaveRequest.LeaveType type,
-                                           LocalDate from, LocalDate to, String reason) {
+                                           LocalDate from, LocalDate to, String reason,
+                                           StaffLeaveRequest.Portion portion) {
         requireStaff(caller);
         if (from == null || to == null || to.isBefore(from)) {
             throw new BadRequestException("Invalid leave date range");
         }
+        StaffLeaveRequest.Portion span = portion == null ? StaffLeaveRequest.Portion.FULL : portion;
+        if (span != StaffLeaveRequest.Portion.FULL && !from.equals(to)) {
+            throw new BadRequestException("A half-day leave is a single date");
+        }
         StaffLeaveRequest row = new StaffLeaveRequest(caller.id(), type, from, to);
+        row.setPortion(span);
         row.setReason(XssSanitizer.text(reason));
         return leaveMap(leaves.save(row), userNames());
     }
@@ -128,7 +138,29 @@ public class BasecampService {
         row.setReviewedBy(caller.id());
         row.setReviewedAt(Instant.now());
         row.setReviewNote(XssSanitizer.text(note));
-        return leaveMap(leaves.save(row), userNames());
+        leaves.saveAndFlush(row);
+        attendance.rebuildRange(row.getUserId(), row.getFromDate(), row.getToDate());
+        return leaveMap(row, userNames());
+    }
+
+    @Transactional
+    public Map<String, Object> cancelLeave(UUID id, UserPrincipal caller) {
+        StaffLeaveRequest row = leaves.findById(id)
+                .orElseThrow(() -> new NotFoundException("Leave request not found"));
+        boolean owner = row.getUserId().equals(caller.id());
+        boolean manager = MANAGERS.contains(caller.role());
+        if (row.getStatus() == StaffLeaveRequest.Status.PENDING && (owner || manager)) {
+            row.setStatus(StaffLeaveRequest.Status.CANCELLED);
+        } else if (row.getStatus() == StaffLeaveRequest.Status.APPROVED && manager) {
+            row.setStatus(StaffLeaveRequest.Status.CANCELLED);
+        } else {
+            throw new ForbiddenException("This leave cannot be cancelled");
+        }
+        row.setReviewedBy(caller.id());
+        row.setReviewedAt(Instant.now());
+        leaves.saveAndFlush(row);
+        attendance.rebuildRange(row.getUserId(), row.getFromDate(), row.getToDate());
+        return leaveMap(row, userNames());
     }
 
     @Transactional(readOnly = true)
@@ -167,7 +199,7 @@ public class BasecampService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listInventory(UserPrincipal caller) {
-        if (!OPS.contains(caller.role())) {
+        if (!INVENTORY_READ.contains(caller.role())) {
             throw new ForbiddenException("Inventory access requires ops or above");
         }
         return inventory.findByActiveTrueOrderByNameAsc().stream().map(this::inventoryMap).toList();
@@ -298,16 +330,20 @@ public class BasecampService {
         return v != null ? v : BigDecimal.ZERO;
     }
 
-    private Map<String, Object> attendanceMap(StaffAttendance a, Map<UUID, String> names) {
+    private Map<String, Object> attendanceMap(AttendanceDayResponse a) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", a.getId());
-        m.put("userId", a.getUserId());
-        m.put("userName", names.getOrDefault(a.getUserId(), "—"));
-        m.put("workDate", a.getWorkDate());
-        m.put("checkInAt", a.getCheckInAt());
-        m.put("checkOutAt", a.getCheckOutAt());
-        m.put("status", a.getStatus());
-        m.put("notes", a.getNotes());
+        m.put("id", a.id());
+        m.put("userId", a.userId());
+        m.put("userName", a.userName() != null ? a.userName() : "—");
+        m.put("workDate", a.workDate());
+        m.put("checkInAt", a.checkInAt());
+        m.put("checkOutAt", a.checkOutAt());
+        m.put("status", a.status());
+        m.put("notes", a.notes());
+        m.put("clockSkewFlagged", a.clockSkewFlagged());
+        m.put("lateFlagged", a.lateFlagged());
+        m.put("workedMinutes", a.workedMinutes());
+        m.put("ruleVersion", a.ruleVersion());
         return m;
     }
 
@@ -321,6 +357,8 @@ public class BasecampService {
         m.put("toDate", l.getToDate());
         m.put("reason", l.getReason());
         m.put("status", l.getStatus());
+        m.put("portion", l.getPortion());
+        m.put("chargeableDays", attendance.chargeableDays(l.getFromDate(), l.getToDate()));
         m.put("reviewedBy", l.getReviewedBy());
         m.put("reviewNote", l.getReviewNote());
         return m;
