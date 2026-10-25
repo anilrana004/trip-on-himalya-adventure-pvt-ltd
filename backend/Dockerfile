@@ -9,8 +9,15 @@ RUN mvn -q -DskipTests package
 # ---- runtime stage ----
 FROM eclipse-temurin:25-jre
 WORKDIR /app
-# eclipse-temurin already ships a non-root user (uid 1000); reuse it
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /build/target/securetravels-crm-0.1.0.jar app.jar
 USER 1000:1000
 EXPOSE 8080
+ENV PORT=8080
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT}/actuator/health" || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
