@@ -4,6 +4,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -12,18 +14,16 @@ import java.util.List;
 /**
  * Refuses a Railway or {@code prod} boot that is still on checked-in secrets,
  * or that leaves the public email and SMS webhooks without a signing secret.
- * Logs never include secret values. A missing secret used to be a warning so
- * the process could stay up; that left {@code admin}-equivalent webhook
- * forgery available on the public port.
+ * Runs early (before seeders) and prints the refusal to stderr so Railway
+ * deploy logs always show the missing variable names.
  */
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class ProdSecretsValidator implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ProdSecretsValidator.class);
 
-    /** @deprecated use {@link RequiredProductionConfig#DEV_JWT} — kept for tests. */
     static final String DEV_JWT = RequiredProductionConfig.DEV_JWT;
-    /** @deprecated use {@link RequiredProductionConfig#DEV_WEBHOOK} — kept for tests. */
     static final String DEV_WEBHOOK = RequiredProductionConfig.DEV_WEBHOOK;
 
     private final Environment env;
@@ -39,7 +39,13 @@ public class ProdSecretsValidator implements ApplicationRunner {
         }
         List<String> missing = problems();
         if (!missing.isEmpty()) {
-            throw new IllegalStateException(RequiredProductionConfig.refusalMessage(missing));
+            String message = RequiredProductionConfig.refusalMessage(missing);
+            // stderr survives Railway log drains better than structured JSON alone
+            System.err.println("================================================================");
+            System.err.println(message);
+            System.err.println("================================================================");
+            log.error("[prod-secrets] refusing boot — missing/invalid: {}", String.join(", ", missing));
+            throw new IllegalStateException(message);
         }
         log.info("[prod-secrets] JWT_SECRET, WEBHOOK_SECRET, email/SMS webhook secrets, and CORS are set");
     }

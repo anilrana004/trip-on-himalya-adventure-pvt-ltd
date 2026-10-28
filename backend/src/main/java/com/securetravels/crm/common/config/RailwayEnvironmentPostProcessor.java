@@ -75,7 +75,11 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             problems.addAll(RequiredProductionConfig.databaseProblems(environment));
             problems.addAll(RequiredProductionConfig.secretProblems(environment));
             if (!problems.isEmpty()) {
-                throw new IllegalStateException(RequiredProductionConfig.refusalMessage(problems));
+                String message = RequiredProductionConfig.refusalMessage(problems);
+                System.err.println("================================================================");
+                System.err.println(message);
+                System.err.println("================================================================");
+                throw new IllegalStateException(message);
             }
         }
     }

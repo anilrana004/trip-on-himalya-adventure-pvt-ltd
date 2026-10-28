@@ -6,6 +6,7 @@ import com.securetravels.crm.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ import java.util.Locale;
  * and logs at INFO.
  */
 @Component
+@Order(10) // before BootstrapFinanceUserRunner (20) so finance alone cannot block first CEO
 public class BootstrapAdminRunner implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(BootstrapAdminRunner.class);
@@ -72,12 +74,13 @@ public class BootstrapAdminRunner implements CommandLineRunner {
             return false;
         }
 
-        if (users.count() > 0) {
-            log.info("[bootstrap-admin] skipped: users table already populated ({} row(s))", users.count());
+        String normalisedEmail = email.toLowerCase(Locale.ROOT);
+        // Finance (or any other) user must not block creating the CEO desk login.
+        if (users.existsByEmailIgnoreCase(normalisedEmail)) {
+            log.info("[bootstrap-admin] skipped: {} already exists", normalisedEmail);
             return false;
         }
 
-        String normalisedEmail = email.toLowerCase(Locale.ROOT);
         User admin = new User(
                 normalisedEmail,
                 passwordEncoder.encode(password),
