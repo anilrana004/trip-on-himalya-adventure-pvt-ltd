@@ -31,7 +31,8 @@ class ProdSecretsValidatorTest {
         assertThatThrownBy(() -> validator.run(new DefaultApplicationArguments()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("JWT_SECRET")
-                .hasMessageContaining("EMAIL_WEBHOOK_SECRET");
+                .hasMessageContaining("EMAIL_WEBHOOK_SECRET")
+                .hasMessageContaining("RAILWAY.md");
     }
 
     @Test

@@ -11,16 +11,17 @@ Do not paste real secrets into tickets or git.
 
 ## B. Railway — API
 
-- [ ] Service builds from repo `Dockerfile` / `railway.toml`
-- [ ] `SPRING_PROFILES_ACTIVE=prod`
-- [ ] `DB_URL` / `DB_USER` / `DB_PASSWORD` **or** plugin `DATABASE_URL` mapped
-- [ ] `JWT_SECRET` strong (≥ 32 bytes random)
-- [ ] `WEBHOOK_SECRET`, `EMAIL_WEBHOOK_SECRET`, `SMS_WEBHOOK_SECRET` set
-- [ ] `CORS_ALLOWED_ORIGINS` = exact app origin (no `*`, no localhost)
+- [ ] Service builds from repo-root `Dockerfile` / `railway.toml`
+- [ ] **Variables tab is not empty** (secrets are never in `railway.toml`)
+- [ ] Postgres plugin attached; `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+- [ ] `JWT_SECRET` / webhook secrets from `ops/gen-prod-secrets.ps1`
+- [ ] `CORS_ALLOWED_ORIGINS` = exact Vercel origin (no `*`, no localhost)
+- [ ] **Networking → Generate Domain** (service must not stay Unexposed)
 - [ ] `APP_PUBLIC_URL` = public app URL (follow-up emails)
 - [ ] `COOKIE_DOMAIN` empty while Next proxies `/api`
-- [ ] Healthcheck `/actuator/health` passing before traffic switch
+- [ ] Healthcheck `/actuator/health` → Active before traffic switch
 - [ ] Custom domain `api.<domain>` (optional but recommended)
+- [ ] Full runbook: [`../deployment/RAILWAY.md`](../deployment/RAILWAY.md)
 
 ## C. Vercel — frontend
 

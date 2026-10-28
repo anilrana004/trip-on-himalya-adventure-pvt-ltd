@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.mock.env.MockEnvironment;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -19,12 +21,34 @@ class RailwayEnvironmentPostProcessorTest {
     }
 
     @Test
-    void doesNotInventAJwtSecretWhenRailwayOmitsOne() {
+    void railwayWithoutConfigRefusesBootWithClearMessage() {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("RAILWAY_PROJECT_ID", "proj");
-        new RailwayEnvironmentPostProcessor().postProcessEnvironment(env, new SpringApplication());
+        assertThatThrownBy(() ->
+                        new RailwayEnvironmentPostProcessor().postProcessEnvironment(env, new SpringApplication()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DATABASE_URL")
+                .hasMessageContaining("JWT_SECRET")
+                .hasMessageContaining("RAILWAY.md");
         assertNull(env.getProperty("JWT_SECRET"));
         assertNull(env.getProperty("app.jwt.secret"));
+    }
+
+    @Test
+    void railwayWithFullConfigMapsDatabaseAndAllowsBoot() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("RAILWAY_PROJECT_ID", "proj");
+        env.setProperty("DATABASE_URL", "postgres://rail:s3cret@host.railway.internal:5432/railway");
+        env.setProperty("JWT_SECRET", "abcdefghijklmnopqrstuvwxyz0123456789ABCD");
+        env.setProperty("WEBHOOK_SECRET", "a-real-webhook-secret-not-the-default");
+        env.setProperty("EMAIL_WEBHOOK_SECRET", "email-secret");
+        env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret");
+        env.setProperty("CORS_ALLOWED_ORIGINS", "https://app.example.com");
+
+        new RailwayEnvironmentPostProcessor().postProcessEnvironment(env, new SpringApplication());
+
+        assertThat(env.getProperty("DB_URL")).isEqualTo("jdbc:postgresql://host.railway.internal:5432/railway");
+        assertThat(env.getProperty("DB_USER")).isEqualTo("rail");
     }
 
     @Test

@@ -1,8 +1,15 @@
+# Used only if the Railway service Root Directory is set to `backend/`.
+# Prefer the repo-root Dockerfile + railway.toml for the monorepo.
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+watchPatterns = ["**"]
 
 [deploy]
 healthcheckPath = "/actuator/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+overlapSeconds = 30
+drainingSeconds = 15

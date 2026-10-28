@@ -1,14 +1,19 @@
+# Trip On Himalaya CRM — Railway API service (repo root).
+# Secrets are NOT set here: Railway ignores unknown toml keys for secrets.
+# Set Variables in the dashboard (see docs/deployment/RAILWAY.md and .env.example).
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# Do not restart the API on frontend-only commits (Vercel owns the UI).
+watchPatterns = ["backend/**", "Dockerfile", "railway.toml", "ops/ENV.production.example", ".env.example"]
 
 [deploy]
 healthcheckPath = "/actuator/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-# Let the image ENTRYPOINT run (java -jar /app/app.jar). Do not override.
-
-[variables]
-SPRING_PROFILES_ACTIVE = "prod"
-MESSAGING_MODE = "INLINE"
-WHATSAPP_MODE = "SANDBOX"
+restartPolicyMaxRetries = 3
+# Zero-downtime style handoff when health passes.
+overlapSeconds = 30
+drainingSeconds = 15
+# Let the image ENTRYPOINT run (java -jar /app/app.jar). Do not override startCommand.

@@ -10,7 +10,9 @@ import org.springframework.core.env.MapPropertySource;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,9 +20,9 @@ import java.util.Map;
  * This app expects {@code DB_URL} / {@code DB_USER} / {@code DB_PASSWORD}. Map the
  * Railway form early so the datasource can boot when only the plugin vars exist.
  *
- * <p>A missing {@code JWT_SECRET} is not invented here. {@link ProdSecretsValidator}
- * refuses the boot on Railway so a redeploy cannot silently rotate every session
- * onto a secret that was never stored.
+ * <p>On Railway, also fail <em>before</em> Hibernate/Flyway if secrets or DB are
+ * missing — a clear crash message instead of a silent restart loop. Secrets are
+ * never invented here; operators set them in the Railway Variables tab.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor {
@@ -59,6 +61,15 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
         if (!extras.isEmpty()) {
             environment.getPropertySources().addFirst(new MapPropertySource("railwayDbMapping", extras));
         }
+
+        if (ProductionBoot.detected(environment)) {
+            List<String> problems = new ArrayList<>();
+            problems.addAll(RequiredProductionConfig.databaseProblems(environment));
+            problems.addAll(RequiredProductionConfig.secretProblems(environment));
+            if (!problems.isEmpty()) {
+                throw new IllegalStateException(RequiredProductionConfig.refusalMessage(problems));
+            }
+        }
     }
 
     static MappedDb mapDatabaseUrl(String raw) {
@@ -70,7 +81,6 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             throw new IllegalArgumentException("expected postgres/postgresql URL");
         }
         if (normalized.startsWith("jdbc:")) {
-            // Already JDBC; leave user/pass to separate env if present.
             return new MappedDb(normalized, null, null);
         }
 

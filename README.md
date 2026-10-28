@@ -117,8 +117,9 @@ Never commit real secrets. Use dashboard env vars only. Template:
 ### Vercel (frontend)
 
 1. Import this repo; **Root Directory** = `frontend`.
-2. Set `API_PROXY_TARGET` to the Railway HTTPS API origin (no path).
-3. Do not set `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` or any backend secrets.
+2. Complete Railway Variables + public domain first (`docs/deployment/RAILWAY.md`).
+3. Set Vercel `API_PROXY_TARGET` to the Railway HTTPS API origin (no path).
+4. Do not set `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` or any backend secrets.
 
 Browser → Vercel `/api` App Router proxy → Railway. Leave `COOKIE_DOMAIN` empty while
 that proxy is in front. Detail: `docs/deployment/VERCEL.md`, `docs/deployment/RAILWAY.md`.

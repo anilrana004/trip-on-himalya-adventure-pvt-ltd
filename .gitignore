@@ -45,6 +45,8 @@ app-boot*.cmd
 app-boot*.sh
 *.env
 .env.*
+!.env.example
+!**/.env.example
 
 # Temporary / local-only logs and caches
 temp/
