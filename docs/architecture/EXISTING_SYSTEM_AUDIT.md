@@ -38,7 +38,7 @@ Browser
   | HTTPS (prod) / same-origin /api
   v
 Next.js (Vercel intended; local :3001/:3002)
-  | rewrite /api/* → API_PROXY_TARGET
+  | App Router /api/[...path] → runtime API_PROXY_TARGET
   v
 Spring Boot API (Railway intended; local :8080)
   |

@@ -30,13 +30,16 @@ Custom domains: `app.<domain>` on Vercel, `api.<domain>` on Railway. Set
 `https://app.example.com`. No wildcard. The prod profile refuses to boot if
 that value is blank, `*`, or localhost.
 
-The browser talks to the Vercel origin. Next proxies `/api` to Railway
-(`API_PROXY_TARGET`). The refresh cookie is host-only on the app host
-(`SameSite=Lax`, `HttpOnly`, `Secure` when the request is HTTPS). Leave
-`COOKIE_DOMAIN` empty while the proxy is in front. Setting it to the API host
-makes the browser drop the cookie, because the response the browser sees comes
-from the app host. `SameSite=None` is not the setup: `*.vercel.app` calling
-`*.up.railway.app` is cross-site, and browsers are dropping those cookies.
+The browser talks to the Vercel origin. Next.js App Router
+`src/app/api/[...path]/route.ts` proxies `/api` to Railway at **runtime**
+(`API_PROXY_TARGET`). Production does **not** use next.config rewrites (those
+bake at build time and previously caused login 404 on Vercel when the target
+defaulted to localhost). The refresh cookie is host-only on the app host
+(`SameSite=Lax`, `HttpOnly`, `Secure` on HTTPS). Leave `COOKIE_DOMAIN` empty
+while the proxy is in front. Setting it to the API host makes the browser drop
+the cookie, because the response the browser sees comes from the app host.
+`SameSite=None` is not the setup: `*.vercel.app` calling `*.up.railway.app` is
+cross-site, and browsers are dropping those cookies. See `docs/deployment/VERCEL.md`.
 
 Logs on the prod profile are ECS JSON on stdout (`logging.structured.format.console`).
 `SPRING_PROFILES_ACTIVE=staging` is the prod group plus the name `staging`.

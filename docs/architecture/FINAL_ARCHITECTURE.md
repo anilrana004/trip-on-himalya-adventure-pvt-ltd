@@ -5,7 +5,7 @@ Users
   │
   ▼
 Vercel (Next.js 15)  app.<domain>
-  │  HTTPS  /api rewrite (API_PROXY_TARGET)
+  │  HTTPS  /api → App Router BFF proxy (runtime API_PROXY_TARGET)
   ▼
 Railway API (Spring Boot 3.5 / Java 25)
   │

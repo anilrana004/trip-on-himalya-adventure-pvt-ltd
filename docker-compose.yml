@@ -38,13 +38,12 @@ services:
     build:
       context: ./frontend
       args:
-        # next.config rewrites are baked at build time — must reach the
-        # compose service, not localhost inside the frontend container.
+        # Hint only; production proxy reads runtime API_PROXY_TARGET.
         API_PROXY_TARGET: http://backend:8080
     environment:
-      # Browser-facing API origin (unused by client fetch — UI uses /api proxy).
+      # Browser uses same-origin /api; App Router proxies to this origin.
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080/api
-      # Also set at runtime in case next start re-reads next.config.ts.
+      # Required at runtime for next start (Compose service hostname).
       API_PROXY_TARGET: http://backend:8080
     ports:
       - "3002:3000"
