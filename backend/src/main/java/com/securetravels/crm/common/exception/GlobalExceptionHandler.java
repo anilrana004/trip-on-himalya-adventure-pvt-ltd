@@ -129,13 +129,30 @@ public class GlobalExceptionHandler {
                 new ApiError(HttpStatus.SERVICE_UNAVAILABLE.value(), "SERVICE_UNAVAILABLE", ex.getMessage()));
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiError> onTooManyRequests(TooManyRequestsException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(new ApiError(HttpStatus.TOO_MANY_REQUESTS.value(), "RATE_LIMITED", ex.getMessage()));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> onAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
                 new ApiError(HttpStatus.FORBIDDEN.value(), "FORBIDDEN", "You do not have permission for this action"));
     }
 
-    @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ApiError> onBadCredentials(BadCredentialsException ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "Invalid email or password";
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                new ApiError(HttpStatus.UNAUTHORIZED.value(), "UNAUTHORIZED", message));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiError> onAuth(AuthenticationException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                 new ApiError(HttpStatus.UNAUTHORIZED.value(), "UNAUTHORIZED", "Invalid email or password"));

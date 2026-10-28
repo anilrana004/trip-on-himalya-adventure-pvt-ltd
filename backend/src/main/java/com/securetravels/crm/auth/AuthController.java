@@ -3,6 +3,7 @@ package com.securetravels.crm.auth;
 import com.securetravels.crm.auth.dto.DayHoursResponse;
 import com.securetravels.crm.auth.dto.PresenceResponse;
 import com.securetravels.crm.common.config.AppProperties;
+import com.securetravels.crm.common.security.ClientIpResolver;
 import com.securetravels.crm.common.security.CurrentUser;
 import com.securetravels.crm.user.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,21 +35,34 @@ public class AuthController {
     private final AuthService authService;
     private final PresenceService presence;
     private final AppProperties props;
+    private final LoginThrottleService loginThrottle;
+    private final ClientIpResolver clientIpResolver;
 
-    public AuthController(AuthService authService, PresenceService presence, AppProperties props) {
+    public AuthController(AuthService authService, PresenceService presence, AppProperties props,
+                          LoginThrottleService loginThrottle, ClientIpResolver clientIpResolver) {
         this.authService = authService;
         this.presence = presence;
         this.props = props;
+        this.loginThrottle = loginThrottle;
+        this.clientIpResolver = clientIpResolver;
     }
 
-    @Operation(summary = "Login (rate-limited: 5 attempts / IP / 15 min)")
+    @Operation(summary = "Login (failed-password lockout per account + IP; flood ceiling separately)")
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public AuthResponse login(@Valid @RequestBody LoginRequest request,
                               HttpServletRequest httpRequest,
                               HttpServletResponse httpResponse) {
-        AuthResponse issued = authService.login(request.email(), request.password());
-        writeRefresh(httpRequest, httpResponse, issued.refreshToken());
-        return issued.withoutRefresh();
+        String clientIp = clientIpResolver.resolve(httpRequest);
+        loginThrottle.assertAllowed(request.email(), clientIp);
+        try {
+            AuthResponse issued = authService.login(request.email(), request.password());
+            loginThrottle.onSuccess(request.email(), clientIp);
+            writeRefresh(httpRequest, httpResponse, issued.refreshToken());
+            return issued.withoutRefresh();
+        } catch (BadCredentialsException ex) {
+            loginThrottle.onFailure(request.email(), clientIp);
+            throw ex;
+        }
     }
 
     @Operation(summary = "Rotate refresh token from the HttpOnly cookie, or from a non-browser body")

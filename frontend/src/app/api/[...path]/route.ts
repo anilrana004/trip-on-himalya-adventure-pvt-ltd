@@ -119,6 +119,9 @@ async function proxy(req: NextRequest, pathSegments: string[]) {
   if (upstreamType) outHeaders.set("content-type", upstreamType);
   const cacheControl = upstream.headers.get("cache-control");
   if (cacheControl) outHeaders.set("cache-control", cacheControl);
+  // Login / webhook throttles set Retry-After; browsers and the desk UI need it.
+  const retryAfter = upstream.headers.get("retry-after");
+  if (retryAfter) outHeaders.set("retry-after", retryAfter);
 
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   if (setCookies.length > 0) {

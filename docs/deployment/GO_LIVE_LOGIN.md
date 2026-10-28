@@ -84,5 +84,6 @@ If your Postgres service is **not** named `Postgres`, change the reference, e.g.
 | Unexposed service | Generate Domain on Railway |
 | CORS / cookie issues | `CORS_ALLOWED_ORIGINS` / `APP_PUBLIC_URL` = production Vercel https URL (preview hosts are derived) |
 | `Invalid email or password` / demo-password message | Use Railway `BOOTSTRAP_ADMIN_PASSWORD`, not `admin123`. To rotate: set new password + `BOOTSTRAP_ADMIN_FORCE_PASSWORD=true`, redeploy, then unset force |
+| `Too many login attempts` / `RATE_LIMITED` | Failed-password lockout (8 / account / 15 min). Wait for `Retry-After`, or redeploy API to clear in-memory windows. Correct password clears that account's failures. |
 
 Full detail: [`RAILWAY.md`](./RAILWAY.md), [`VERCEL.md`](./VERCEL.md).

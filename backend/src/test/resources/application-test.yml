@@ -10,6 +10,8 @@ app:
     capacity: 10000
     refill-per-window: 10000
     window-minutes: 15
+    max-failures-per-email: 10000
+    max-failures-per-ip: 10000
   webhook:
     rate-limit:
       capacity: 10000

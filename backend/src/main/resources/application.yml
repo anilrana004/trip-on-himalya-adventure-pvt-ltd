@@ -62,9 +62,12 @@ app:
     domain: ${COOKIE_DOMAIN:}
     secure: ${COOKIE_SECURE:false}
   login-rate-limit:
-    capacity: 5
-    refill-per-window: 5
+    # Coarse POST flood per IP (success + fail). Failed-password lockout is separate.
+    capacity: 60
+    refill-per-window: 60
     window-minutes: 15
+    max-failures-per-email: 8
+    max-failures-per-ip: 40
   discount:
     max-auto-approve-percent: ${DISCOUNT_AUTO_APPROVE_PERCENT:5.00}
   webhook:

@@ -105,10 +105,23 @@ public class AppProperties {
         public void setAllowedOrigins(List<String> allowedOrigins) { this.allowedOrigins = allowedOrigins; }
     }
 
+    /**
+     * Login protection: failed-password lockout (email + IP) plus a coarse
+     * per-IP request flood ceiling on {@code POST /api/auth/login}.
+     *
+     * <p>{@code capacity} / {@code refillPerWindow} remain as the flood ceiling
+     * for {@link com.securetravels.crm.common.security.RateLimitingFilter} so
+     * existing env/yaml keys keep working.
+     */
     public static class LoginRateLimit {
-        private long capacity = 5;
-        private long refillPerWindow = 5;
+        /** Coarse POST flood per IP (all login posts, success or fail). */
+        private long capacity = 60;
+        private long refillPerWindow = 60;
         private long windowMinutes = 15;
+        /** Failed passwords for one email before that account locks. */
+        private long maxFailuresPerEmail = 8;
+        /** Failed passwords from one client IP across any emails. */
+        private long maxFailuresPerIp = 40;
 
         public long getCapacity() { return capacity; }
         public void setCapacity(long capacity) { this.capacity = capacity; }
@@ -116,6 +129,10 @@ public class AppProperties {
         public void setRefillPerWindow(long refillPerWindow) { this.refillPerWindow = refillPerWindow; }
         public long getWindowMinutes() { return windowMinutes; }
         public void setWindowMinutes(long windowMinutes) { this.windowMinutes = windowMinutes; }
+        public long getMaxFailuresPerEmail() { return maxFailuresPerEmail; }
+        public void setMaxFailuresPerEmail(long maxFailuresPerEmail) { this.maxFailuresPerEmail = maxFailuresPerEmail; }
+        public long getMaxFailuresPerIp() { return maxFailuresPerIp; }
+        public void setMaxFailuresPerIp(long maxFailuresPerIp) { this.maxFailuresPerIp = maxFailuresPerIp; }
     }
 
     /** Public webhook (Module 9): HMAC shared secret + per-IP intake limit. */

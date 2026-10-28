@@ -20,12 +20,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Bucket4j rate limiter keyed by client IP. Phase 1 applies it to:
- *   • POST /api/auth/login — 5 attempts / IP / 15 min (security requirement 5)
- *   • POST /api/webhook/lead — 20 requests / IP / min (security requirement 12)
+ * Bucket4j request flood ceilings keyed by client IP:
+ *   • POST /api/auth/login — coarse flood only (failed-password lockout is
+ *     {@link com.securetravels.crm.auth.LoginThrottleService})
+ *   • POST /api/webhook/lead|meta — intake flood
  *
- * Buckets live in a bounded LRU map (per-IP entries are evicted after the cap)
- * so a hostile stream of distinct source IPs cannot grow memory without bound.
+ * Buckets live in a bounded LRU map so a hostile stream of distinct source
+ * IPs cannot grow memory without bound.
  */
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
@@ -41,17 +42,19 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             });
     private final AppProperties props;
     private final ObjectMapper objectMapper;
+    private final ClientIpResolver clientIpResolver;
 
-    public RateLimitingFilter(AppProperties props, ObjectMapper objectMapper) {
+    public RateLimitingFilter(AppProperties props, ObjectMapper objectMapper, ClientIpResolver clientIpResolver) {
         this.props = props;
         this.objectMapper = objectMapper;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /** Which bucket applies to this request, keyed by type + IP. null = unlimited. */
     private String pathKey(HttpServletRequest request) {
         if (!request.getMethod().equalsIgnoreCase("POST")) return null;
         String uri = request.getRequestURI();
-        if (uri.equals("/api/auth/login")) return "login";
+        if (uri.equals("/api/auth/login")) return "login-flood";
         if (uri.equals("/api/webhook/lead") || uri.equals("/api/webhook/meta")) return "webhook";
         return null;
     }
@@ -65,7 +68,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String bucketKey = key + ":" + clientIp(request);
+        String bucketKey = key + ":" + clientIpResolver.resolve(request);
         boolean consumed;
         long waitSeconds;
         synchronized (buckets) {
@@ -80,7 +83,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             response.setHeader("Retry-After", String.valueOf(waitSeconds + 1));
             String message = "webhook".equals(key)
                     ? "Too many webhook requests. Try again later."
-                    : "Too many login attempts. Try again later.";
+                    : "Too many sign-in requests from this network. Try again later.";
             objectMapper.writeValue(response.getOutputStream(),
                     new ApiError(HttpStatus.TOO_MANY_REQUESTS.value(), "RATE_LIMITED", message));
             return;
@@ -97,13 +100,5 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         var limit = props.getLoginRateLimit();
         return Bucket.builder().addLimit(Bandwidth.classic(limit.getCapacity(),
                 Refill.greedy(limit.getRefillPerWindow(), Duration.ofMinutes(limit.getWindowMinutes())))).build();
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }
