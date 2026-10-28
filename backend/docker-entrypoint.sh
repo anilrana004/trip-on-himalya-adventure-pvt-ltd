@@ -82,4 +82,22 @@ echo "[entrypoint] PORT=${PORT:-8080} SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_A
 # Bind all interfaces; Railway proxies to this PORT.
 export SERVER_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
+# JAVA_TOOL_OPTIONS is picked up by the JVM automatically. Operators sometimes
+# paste a secret into this variable by mistake → "Unrecognized option" and the
+# process never boots. Only keep values that look like real JVM flags.
+case "${JAVA_TOOL_OPTIONS:-}" in
+  ""|-XX:*|*-XX:*)
+    : # ok — empty or contains -XX:
+    ;;
+  *)
+    echo "[entrypoint] WARNING: JAVA_TOOL_OPTIONS looks invalid (not JVM flags). Resetting."
+    echo "[entrypoint] Delete the JAVA_TOOL_OPTIONS variable in Railway if it holds a secret."
+    export JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+    ;;
+esac
+# Ensure memory flags exist even when the var was empty.
+if [ -z "${JAVA_TOOL_OPTIONS:-}" ]; then
+  export JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+fi
+
 exec java -jar /app/app.jar
