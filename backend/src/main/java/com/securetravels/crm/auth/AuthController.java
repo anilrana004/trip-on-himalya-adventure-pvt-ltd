@@ -1,5 +1,7 @@
 package com.securetravels.crm.auth;
 
+import com.securetravels.crm.auth.dto.DayHoursResponse;
+import com.securetravels.crm.auth.dto.PresenceResponse;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.security.CurrentUser;
 import com.securetravels.crm.user.UserPrincipal;
@@ -13,11 +15,15 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,10 +32,12 @@ import java.util.UUID;
 public class AuthController {
 
     private final AuthService authService;
+    private final PresenceService presence;
     private final AppProperties props;
 
-    public AuthController(AuthService authService, AppProperties props) {
+    public AuthController(AuthService authService, PresenceService presence, AppProperties props) {
         this.authService = authService;
+        this.presence = presence;
         this.props = props;
     }
 
@@ -64,6 +72,29 @@ public class AuthController {
             authService.logout(raw);
         }
         RefreshCookie.clear(httpResponse, secure(httpRequest), props.getCookie().getSameSite(), props.getCookie().getDomain());
+    }
+
+    @Operation(summary = "This browser's sign-in clock", security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/presence")
+    public PresenceResponse myPresence(@CurrentUser UserPrincipal principal, HttpServletRequest httpRequest) {
+        return presence.current(principal.id(), RefreshCookie.read(httpRequest));
+    }
+
+    @Operation(summary = "Hours worked on one India day", security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/presence/hours")
+    public DayHoursResponse dayHours(
+            @CurrentUser UserPrincipal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        return presence.dayHours(principal, day);
+    }
+
+    @Operation(summary = "Who signed in today", security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/presence/team")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN','CEO')")
+    public List<PresenceResponse> teamPresence(
+            @CurrentUser UserPrincipal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        return presence.board(principal, day);
     }
 
     @Operation(summary = "Current authenticated user", security = @SecurityRequirement(name = "bearerAuth"))

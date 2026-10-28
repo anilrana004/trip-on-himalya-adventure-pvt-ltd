@@ -7,7 +7,9 @@ import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.exception.NotFoundException;
 import com.securetravels.crm.common.util.XssSanitizer;
 import com.securetravels.crm.user.Role;
+import com.securetravels.crm.user.User;
 import com.securetravels.crm.user.UserPrincipal;
+import com.securetravels.crm.user.UserRepository;
 import com.securetravels.crm.vendors.dto.VendorCreateRequest;
 import com.securetravels.crm.vendors.dto.VendorResponse;
 import com.securetravels.crm.vendors.dto.VendorUpdateRequest;
@@ -22,15 +24,24 @@ import java.util.UUID;
 public class VendorService {
 
     private final VendorRepository vendors;
+    private final UserRepository users;
     private final AuditService auditService;
 
-    public VendorService(VendorRepository vendors, AuditService auditService) {
+    public VendorService(VendorRepository vendors, UserRepository users, AuditService auditService) {
         this.vendors = vendors;
+        this.users = users;
         this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
-    public List<VendorResponse> list(Vendor.Category category, boolean activeOnly) {
+    public List<VendorResponse> list(Vendor.Category category, boolean activeOnly, UserPrincipal caller) {
+        if (isPartner(caller)) {
+            Vendor own = ownVendor(caller);
+            if (own == null) return List.of();
+            if (category != null && own.getCategory() != category) return List.of();
+            if (activeOnly && !own.isActive()) return List.of();
+            return List.of(toResponse(own));
+        }
         List<Vendor> result;
         if (category != null) {
             result = activeOnly
@@ -45,7 +56,14 @@ public class VendorService {
     }
 
     @Transactional(readOnly = true)
-    public VendorResponse get(UUID id) {
+    public VendorResponse get(UUID id, UserPrincipal caller) {
+        if (isPartner(caller)) {
+            Vendor own = ownVendor(caller);
+            if (own == null || !own.getId().equals(id)) {
+                throw new ForbiddenException("You can only view your own vendor record");
+            }
+            return toResponse(own);
+        }
         return toResponse(vendors.findById(id)
                 .orElseThrow(() -> new NotFoundException("Vendor not found: " + id)));
     }
@@ -122,9 +140,20 @@ public class VendorService {
     }
 
     private static void requireManager(UserPrincipal caller) {
-        if (caller.role() != Role.MANAGER && caller.role() != Role.ADMIN && caller.role() != Role.CEO) {
-            throw new ForbiddenException("Only managers can manage the vendor catalogue");
+        if (caller.role() != Role.OPS && caller.role() != Role.MANAGER
+                && caller.role() != Role.ADMIN && caller.role() != Role.CEO) {
+            throw new ForbiddenException("Only ops and managers can manage the vendor catalogue");
         }
+    }
+
+    private static boolean isPartner(UserPrincipal caller) {
+        return caller != null && (caller.role() == Role.TRANSPORT || caller.role() == Role.VENDOR);
+    }
+
+    private Vendor ownVendor(UserPrincipal caller) {
+        User me = users.findById(caller.id()).orElse(null);
+        if (me == null || me.getVendorId() == null) return null;
+        return vendors.findById(me.getVendorId()).orElse(null);
     }
 
     private VendorResponse toResponse(Vendor vendor) {

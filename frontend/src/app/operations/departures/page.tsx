@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { DeparturesDesk } from "@/components/ops/DeparturesDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function DeparturesPage() {
   return (
-    <ModuleStub
-      title={"Departures & Trips"}
-      subtitle={"Upcoming and live trek departures"}
+    <AdminPage
+      title="Departures & Trips"
+      subtitle="Batches in the next 90 days, the seats on them, and the handoff still open"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Use Operations Overview batch table for departure status.",
-        "Calendar shows seat fill by departure date.",
-        "Bookings Operations desk manages hotel and transport handoffs.",
-      ]}
-    />
+    >
+      <DeparturesDesk />
+    </AdminPage>
   );
 }

@@ -587,16 +587,7 @@ select u.id                              as consultant_id,
 
         List<OperationsReadinessResponse.VendorScorecard> vendors = vendorScorecards();
 
-        // Explicitly unavailable, never zero. See the DTO note: reporting 0
-        // incidents would assert that nothing has ever gone wrong, backed by no
-        // data at all.
-        OperationsReadinessResponse.IncidentSummary incidents =
-                new OperationsReadinessResponse.IncidentSummary(
-                        false,
-                        "Trip incident logging is not built yet, so no incident data exists to summarise. "
-                                + "This is NOT a report of zero incidents.",
-                        "Phase 3 Module 1 (mobile trip log)",
-                        null, null);
+        OperationsReadinessResponse.IncidentSummary incidents = incidentSummary(f);
 
         long handoffs = vendors.stream().mapToLong(
                 OperationsReadinessResponse.VendorScorecard::handoffsAssigned).sum();
@@ -605,6 +596,33 @@ select u.id                              as consultant_id,
                 scopeLabel(caller), f, incidents, batches, vendors,
                 new OperationsReadinessResponse.Totals(
                         batches.size(), withGaps, vendors.size(), handoffs));
+    }
+
+    /**
+     * Open incidents are the ones still unresolved. The period count is every
+     * incident whose date falls in the report window, open or resolved.
+     */
+    private OperationsReadinessResponse.IncidentSummary incidentSummary(ReportFilter f) {
+        Long open = jdbc.queryForObject(
+                "select count(*) from field_incidents where status = 'OPEN'",
+                new MapSqlParameterSource(), Long.class);
+        MapSqlParameterSource p = new MapSqlParameterSource();
+        StringBuilder sql = new StringBuilder("select count(*) from field_incidents where 1 = 1");
+        if (f.from() != null) {
+            sql.append(" and occurred_on >= :from");
+            p.addValue("from", f.from());
+        }
+        if (f.to() != null) {
+            sql.append(" and occurred_on < :to");
+            p.addValue("to", f.to());
+        }
+        Long inPeriod = jdbc.queryForObject(sql.toString(), p, Long.class);
+        return new OperationsReadinessResponse.IncidentSummary(
+                true,
+                "These are incidents an operator logged against a booking. Zero means none have been logged.",
+                null,
+                open == null ? 0L : open,
+                inPeriod == null ? 0L : inPeriod);
     }
 
     /**

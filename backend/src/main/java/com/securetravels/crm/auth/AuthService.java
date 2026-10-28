@@ -19,13 +19,16 @@ public class AuthService {
 
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
+    private final LoginSessionRepository loginSessions;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthService(UserRepository users, RefreshTokenRepository refreshTokens,
-                       PasswordEncoder passwordEncoder, JwtService jwtService) {
+                       LoginSessionRepository loginSessions, PasswordEncoder passwordEncoder,
+                       JwtService jwtService) {
         this.users = users;
         this.refreshTokens = refreshTokens;
+        this.loginSessions = loginSessions;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -56,6 +59,7 @@ public class AuthService {
             // Logout (replacedBy == null) stays a single-session revoke.
             if (stored.getReplacedBy() != null) {
                 refreshTokens.revokeActiveByUserId(stored.getUserId());
+                loginSessions.closeOpenByUserId(stored.getUserId(), Instant.now(), "REUSE");
             }
             throw new BadCredentialsException("Invalid refresh token");
         }
@@ -73,8 +77,10 @@ public class AuthService {
         String newHash = jwtService.sha256Hex(newRefresh);
         stored.revoke(newHash);
         refreshTokens.save(stored);
-        refreshTokens.save(new RefreshToken(user.getId(), newHash,
-                Instant.now().plus(jwtService.refreshTtl())));
+        RefreshToken successor = new RefreshToken(user.getId(), newHash,
+                Instant.now().plus(jwtService.refreshTtl()));
+        successor.setLoginSessionId(stored.getLoginSessionId());
+        refreshTokens.save(successor);
 
         return new AuthResponse(
                 jwtService.issueAccessToken(user.getId(), user.getEmail(), user.getRole()),
@@ -106,6 +112,7 @@ public class AuthService {
         if (!token.isRevoked()) {
             token.revoke(null);
             refreshTokens.save(token);
+            closeSession(token.getLoginSessionId(), "REVOKED");
         }
         return current;
     }
@@ -116,19 +123,38 @@ public class AuthService {
         refreshTokens.findByTokenHash(hash).ifPresent(t -> {
             t.revoke(null);
             refreshTokens.save(t);
+            closeSession(t.getLoginSessionId(), "LOGOUT");
         });
     }
 
     private AuthResponse issuePair(User user) {
+        Instant now = Instant.now();
+        // One open desk clock per person. An earlier browser without Sign out
+        // must not keep counting into today's hours after this sign-in.
+        // Refresh tokens for other devices stay alive (session list / revoke).
+        loginSessions.closeOpenByUserId(user.getId(), now, "SUPERSEDED");
+        LoginSession session = loginSessions.save(new LoginSession(UUID.randomUUID(), user.getId(), now));
         String refresh = jwtService.issueRefreshToken(user.getId());
-        refreshTokens.save(new RefreshToken(user.getId(), jwtService.sha256Hex(refresh),
-                Instant.now().plus(jwtService.refreshTtl())));
+        RefreshToken token = new RefreshToken(user.getId(), jwtService.sha256Hex(refresh),
+                now.plus(jwtService.refreshTtl()));
+        token.setLoginSessionId(session.getId());
+        refreshTokens.save(token);
         return new AuthResponse(
                 jwtService.issueAccessToken(user.getId(), user.getEmail(), user.getRole()),
                 refresh,
                 "Bearer",
                 jwtService.accessTtlSeconds(),
                 toUserInfo(user));
+    }
+
+    private void closeSession(UUID sessionId, String reason) {
+        if (sessionId == null) {
+            return;
+        }
+        loginSessions.findById(sessionId).ifPresent(session -> {
+            session.close(Instant.now(), reason);
+            loginSessions.save(session);
+        });
     }
 
     private AuthResponse.UserInfo toUserInfo(User user) {

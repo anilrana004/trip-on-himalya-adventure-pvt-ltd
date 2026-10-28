@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, type UpcomingBatch } from "@/lib/api";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 function monthStart(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -75,8 +75,7 @@ function CalendarView() {
   const today = ymd(new Date());
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
+    <AppShell>
       <main className="flex-1 p-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -213,7 +212,7 @@ function CalendarView() {
           </aside>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 

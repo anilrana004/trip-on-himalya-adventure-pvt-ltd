@@ -1,19 +1,17 @@
 "use client";
 
-import { MANAGERS } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
+import { SALES_DESK } from "@/lib/rbac";
+import { AdminPage } from "@/components/AdminPage";
+import { ActivitiesDesk } from "@/components/activities/ActivitiesDesk";
 
 export default function ActivitiesPage() {
   return (
-    <ModuleStub
+    <AdminPage
       title="Activities"
-      subtitle="Calls, WhatsApp touches and follow-ups across the sales desk"
-      allowedRoles={MANAGERS}
-      bullets={[
-        "Open Tasks & Follow Ups for the actionable queue.",
-        "Lead activity timelines show status and field changes.",
-        "Calendar & Tasks covers scheduled calls and departures.",
-      ]}
-    />
+      subtitle="Calls and follow-ups from the task queue, plus lead changes, messages and upcoming departures"
+      allowedRoles={SALES_DESK}
+    >
+      <ActivitiesDesk />
+    </AdminPage>
   );
 }

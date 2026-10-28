@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { TransportDesk } from "@/components/ops/TransportDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function TransportPage() {
   return (
-    <ModuleStub
-      title={"Transport Management"}
-      subtitle={"Vehicles, routes and on-road status"}
+    <AdminPage
+      title="Transport Management"
+      subtitle="The transport handoff on each booking, and the partners who can take it"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Overview Transport card shows fleet utilisation.",
-        "Vendors directory holds transport partners.",
-        "Mark transport CONFIRMED on Bookings Operations desk.",
-      ]}
-    />
+    >
+      <TransportDesk />
+    </AdminPage>
   );
 }

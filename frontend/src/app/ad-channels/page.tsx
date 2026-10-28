@@ -1,6 +1,6 @@
 "use client";
 
-import { MANAGERS } from "@/lib/rbac";
+import { ADMINS } from "@/lib/rbac";
 import { AdminPage } from "@/components/AdminPage";
 import { MetaAdChannelsPanel } from "@/components/marketing/MetaAdChannelsPanel";
 
@@ -9,7 +9,7 @@ export default function AdChannelsPage() {
     <AdminPage
       title="Ad Channels"
       subtitle="Connected Meta ad accounts and channel intake notes"
-      allowedRoles={MANAGERS}
+      allowedRoles={ADMINS}
     >
       <MetaAdChannelsPanel />
     </AdminPage>

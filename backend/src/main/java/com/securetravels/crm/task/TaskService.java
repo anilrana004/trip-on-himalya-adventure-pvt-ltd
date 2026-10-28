@@ -4,6 +4,7 @@ import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.exception.NotFoundException;
 import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.lead.LeadRepository;
+import com.securetravels.crm.lead.LeadScoringService;
 import com.securetravels.crm.task.dto.TaskResponse;
 import com.securetravels.crm.user.Role;
 import com.securetravels.crm.user.User;
@@ -26,11 +27,14 @@ public class TaskService {
     private final TaskRepository tasks;
     private final LeadRepository leads;
     private final UserRepository users;
+    private final LeadScoringService scoring;
 
-    public TaskService(TaskRepository tasks, LeadRepository leads, UserRepository users) {
+    public TaskService(TaskRepository tasks, LeadRepository leads, UserRepository users,
+                       LeadScoringService scoring) {
         this.tasks = tasks;
         this.leads = leads;
         this.users = users;
+        this.scoring = scoring;
     }
 
     @Transactional(readOnly = true)
@@ -58,7 +62,15 @@ public class TaskService {
             throw new ForbiddenException("You can only complete tasks assigned to you");
         }
         if (task.getStatus() != Task.Status.COMPLETED) {
-            task.complete(Instant.now());
+            Instant now = Instant.now();
+            task.complete(now);
+            if (task.getType() == Task.Type.INITIAL_CALL && task.getLeadId() != null) {
+                leads.findById(task.getLeadId()).ifPresent(lead -> {
+                    lead.setLastContactedAt(now);
+                    lead.setHeat(scoring.score(lead));
+                    leads.save(lead);
+                });
+            }
         }
         return toResponse(task);
     }

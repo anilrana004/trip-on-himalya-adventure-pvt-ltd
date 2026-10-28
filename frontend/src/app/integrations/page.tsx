@@ -1,6 +1,6 @@
 "use client";
 
-import { MANAGERS } from "@/lib/rbac";
+import { ADMINS } from "@/lib/rbac";
 import { ModuleStub } from "@/components/ModuleStub";
 
 export default function IntegrationsPage() {
@@ -8,7 +8,7 @@ export default function IntegrationsPage() {
     <ModuleStub
       title="Integrations"
       subtitle="Connect ads, WhatsApp, webhooks and Finance ERP"
-      allowedRoles={MANAGERS}
+      allowedRoles={ADMINS}
       bullets={[
         "WhatsApp & Email hub for messaging providers.",
         "Lead webhook for website / form tools.",

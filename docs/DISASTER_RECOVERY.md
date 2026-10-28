@@ -1,9 +1,12 @@
 # SecureTravels CRM — Disaster Recovery
 
-> **Status: ratified since Phase 1 Prompt 3; automation added 2026-09-26.** The
-> plan below is now backed by a real, tested script (`scripts/backup-postgres.sh`)
-> plus a systemd timer. It is **not yet running in production** — no VPS exists
-> (see `RUNBOOK_PRODUCTION_DEPLOY.md`). PITR remains a Phase-2 item.
+> **Status: ratified since Phase 1 Prompt 3; automation added 2026-09-26;
+> Railway Cron packaging added 2026-10-28.** Backed by `scripts/backup-postgres.sh`,
+> optional systemd units, and `infra/backup/` (Docker entrypoint for Railway Cron).
+> **Not yet proven running against production** until an operator provisions the
+> cron service + dedicated bucket and logs a restore drill. Prefer
+> `docs/disaster-recovery/BACKUP_POLICY.md` for the short policy.
+> Provider PITR remains an ops confirmation item (Railway console).
 
 ---
 

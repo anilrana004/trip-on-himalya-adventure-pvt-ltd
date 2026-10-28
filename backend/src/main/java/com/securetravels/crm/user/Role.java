@@ -1,5 +1,5 @@
 package com.securetravels.crm.user;
 
 public enum Role {
-    SALES, OPS, MANAGER, ADMIN, CEO, FINANCE
+    SALES, OPS, MANAGER, ADMIN, CEO, FINANCE, TRANSPORT, VENDOR
 }

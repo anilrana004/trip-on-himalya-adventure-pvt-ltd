@@ -41,6 +41,9 @@ public class User extends Auditable {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Column(name = "vendor_id")
+    private UUID vendorId;
+
     @Column(name = "reports_to")
     private UUID reportsTo;
 
@@ -61,6 +64,7 @@ public class User extends Auditable {
     public Role getRole() { return role; }
     public String getPhone() { return phone; }
     public boolean isActive() { return isActive; }
+    public UUID getVendorId() { return vendorId; }
     public UUID getReportsTo() { return reportsTo; }
 
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
@@ -68,5 +72,6 @@ public class User extends Auditable {
     public void setRole(Role role) { this.role = role; }
     public void setPhone(String phone) { this.phone = phone; }
     public void setActive(boolean active) { isActive = active; }
+    public void setVendorId(UUID vendorId) { this.vendorId = vendorId; }
     public void setReportsTo(UUID reportsTo) { this.reportsTo = reportsTo; }
 }

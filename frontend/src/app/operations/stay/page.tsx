@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { StayDesk } from "@/components/ops/StayDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function StayPage() {
   return (
-    <ModuleStub
-      title={"Stay Management"}
-      subtitle={"Camps, hotels and base stays"}
+    <AdminPage
+      title="Stay Management"
+      subtitle="The hotel on each booking, and the camps already saved on a trek"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Overview Stay & Camps card tracks allotments.",
-        "Hotel status is updated on Bookings Operations.",
-        "Vendors holds hotel partners.",
-      ]}
-    />
+    >
+      <StayDesk />
+    </AdminPage>
   );
 }

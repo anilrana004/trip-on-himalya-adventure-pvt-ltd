@@ -5,14 +5,21 @@ import com.securetravels.crm.trip.dto.BatchCreateRequest;
 import com.securetravels.crm.trip.dto.BatchGenerateRequest;
 import com.securetravels.crm.trip.dto.BatchGenerateResponse;
 import com.securetravels.crm.trip.dto.BatchResponse;
+import com.securetravels.crm.trip.dto.TripCloneRequest;
+import com.securetravels.crm.trip.dto.TripCloneResponse;
 import com.securetravels.crm.trip.dto.TripCreateRequest;
 import com.securetravels.crm.trip.dto.TripDetailResponse;
+import com.securetravels.crm.trip.dto.TripImportRequest;
+import com.securetravels.crm.trip.dto.TripImportResponse;
+import com.securetravels.crm.trip.dto.TripBulkStatusRequest;
+import com.securetravels.crm.trip.dto.TripBulkStatusResponse;
 import com.securetravels.crm.trip.dto.TripResponse;
 import com.securetravels.crm.trip.dto.TripUpdateRequest;
 import com.securetravels.crm.user.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -36,9 +44,11 @@ import java.util.UUID;
 public class TripController {
 
     private final TripService trips;
+    private final TripCatalogueActions catalogue;
 
-    public TripController(TripService trips) {
+    public TripController(TripService trips, TripCatalogueActions catalogue) {
         this.trips = trips;
+        this.catalogue = catalogue;
     }
 
     @Operation(summary = "List trips (active=true: live catalogue; active=false: all including drafts)",
@@ -49,7 +59,9 @@ public class TripController {
         // active=false means "full catalogue" for managers — not "inactive only".
         return trips.list(active).stream()
                 .map(t -> new TripResponse(t.getId(), t.getName(), t.getSlug(), t.getCategory(),
-                        t.getBookingType(), t.getDifficulty(), t.getBaseCost(), t.getDurationDays(), t.isActive()))
+                        t.getBookingType(), t.getDifficulty(), t.getBaseCost(), t.getDurationDays(),
+                        t.isActive(), t.getCoverImageUrl(), t.getMetaTitle(), t.getMetaDescription(),
+                        t.getContentBrief()))
                 .toList();
     }
 
@@ -74,6 +86,34 @@ public class TripController {
     public TripDetailResponse update(@PathVariable UUID id, @Valid @RequestBody TripUpdateRequest request,
                                      @CurrentUser UserPrincipal caller) {
         return trips.update(id, request, caller);
+    }
+
+    @Operation(summary = "Clone a trek as an unpublished draft. Departures, leads, and bookings stay on the original.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping(value = "/{id}/clone", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CEO')")
+    public TripCloneResponse clone(@PathVariable UUID id,
+                                   @RequestBody(required = false) @Valid TripCloneRequest request,
+                                   @CurrentUser UserPrincipal caller) {
+        return catalogue.clone(id, request, caller);
+    }
+
+    @Operation(summary = "Publish or unpublish up to 50 treks", security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping(value = "/bulk-status", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CEO')")
+    public TripBulkStatusResponse bulkStatus(@Valid @RequestBody TripBulkStatusRequest request,
+                                             @CurrentUser UserPrincipal caller) {
+        return catalogue.setActive(request, caller);
+    }
+
+    @Operation(summary = "Create up to 40 unpublished trek drafts", security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping(value = "/import", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CEO')")
+    public TripImportResponse importDrafts(@Valid @RequestBody TripImportRequest request,
+                                           @CurrentUser UserPrincipal caller) {
+        return catalogue.importDrafts(request, caller);
     }
 
     @Operation(summary = "List batches of a trip", security = @SecurityRequirement(name = "bearerAuth"))

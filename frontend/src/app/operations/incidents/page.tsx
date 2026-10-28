@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { IncidentsDesk } from "@/components/ops/IncidentsDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function IncidentsPage() {
   return (
-    <ModuleStub
-      title={"Incident Management"}
-      subtitle={"Field incidents and resolution tracking"}
+    <AdminPage
+      title="Incident Management"
+      subtitle="What happened on a confirmed booking, and how it was closed"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Log altitude, medical or weather incidents here.",
-        "Link affected batches from Departures.",
-        "Notify managers via Notifications.",
-      ]}
-    />
+    >
+      <IncidentsDesk />
+    </AdminPage>
   );
 }

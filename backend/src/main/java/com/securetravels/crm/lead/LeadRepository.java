@@ -26,6 +26,20 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     Optional<Lead> findByMetaLeadId(String metaLeadId);
 
+    @Query(value = """
+            select l.source as source,
+                   count(*) as total,
+                   count(*) filter (where l.status in ('NEW', 'INTERESTED')) as open,
+                   count(*) filter (where l.status = 'QUOTATION_SENT') as quoted,
+                   count(*) filter (where l.status = 'BOOKING_CONFIRMED') as booked,
+                   count(*) filter (where l.status = 'LOST') as lost
+            from leads l
+            where (CAST(:ownerId AS uuid) is null or l.owner_id = :ownerId)
+            group by l.source
+            order by count(*) desc
+            """, nativeQuery = true)
+    java.util.List<LeadSourceCount> countBySource(@Param("ownerId") UUID ownerId);
+
     /**
      * Filtered listing. All parameters are optional; the SQL is assembled to
      * use the (owner_id, status, created_at) index when scoping by owner.

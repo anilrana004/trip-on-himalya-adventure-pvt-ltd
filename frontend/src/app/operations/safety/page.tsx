@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { SafetyDesk } from "@/components/ops/SafetyDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function SafetyPage() {
   return (
-    <ModuleStub
-      title={"Risk & Safety"}
-      subtitle={"Altitude risk, gear and emergency readiness"}
+    <AdminPage
+      title="Risk & Safety"
+      subtitle="Open incidents, medical and safety stock, and medical checks still open"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "High altitude alerts appear on Operations Overview.",
-        "Inventory tracks oxygen and first-aid stock.",
-        "Incident Management logs field events.",
-      ]}
-    />
+    >
+      <SafetyDesk />
+    </AdminPage>
   );
 }

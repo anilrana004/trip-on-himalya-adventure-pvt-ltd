@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { MANAGERS, SALES_DESK, hasRole } from "@/lib/rbac";
 import { TASK_STATUS_STYLE, TASK_TYPE_LABEL } from "@/lib/taskLabels";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 function fmtWhen(iso?: string) {
   return iso ? new Date(iso).toLocaleString("en-IN") : "—";
@@ -86,8 +86,7 @@ function TasksView() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
+    <AppShell>
       <main className="flex-1 p-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -225,7 +224,7 @@ function TasksView() {
         )}
 
       </main>
-    </div>
+    </AppShell>
   );
 }
 

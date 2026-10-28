@@ -9,6 +9,7 @@ import { AdminPage } from "@/components/AdminPage";
 export default function LeavePage() {
   const { user } = useAuth();
   const isManager = hasRole(user?.role, MANAGERS);
+  const [portion, setPortion] = useState("FULL");
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -29,7 +30,7 @@ export default function LeavePage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-      await api.createBasecampLeave(form);
+      await api.createBasecampLeave({ ...form, portion });
       setForm({ ...form, reason: "" });
       reload();
     } catch (err) {
@@ -40,12 +41,17 @@ export default function LeavePage() {
   return (
     <AdminPage title="Leave" subtitle="Request leave; managers approve / reject" allowedRoles={HR_ROLES}>
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-      <form onSubmit={onSubmit} className="mb-4 grid gap-2 rounded-xl border bg-white p-4 md:grid-cols-5">
+      <form onSubmit={onSubmit} className="mb-4 grid gap-2 rounded-xl border bg-white p-4 md:grid-cols-6">
         <select value={form.leaveType} onChange={(e) => setForm({ ...form, leaveType: e.target.value })} className="rounded-lg border px-3 py-2 text-sm">
           {["CASUAL", "SICK", "EARNED", "UNPAID", "COMP_OFF"].map((t) => <option key={t}>{t}</option>)}
         </select>
         <input type="date" value={form.fromDate} onChange={(e) => setForm({ ...form, fromDate: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" />
         <input type="date" value={form.toDate} onChange={(e) => setForm({ ...form, toDate: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" />
+        <select value={portion} onChange={(e) => setPortion(e.target.value)} className="rounded-lg border px-3 py-2 text-sm">
+          <option value="FULL">Full day</option>
+          <option value="FIRST_HALF">First half</option>
+          <option value="SECOND_HALF">Second half</option>
+        </select>
         <input placeholder="Reason" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className="rounded-lg border px-3 py-2 text-sm" />
         <button type="submit" className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white">Request</button>
       </form>
@@ -57,7 +63,7 @@ export default function LeavePage() {
               <th className="px-4 py-3 text-left">Type</th>
               <th className="px-4 py-3 text-left">Dates</th>
               <th className="px-4 py-3 text-left">Status</th>
-              {isManager && <th className="px-4 py-3" />}
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
@@ -66,17 +72,21 @@ export default function LeavePage() {
                 <td className="px-4 py-3 font-medium">{String(r.userName)}</td>
                 <td className="px-4 py-3">{String(r.leaveType)}</td>
                 <td className="px-4 py-3 text-slate-500">{String(r.fromDate)} → {String(r.toDate)}</td>
-                <td className="px-4 py-3 text-xs font-semibold">{String(r.status)}</td>
-                {isManager && (
-                  <td className="px-4 py-3 space-x-2">
-                    {r.status === "PENDING" && (
-                      <>
-                        <button onClick={() => api.reviewBasecampLeave(String(r.id), "APPROVED").then(reload)} className="text-xs text-emerald-700 hover:underline">Approve</button>
-                        <button onClick={() => api.reviewBasecampLeave(String(r.id), "REJECTED").then(reload)} className="text-xs text-rose-600 hover:underline">Reject</button>
-                      </>
-                    )}
-                  </td>
-                )}
+                <td className="px-4 py-3 text-xs font-semibold">
+                  {String(r.status)}
+                  {r.chargeableDays != null ? ` · ${String(r.chargeableDays)} chargeable` : ""}
+                </td>
+                <td className="px-4 py-3 space-x-2">
+                  {isManager && r.status === "PENDING" && (
+                    <>
+                      <button onClick={() => api.reviewBasecampLeave(String(r.id), "APPROVED").then(reload)} className="text-xs text-emerald-700 hover:underline">Approve</button>
+                      <button onClick={() => api.reviewBasecampLeave(String(r.id), "REJECTED").then(reload)} className="text-xs text-rose-600 hover:underline">Reject</button>
+                    </>
+                  )}
+                  {((r.userId === user?.id && r.status === "PENDING") || (isManager && (r.status === "PENDING" || r.status === "APPROVED"))) && (
+                    <button onClick={() => api.cancelBasecampLeave(String(r.id)).then(reload)} className="text-xs text-slate-600 hover:underline">Cancel</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

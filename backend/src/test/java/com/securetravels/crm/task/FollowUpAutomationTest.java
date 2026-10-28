@@ -1,5 +1,6 @@
 package com.securetravels.crm.task;
 
+import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
 import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.notification.Notification;
@@ -44,7 +45,9 @@ class FollowUpAutomationTest {
 
     @BeforeEach
     void setUp() {
-        automation = new FollowUpAutomation(tasks, users, notifications, email);
+        AppProperties props = new AppProperties();
+        props.setPublicUrl("http://localhost:3001");
+        automation = new FollowUpAutomation(tasks, users, notifications, email, props);
         assignee = UUID.randomUUID();
         user = new User("sales@securetravels.in", "pw", "Ravi", Role.SALES, "9876500000");
     }

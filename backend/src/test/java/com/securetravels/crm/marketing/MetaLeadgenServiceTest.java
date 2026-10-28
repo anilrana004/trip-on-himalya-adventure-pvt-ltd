@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.securetravels.crm.common.config.AppProperties;
+import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.exception.WebhookSignatureException;
 import com.securetravels.crm.common.security.HmacSigner;
 import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.lead.LeadService;
 import com.securetravels.crm.lead.dto.LeadResponse;
+import com.securetravels.crm.trip.TripRepository;
 import com.securetravels.crm.user.User;
 import com.securetravels.crm.webhook.RoundRobinService;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +42,9 @@ class MetaLeadgenServiceTest {
     private MetaLeadgenEventRepository events;
     private LeadService leadService;
     private RoundRobinService roundRobin;
+    private TripRepository trips;
     private AppProperties props;
+    private MetaAccessGuard access;
     private MetaLeadgenService service;
 
     @BeforeEach
@@ -49,17 +53,21 @@ class MetaLeadgenServiceTest {
         events = mock(MetaLeadgenEventRepository.class);
         leadService = mock(LeadService.class);
         roundRobin = mock(RoundRobinService.class);
+        trips = mock(TripRepository.class);
+        access = mock(MetaAccessGuard.class);
         props = new AppProperties();
         props.getMeta().setAppSecret(SECRET);
         props.getMeta().setAccessToken("token");
         props.getMeta().setWebhookVerifyToken("verify-me");
-        service = new MetaLeadgenService(mapper, props, graph, events, leadService, roundRobin);
+        service = new MetaLeadgenService(mapper, props, graph, events, leadService, roundRobin, trips, access);
 
         when(events.findByMetaLeadId(anyString())).thenReturn(Optional.empty());
         when(events.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(events.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(trips.findActiveNameMatches(anyString(), any())).thenReturn(java.util.List.of());
         User owner = mock(User.class);
         when(owner.getId()).thenReturn(UUID.randomUUID());
+        when(roundRobin.assignForEnquiry(any(), any(), any())).thenReturn(owner);
         when(roundRobin.pickNextSalesUser()).thenReturn(owner);
     }
 
@@ -163,6 +171,28 @@ class MetaLeadgenServiceTest {
 
         verify(graph, never()).get(anyString(), any(), anyString(), anyMap());
         verify(events, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void missingLeadPermissionDoesNotFetchTheLead() throws Exception {
+        org.mockito.Mockito.doThrow(new ForbiddenException(
+                        "Lead retrieval is disabled. Grant leads_retrieval."))
+                .when(access).requireLeads();
+
+        ObjectNode webhook = mapper.createObjectNode();
+        webhook.put("object", "page");
+        ObjectNode change = webhook.putArray("entry").addObject().putArray("changes").addObject();
+        change.put("field", "leadgen");
+        change.putObject("value").put("leadgen_id", "lead_blocked");
+        byte[] raw = mapper.writeValueAsBytes(webhook);
+
+        service.ingest(raw, HmacSigner.sign(SECRET, raw));
+
+        verify(graph, never()).get(eq("leadgen.get"), any(), anyString(), anyMap());
+        var saved = org.mockito.ArgumentCaptor.forClass(MetaLeadgenEvent.class);
+        verify(events, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(MetaLeadgenEvent.Status.FAILED);
+        assertThat(saved.getValue().getErrorMessage()).contains("leads_retrieval").doesNotContain("EAA");
     }
 
     @Test

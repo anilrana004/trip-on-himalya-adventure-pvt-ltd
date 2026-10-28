@@ -173,6 +173,9 @@ public class OperationsService {
     @Transactional
     public OperationsHandoffResponse updateArrangements(UUID id, OpsArrangementsRequest request,
                                                         UserPrincipal caller) {
+        if (caller.role() == Role.TRANSPORT || caller.role() == Role.VENDOR) {
+            return partnerStatus(id, request, caller);
+        }
         requireWriter(caller.role());
         OperationsHandoff handoff = getHandoff(id);
         assertCanRead(handoff.getBookingId(), caller);
@@ -403,6 +406,11 @@ public class OperationsService {
     }
 
     private void assertCanRead(UUID bookingId, UserPrincipal caller) {
+        if (caller.role() == Role.TRANSPORT || caller.role() == Role.VENDOR) {
+            OperationsHandoff handoff = handoffs.findByBookingId(bookingId).orElse(null);
+            if (handoff != null && partnerOwns(handoff, caller)) return;
+            throw new ForbiddenException("You can only view trips assigned to your vendor");
+        }
         if (SEES_ALL.contains(caller.role())) return;
         if (caller.role() == Role.SALES) {
             Booking booking = bookings.findById(bookingId).orElse(null);
@@ -426,5 +434,38 @@ public class OperationsService {
         if (!WRITERS.contains(role)) {
             throw new ForbiddenException("This role (" + role + ") cannot modify ops handoffs");
         }
+    }
+
+    private OperationsHandoffResponse partnerStatus(UUID id, OpsArrangementsRequest request, UserPrincipal caller) {
+        OperationsHandoff handoff = getHandoff(id);
+        if (!partnerOwns(handoff, caller)) {
+            throw new ForbiddenException("You can only update trips assigned to your vendor");
+        }
+        User me = users.findById(caller.id()).orElseThrow(() -> new ForbiddenException("Account not found"));
+        Vendor vendor = me.getVendorId() == null ? null : vendors.findById(me.getVendorId()).orElse(null);
+        if (caller.role() == Role.TRANSPORT) {
+            if (request.transportStatus() == null) {
+                throw new BadRequestException("transportStatus is required");
+            }
+            handoff.setTransportStatus(request.transportStatus());
+        } else if (vendor != null && vendor.getCategory() == Vendor.Category.HOTEL) {
+            if (request.hotelStatus() == null) {
+                throw new BadRequestException("hotelStatus is required");
+            }
+            handoff.setHotelStatus(request.hotelStatus());
+        } else {
+            throw new ForbiddenException("Guide logins can read their trips. Operations confirms the stay.");
+        }
+        return toResponse(handoffs.save(handoff));
+    }
+
+    private boolean partnerOwns(OperationsHandoff handoff, UserPrincipal caller) {
+        User me = users.findById(caller.id()).orElse(null);
+        UUID vendorId = me == null ? null : me.getVendorId();
+        if (vendorId == null) return false;
+        if (caller.role() == Role.TRANSPORT) {
+            return vendorId.equals(handoff.getTransportVendorId()) || vendorId.equals(handoff.getDriverId());
+        }
+        return vendorId.equals(handoff.getHotelVendorId()) || vendorId.equals(handoff.getGuideId());
     }
 }

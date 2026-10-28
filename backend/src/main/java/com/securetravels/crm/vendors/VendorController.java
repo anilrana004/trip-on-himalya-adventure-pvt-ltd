@@ -37,15 +37,16 @@ public class VendorController {
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
     public List<VendorResponse> list(@RequestParam(required = false) Vendor.Category category,
-                                     @RequestParam(defaultValue = "true") boolean active) {
-        return vendors.list(category, active);
+                                     @RequestParam(defaultValue = "true") boolean active,
+                                     @CurrentUser UserPrincipal caller) {
+        return vendors.list(category, active, caller);
     }
 
     @Operation(summary = "Get a vendor", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("isAuthenticated()")
-    public VendorResponse get(@PathVariable UUID id) {
-        return vendors.get(id);
+    public VendorResponse get(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
+        return vendors.get(id, caller);
     }
 
     @Operation(summary = "Create a vendor", security = @SecurityRequirement(name = "bearerAuth"))

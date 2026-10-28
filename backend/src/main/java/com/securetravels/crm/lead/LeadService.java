@@ -15,6 +15,7 @@ import com.securetravels.crm.customer.Customer360Repository;
 import com.securetravels.crm.lead.dto.LeadActivityResponse;
 import com.securetravels.crm.lead.dto.LeadCreateRequest;
 import com.securetravels.crm.lead.dto.LeadResponse;
+import com.securetravels.crm.lead.dto.LeadSourceSummary;
 import com.securetravels.crm.lead.dto.LeadStatusRequest;
 import com.securetravels.crm.lead.dto.LeadUpdateRequest;
 import com.securetravels.crm.task.FollowUpAutomation;
@@ -185,7 +186,7 @@ public class LeadService {
                     com.securetravels.crm.common.audit.AuditAction.UPDATE, "new_trip_interest", null,
                     saved.getId().toString());
         }
-        automation.onLeadCreated(saved.getId(), saved.getOwnerId());
+        automation.onLeadCreated(saved.getId(), saved.getOwnerId(), saved.getSource());
         return toResponse(saved);
     }
 
@@ -249,7 +250,7 @@ public class LeadService {
         auditService.record("LEAD", saved.getId(), AuditAction.CREATE,
                 "lead_from_inbound", source.name(), saved.getId().toString());
         if (saved.getOwnerId() != null) {
-            automation.onLeadCreated(saved.getId(), saved.getOwnerId());
+            automation.onLeadCreated(saved.getId(), saved.getOwnerId(), saved.getSource());
         }
         log.info("[lead] created lead {} from inbound {} message for {} (owner={})",
                 saved.getId(), source, digits, saved.getOwnerId());
@@ -314,6 +315,20 @@ public class LeadService {
     }
 
     @Transactional(readOnly = true)
+    public List<LeadSourceSummary> sources(UserPrincipal caller) {
+        UUID owner = SEES_ALL.contains(caller.role()) ? null : caller.id();
+        return leads.countBySource(owner).stream()
+                .map(row -> new LeadSourceSummary(
+                        Lead.Source.valueOf(row.getSource()),
+                        row.getTotal(),
+                        row.getOpen(),
+                        row.getQuoted(),
+                        row.getBooked(),
+                        row.getLost()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public LeadResponse get(UUID id, UserPrincipal caller) {
         Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
         assertCanAccess(lead, caller);
@@ -341,6 +356,24 @@ public class LeadService {
         // Rule-based scoring recomputes whenever enquiry fields change.
         if (request.accountId() != null) {
             lead.setAccountId(requireActiveAccount(request.accountId()));
+        }
+        if (request.ownerId() != null && !request.ownerId().equals(lead.getOwnerId())) {
+            if (!SEES_ALL.contains(caller.role())) {
+                throw new ForbiddenException("Only managers can reassign lead ownership");
+            }
+            User nextOwner = users.findById(request.ownerId())
+                    .orElseThrow(() -> new BadRequestException("ownerId not found"));
+            if (!nextOwner.isActive() || (nextOwner.getRole() != Role.SALES
+                    && nextOwner.getRole() != Role.MANAGER
+                    && nextOwner.getRole() != Role.ADMIN
+                    && nextOwner.getRole() != Role.CEO)) {
+                throw new BadRequestException("Leads can only be assigned to an active sales or manager login");
+            }
+            UUID previous = lead.getOwnerId();
+            lead.setOwnerId(nextOwner.getId());
+            auditService.record("LEAD", lead.getId(), com.securetravels.crm.common.audit.AuditAction.UPDATE,
+                    "ownerId", toStr(previous), nextOwner.getId().toString());
+            automation.reassignOpenTasks(lead.getId(), nextOwner.getId());
         }
         lead.setHeat(scoringService.score(lead));
         leads.save(lead);

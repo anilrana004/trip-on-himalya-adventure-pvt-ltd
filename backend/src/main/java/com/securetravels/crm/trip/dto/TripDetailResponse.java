@@ -22,6 +22,10 @@ public record TripDetailResponse(
         String inclusions,
         String exclusions,
         boolean active,
+        String coverImageUrl,
+        String metaTitle,
+        String metaDescription,
+        String contentBrief,
         Instant createdAt,
         Instant updatedAt,
         List<BatchResponse> batches

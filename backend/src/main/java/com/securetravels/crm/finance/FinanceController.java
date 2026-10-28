@@ -39,7 +39,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/finance")
-@PreAuthorize("hasAnyRole('FINANCE', 'MANAGER', 'ADMIN', 'CEO')")
+@PreAuthorize("hasAnyRole('FINANCE', 'ADMIN', 'CEO')")
 public class FinanceController {
 
     private final FinanceService finance;

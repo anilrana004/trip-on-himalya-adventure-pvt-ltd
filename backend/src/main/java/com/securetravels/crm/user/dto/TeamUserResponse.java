@@ -13,16 +13,22 @@ public record TeamUserResponse(
         Role role,
         String phone,
         boolean active,
-        Instant createdAt
+        Instant createdAt,
+        UUID vendorId,
+        String vendorName,
+        String vendorCategory
 ) {
-    public static TeamUserResponse from(User u) {
+    public static TeamUserResponse from(User user, String vendorName, String vendorCategory) {
         return new TeamUserResponse(
-                u.getId(),
-                u.getEmail(),
-                u.getFullName(),
-                u.getRole(),
-                u.getPhone(),
-                u.isActive(),
-                u.getCreatedAt());
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getRole(),
+                user.getPhone(),
+                user.isActive(),
+                user.getCreatedAt(),
+                user.getVendorId(),
+                vendorName,
+                vendorCategory);
     }
 }

@@ -360,19 +360,16 @@ class AnalyticsServiceIT extends BaseIT {
     // ------------------------------------------------------------------ 4. operations
 
     @Test
-    @DisplayName("incident summary reports UNAVAILABLE, never zero incidents")
-    void incidentSummaryIsUnavailableNotZero() {
+    @DisplayName("incident summary counts the log, and zero means nothing was logged")
+    void incidentSummaryCountsTheLog() {
         UUID owner = createUser("ops@x.in", "Ops", Role.OPS, "pw123456");
         OperationsReadinessResponse r =
                 service.operationsReadiness(ReportFilter.none(), principal(owner, Role.OPS));
 
-        assertThat(r.incidentSummary().available())
-                .as("Module 1 is not built, so there is no incident data at all")
-                .isFalse();
-        assertThat(r.incidentSummary().openIncidents())
-                .as("reporting 0 would assert nothing has ever gone wrong, backed by no data")
-                .isNull();
-        assertThat(r.incidentSummary().blockedBy()).contains("Module 1");
+        assertThat(r.incidentSummary().available()).isTrue();
+        assertThat(r.incidentSummary().openIncidents()).isZero();
+        assertThat(r.incidentSummary().incidentsInPeriod()).isZero();
+        assertThat(r.incidentSummary().blockedBy()).isNull();
     }
 
     @Test

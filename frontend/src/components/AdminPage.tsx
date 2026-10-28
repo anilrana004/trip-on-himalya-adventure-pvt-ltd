@@ -1,7 +1,7 @@
 "use client";
 
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import type { Role } from "@/lib/rbac";
 
 export function AdminPage({
@@ -19,9 +19,8 @@ export function AdminPage({
 }) {
   return (
     <Protected allowedRoles={allowedRoles}>
-      <div className="flex min-h-screen bg-slate-50">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6">
+      <AppShell>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
@@ -31,7 +30,7 @@ export function AdminPage({
           </div>
           {children}
         </main>
-      </div>
+      </AppShell>
     </Protected>
   );
 }

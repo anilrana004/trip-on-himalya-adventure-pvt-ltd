@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   formatApiError,
+  type Guide,
   type TeamUser,
   type TeamUserCreatePayload,
   type TeamUserUpdatePayload,
@@ -11,7 +12,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { MANAGERS, assignableRoles, type Role } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 const ROLE_STYLE: Record<string, string> = {
   SALES: "bg-sky-50 text-sky-700",
@@ -19,9 +20,13 @@ const ROLE_STYLE: Record<string, string> = {
   MANAGER: "bg-violet-50 text-violet-700",
   ADMIN: "bg-rose-50 text-rose-700",
   CEO: "bg-slate-900 text-white",
+  FINANCE: "bg-emerald-50 text-emerald-800",
+  TRANSPORT: "bg-orange-50 text-orange-800",
+  VENDOR: "bg-teal-50 text-teal-800",
 };
 
-const ALL_ROLES: Role[] = ["SALES", "OPS", "MANAGER", "ADMIN", "CEO", "FINANCE"];
+const ALL_ROLES: Role[] = ["SALES", "OPS", "MANAGER", "ADMIN", "CEO", "FINANCE", "TRANSPORT", "VENDOR"];
+const PARTNER_ROLES = new Set<Role>(["TRANSPORT", "VENDOR"]);
 
 function TeamView() {
   const { user } = useAuth();
@@ -34,6 +39,15 @@ function TeamView() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TeamUser | null>(null);
+  const [vendors, setVendors] = useState<Guide[]>([]);
+
+  const loadVendors = useCallback(async () => {
+    try {
+      setVendors(await api.getVendors());
+    } catch {
+      setVendors([]);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +70,14 @@ function TeamView() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    loadVendors();
+  }, [loadVendors]);
+
+  useEffect(() => {
+    if (showCreate || editing) loadVendors();
+  }, [showCreate, editing, loadVendors]);
+
   const counts = useMemo(() => {
     const byRole: Record<string, number> = {};
     for (const r of rows) byRole[r.role] = (byRole[r.role] ?? 0) + 1;
@@ -63,19 +85,21 @@ function TeamView() {
   }, [rows]);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
+    <AppShell>
       <main className="flex-1 p-6">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Team</h1>
             <p className="text-sm text-slate-500">
-              Create users and assign roles. Managers add Sales/Ops; Admin/CEO manage the full roster.
+              Staff run the CRM. Transport and vendor logins are tied to a partner record and only see the trips assigned to that partner.
             </p>
           </div>
           {canAssign.length > 0 && (
             <button
-              onClick={() => setShowCreate(true)}
+              onClick={() => {
+                void loadVendors();
+                setShowCreate(true);
+              }}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
             >
               + Add user
@@ -141,6 +165,7 @@ function TeamView() {
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Linked partner</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -164,6 +189,9 @@ function TeamView() {
                         >
                           {u.role}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {u.vendorName ? `${u.vendorName}${u.vendorCategory ? ` · ${u.vendorCategory}` : ""}` : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -198,11 +226,13 @@ function TeamView() {
           <UserForm
             title="Add team user"
             roles={canAssign}
+            vendors={vendors}
             onClose={() => setShowCreate(false)}
             onSubmit={async (payload) => {
               await api.createTeamUser(payload as TeamUserCreatePayload);
               setShowCreate(false);
               await load();
+              await loadVendors();
             }}
           />
         )}
@@ -217,6 +247,7 @@ function TeamView() {
                   ? ALL_ROLES.filter((r) => r !== "CEO")
                   : canAssign
             }
+            vendors={vendors}
             initial={editing}
             isSelf={editing.id === user?.id}
             onClose={() => setEditing(null)}
@@ -226,16 +257,18 @@ function TeamView() {
                 role: payload.role,
                 phone: payload.phone || null,
                 active: payload.active,
+                vendorId: payload.vendorId ?? null,
               };
               if (payload.password) update.password = payload.password;
               await api.updateTeamUser(editing.id, update);
               setEditing(null);
               await load();
+              await loadVendors();
             }}
           />
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
 
@@ -248,6 +281,8 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+type PartnerMode = "existing" | "new";
+
 type FormState = {
   email: string;
   fullName: string;
@@ -255,11 +290,23 @@ type FormState = {
   phone: string;
   password: string;
   active: boolean;
+  vendorId: string;
+  partnerMode: PartnerMode;
+  partnerCategory: string;
 };
+
+function defaultPartnerCategory(role: Role) {
+  return role === "TRANSPORT" ? "TRANSPORT" : "HOTEL";
+}
+
+function partnerCategoriesFor(role: Role) {
+  return role === "TRANSPORT" ? ["TRANSPORT", "DRIVER"] : ["HOTEL", "GUIDE"];
+}
 
 function UserForm({
   title,
   roles,
+  vendors,
   initial,
   isSelf,
   onClose,
@@ -267,22 +314,39 @@ function UserForm({
 }: {
   title: string;
   roles: Role[];
+  vendors: Guide[];
   initial?: TeamUser;
   isSelf?: boolean;
   onClose: () => void;
   onSubmit: (payload: TeamUserCreatePayload & { active?: boolean }) => Promise<void>;
 }) {
+  const initialRole = (initial?.role as Role) ?? roles[0] ?? "SALES";
   const [form, setForm] = useState<FormState>({
     email: initial?.email ?? "",
     fullName: initial?.fullName ?? "",
-    role: (initial?.role as Role) ?? roles[0] ?? "SALES",
+    role: initialRole,
     phone: initial?.phone ?? "",
     password: "",
     active: initial?.active ?? true,
+    vendorId: initial?.vendorId ?? "",
+    partnerMode: initial?.vendorId ? "existing" : "new",
+    partnerCategory: defaultPartnerCategory(initialRole),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEdit = !!initial;
+
+  const partnerOptions = useMemo(() => {
+    if (!PARTNER_ROLES.has(form.role)) return [];
+    return vendors.filter((v) =>
+      form.role === "TRANSPORT"
+        ? v.category === "TRANSPORT" || v.category === "DRIVER"
+        : v.category === "HOTEL" || v.category === "GUIDE",
+    );
+  }, [form.role, vendors]);
+
+  const partnerValue = partnerOptions.some((v) => v.id === form.vendorId) ? form.vendorId : "";
+  const usingExisting = form.partnerMode === "existing" && partnerOptions.length > 0;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -292,13 +356,36 @@ function UserForm({
       if (!isEdit && form.password.length < 8) {
         throw new Error("Password must be at least 8 characters");
       }
+
+      const mobile = normalizeIndianMobile(form.phone);
+      const phoneOk = mobile.length === 10 && /^[6-9]/.test(mobile) ? mobile : undefined;
+
+      let vendorId: string | undefined;
+      if (PARTNER_ROLES.has(form.role)) {
+        if (usingExisting) {
+          if (!partnerValue) {
+            throw new Error("Choose the existing transport or vendor record this login belongs to");
+          }
+          vendorId = partnerValue;
+        } else {
+          const created = await api.createVendor({
+            category: form.partnerCategory,
+            name: form.fullName.trim(),
+            phone: phoneOk,
+            email: form.email.trim() || undefined,
+          });
+          vendorId = String(created.id);
+        }
+      }
+
       await onSubmit({
         email: form.email.trim(),
         fullName: form.fullName.trim(),
         role: form.role,
-        phone: normalizeIndianMobile(form.phone) || undefined,
+        phone: phoneOk,
         password: form.password,
         active: form.active,
+        vendorId,
       });
     } catch (err) {
       setError(formatApiError(err, "Save failed"));
@@ -308,10 +395,10 @@ function UserForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+        className="max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-xl sm:p-6"
       >
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         <p className="mt-1 text-xs text-slate-500">
@@ -324,7 +411,7 @@ function UserForm({
             required
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm"
           />
         </label>
 
@@ -336,22 +423,25 @@ function UserForm({
             disabled={isEdit}
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50"
           />
         </label>
 
-        <label className="mt-3 block text-sm font-medium text-slate-700">
-          Phone
+        <div className="mt-3">
+          <label htmlFor="team-phone" className="block text-sm font-medium text-slate-700">
+            Phone
+          </label>
           <input
+            id="team-phone"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             placeholder="9876543210"
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm"
           />
-          <span className="mt-1 block text-xs font-normal text-slate-400">
+          <p className="mt-1 text-xs text-slate-400">
             10-digit Indian mobile (leading 0 / +91 ok)
-          </span>
-        </label>
+          </p>
+        </div>
 
         <label className="mt-3 block text-sm font-medium text-slate-700">
           Role
@@ -359,14 +449,88 @@ function UserForm({
             required
             disabled={isSelf}
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50"
+            onChange={(e) => {
+              const role = e.target.value as Role;
+              setForm({
+                ...form,
+                role,
+                vendorId: "",
+                partnerMode: "new",
+                partnerCategory: defaultPartnerCategory(role),
+              });
+            }}
+            className="mt-1 block w-full appearance-auto rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm disabled:bg-slate-50"
           >
             {roles.map((r) => (
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
         </label>
+
+        {PARTNER_ROLES.has(form.role) && (
+          <div className="mt-3 space-y-2">
+            <p className="block text-sm font-medium text-slate-700">Partner record</p>
+            {partnerOptions.length > 0 && (
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, partnerMode: "new", vendorId: "" })}
+                  className={`rounded-md px-3 py-1.5 ${
+                    !usingExisting ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-700"
+                  }`}
+                >
+                  New partner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, partnerMode: "existing" })}
+                  className={`rounded-md px-3 py-1.5 ${
+                    usingExisting ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-700"
+                  }`}
+                >
+                  Existing partner
+                </button>
+              </div>
+            )}
+            {usingExisting ? (
+              <select
+                id="team-partner"
+                required
+                value={partnerValue}
+                onChange={(e) => setForm({ ...form, vendorId: e.target.value })}
+                className="block w-full appearance-auto rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm"
+              >
+                <option value="" disabled>
+                  Choose a partner…
+                </option>
+                {partnerOptions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} · {v.category}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <label className="block text-sm font-medium text-slate-700">
+                Partner type
+                <select
+                  required
+                  value={form.partnerCategory}
+                  onChange={(e) => setForm({ ...form, partnerCategory: e.target.value })}
+                  className="mt-1 block w-full appearance-auto rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                >
+                  {partnerCategoriesFor(form.role).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p className="text-xs text-slate-400">
+              {usingExisting
+                ? "This login only sees trips already assigned to that partner."
+                : "Save creates the partner under Vendors from this name, then attaches the login."}
+            </p>
+          </div>
+        )}
 
         <label className="mt-3 block text-sm font-medium text-slate-700">
           {isEdit ? "New password (optional)" : "Password"}
@@ -376,7 +540,8 @@ function UserForm({
             minLength={isEdit ? undefined : 8}
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            autoComplete={isEdit ? "new-password" : "new-password"}
+            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm"
           />
         </label>
 

@@ -7,20 +7,24 @@ import com.securetravels.crm.common.exception.NotFoundException;
 import com.securetravels.crm.user.dto.TeamUserCreateRequest;
 import com.securetravels.crm.user.dto.TeamUserResponse;
 import com.securetravels.crm.user.dto.TeamUserUpdateRequest;
+import com.securetravels.crm.vendors.Vendor;
+import com.securetravels.crm.vendors.VendorRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * Team directory for managers+. Role assignment is scoped:
  * <ul>
- *   <li>MANAGER — may create/edit SALES and OPS only</li>
+ *   <li>MANAGER — may create/edit SALES, OPS, and partner logins</li>
  *   <li>ADMIN — any role except CEO</li>
  *   <li>CEO — any role</li>
  * </ul>
@@ -29,24 +33,29 @@ import java.util.UUID;
 public class TeamUserService {
 
     private static final Set<Role> DIRECTORY = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO);
-    private static final Set<Role> MANAGER_ASSIGNABLE = EnumSet.of(Role.SALES, Role.OPS);
+    private static final Set<Role> MANAGER_ASSIGNABLE =
+            EnumSet.of(Role.SALES, Role.OPS, Role.TRANSPORT, Role.VENDOR);
+    private static final Set<Role> PARTNERS = EnumSet.of(Role.TRANSPORT, Role.VENDOR);
 
     private final UserRepository users;
+    private final VendorRepository vendors;
     private final PasswordEncoder passwordEncoder;
 
-    public TeamUserService(UserRepository users, PasswordEncoder passwordEncoder) {
+    public TeamUserService(UserRepository users, VendorRepository vendors, PasswordEncoder passwordEncoder) {
         this.users = users;
+        this.vendors = vendors;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional(readOnly = true)
     public List<TeamUserResponse> list(UserPrincipal caller, Role roleFilter, Boolean activeFilter) {
         requireDirectory(caller);
-        return users.findAllByOrderByFullNameAsc().stream()
+        List<User> rows = users.findAllByOrderByFullNameAsc().stream()
                 .filter(u -> roleFilter == null || u.getRole() == roleFilter)
                 .filter(u -> activeFilter == null || u.isActive() == activeFilter)
-                .map(TeamUserResponse::from)
                 .toList();
+        Map<UUID, Vendor> vendorById = vendorNames(rows);
+        return rows.stream().map(u -> toResponse(u, vendorById)).toList();
     }
 
     @Transactional
@@ -65,7 +74,8 @@ public class TeamUserService {
                 request.fullName().trim(),
                 request.role(),
                 normalizePhone(request.phone()));
-        return TeamUserResponse.from(users.save(user));
+        bindVendor(user, request.role(), request.vendorId(), null);
+        return toResponse(users.save(user), null);
     }
 
     @Transactional
@@ -75,12 +85,19 @@ public class TeamUserService {
 
         // Must be allowed to manage the user's *current* role, and the new role if changing.
         assertCanAssign(caller, user.getRole(), user);
+        boolean wasPartner = PARTNERS.contains(user.getRole());
         if (request.role() != null && request.role() != user.getRole()) {
             assertCanAssign(caller, request.role(), user);
             if (user.getId().equals(caller.id())) {
                 throw new BadRequestException("You cannot change your own role");
             }
             user.setRole(request.role());
+        }
+
+        Role nextRole = user.getRole();
+        if (PARTNERS.contains(nextRole) || wasPartner || request.vendorId() != null) {
+            UUID vendorId = request.vendorId() != null ? request.vendorId() : user.getVendorId();
+            bindVendor(user, nextRole, vendorId, user.getId());
         }
 
         if (request.fullName() != null) {
@@ -102,7 +119,7 @@ public class TeamUserService {
         if (request.password() != null && !request.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
-        return TeamUserResponse.from(users.save(user));
+        return toResponse(users.save(user), null);
     }
 
     private void requireDirectory(UserPrincipal caller) {
@@ -123,8 +140,59 @@ public class TeamUserService {
             throw new ForbiddenException("Only the CEO can assign the CEO role");
         }
         if (caller.role() == Role.MANAGER && !MANAGER_ASSIGNABLE.contains(targetRole)) {
-            throw new ForbiddenException("Managers can only assign SALES or OPS roles");
+            throw new ForbiddenException("Managers can only assign sales, ops, transport, or vendor logins");
         }
+    }
+
+    private void bindVendor(User user, Role role, UUID vendorId, UUID ignoreUserId) {
+        if (!PARTNERS.contains(role)) {
+            user.setVendorId(null);
+            return;
+        }
+        if (vendorId == null) {
+            throw new BadRequestException("A transport or vendor login must be linked to an existing vendor");
+        }
+        Vendor vendor = vendors.findById(vendorId)
+                .orElseThrow(() -> new NotFoundException("Vendor not found: " + vendorId));
+        if (!vendor.isActive()) {
+            throw new BadRequestException("That vendor is inactive");
+        }
+        boolean transport = vendor.getCategory() == Vendor.Category.TRANSPORT
+                || vendor.getCategory() == Vendor.Category.DRIVER;
+        if (role == Role.TRANSPORT && !transport) {
+            throw new BadRequestException("A transport login must use a transport or driver vendor");
+        }
+        if (role == Role.VENDOR && transport) {
+            throw new BadRequestException("A vendor login must use a hotel or guide vendor");
+        }
+        users.findAllByOrderByFullNameAsc().stream()
+                .filter(other -> vendorId.equals(other.getVendorId()))
+                .filter(other -> ignoreUserId == null || !ignoreUserId.equals(other.getId()))
+                .findFirst()
+                .ifPresent(other -> {
+                    throw new ConflictException("That vendor already has a login");
+                });
+        user.setVendorId(vendorId);
+    }
+
+    private Map<UUID, Vendor> vendorNames(List<User> rows) {
+        List<UUID> ids = rows.stream().map(User::getVendorId).filter(id -> id != null).distinct().toList();
+        Map<UUID, Vendor> byId = new HashMap<>();
+        if (!ids.isEmpty()) {
+            vendors.findAllById(ids).forEach(v -> byId.put(v.getId(), v));
+        }
+        return byId;
+    }
+
+    private TeamUserResponse toResponse(User user, Map<UUID, Vendor> known) {
+        Vendor vendor = null;
+        if (user.getVendorId() != null) {
+            vendor = known != null ? known.get(user.getVendorId()) : vendors.findById(user.getVendorId()).orElse(null);
+        }
+        return TeamUserResponse.from(
+                user,
+                vendor == null ? null : vendor.getName(),
+                vendor == null ? null : vendor.getCategory().name());
     }
 
     /** Strip spaces / +91 / leading 0 → canonical 10-digit mobile, or null if blank. */

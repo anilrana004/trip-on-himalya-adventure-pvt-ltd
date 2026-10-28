@@ -1710,6 +1710,10 @@ export interface components {
             /** Format: int32 */
             numPersons?: number;
             budget?: number;
+            /** Format: uuid */
+            accountId?: string;
+            /** Format: uuid */
+            ownerId?: string;
             /** Format: date */
             followUpDate?: string;
             remarks?: string;
@@ -1943,6 +1947,12 @@ export interface components {
             /** Format: int64 */
             confirmedBookings?: number;
             revenue?: number;
+            /** Format: int64 */
+            firstCallPending?: number;
+            /** Format: int64 */
+            firstCallOverdue?: number;
+            /** Format: int64 */
+            hotUncalled?: number;
         };
         Employee: {
             /** Format: uuid */

@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { OnTripDesk } from "@/components/ops/OnTripDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function OnTripPage() {
   return (
-    <ModuleStub
-      title={"Customer On-trip Support"}
-      subtitle={"Live traveller help during treks"}
+    <AdminPage
+      title="Customer On-trip Support"
+      subtitle="Confirmed travellers whose trek dates include today, and the messages already on their lead"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Overview Support card shows open conversations.",
-        "WhatsApp & Email hub for traveller messages.",
-        "Escalate issues to Incident Management.",
-      ]}
-    />
+    >
+      <OnTripDesk />
+    </AdminPage>
   );
 }

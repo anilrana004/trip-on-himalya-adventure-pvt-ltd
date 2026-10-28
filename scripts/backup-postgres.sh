@@ -250,6 +250,45 @@ prune_local() {
 }
 
 # ---------------------------------------------------------------------------
+# Populate PG* from DATABASE_URL / POSTGRES_URL / DATABASE_PRIVATE_URL / DB_URL
+# when PGHOST is unset. Never logs password or full URL.
+# ---------------------------------------------------------------------------
+apply_database_url_if_needed() {
+  [ -n "${PGHOST:-}" ] && return 0
+  local raw="${DATABASE_URL:-${POSTGRES_URL:-${DATABASE_PRIVATE_URL:-${DB_URL:-}}}}"
+  [ -n "$raw" ] || return 0
+
+  # Strip jdbc: prefix used by Spring.
+  raw="${raw#jdbc:}"
+  case "$raw" in
+    postgresql://*|postgres://*) ;;
+    *) warn "DATABASE_URL is set but not a postgresql:// URL — ignoring"; return 0 ;;
+  esac
+
+  # postgresql://user:pass@host:port/db?sslmode=require
+  local rest userinfo hostport path
+  rest="${raw#*://}"
+  userinfo="${rest%%@*}"
+  hostport="${rest#*@}"
+  hostport="${hostport%%/*}"
+  path="${rest#*/}"
+  path="${path%%\?*}"
+
+  if [ "$userinfo" != "$rest" ]; then
+    export PGUSER="${PGUSER:-${userinfo%%:*}}"
+    case "$userinfo" in
+      *:*) export PGPASSWORD="${PGPASSWORD:-${userinfo#*:}}" ;;
+    esac
+  fi
+  export PGHOST="${PGHOST:-${hostport%%:*}}"
+  case "$hostport" in
+    *:*) export PGPORT="${PGPORT:-${hostport##*:}}" ;;
+  esac
+  export PGDATABASE="${PGDATABASE:-${path}}"
+  log "using database host from URL (user=${PGUSER:-?}, db=${PGDATABASE:-?}, host=${PGHOST:-?})"
+}
+
+# ---------------------------------------------------------------------------
 main() {
   case "${1:-}" in
     --self-test) self_test; return 0 ;;
@@ -264,7 +303,10 @@ main() {
   fi
   LOCK_HELD=1
 
-  # DB connection: accept the app's own names, fall back to libpq names.
+  # Prefer explicit libpq / app vars. Else parse Railway/Neon-style URLs
+  # (postgresql://… or jdbc:postgresql://…) without echoing secrets.
+  apply_database_url_if_needed
+
   local dbhost="${PGHOST:-127.0.0.1}"
   local dbport="${PGPORT:-5432}"
   local dbname="${PGDATABASE:-${DB_NAME:-securetravels_crm}}"

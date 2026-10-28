@@ -4,6 +4,8 @@ Travel CRM and ERP for a Dehradun Himalayan trek and pilgrimage operator.
 One journey: lead, enquiry, quotation, deal, booking, payment, operations
 handoff, departure, Customer 360.
 
+**Maintainer:** Anil Singh Rana (`anilrana004`)
+
 The UI says Trip On Himalaya. The Java package remains `com.securetravels`
 (see `architecture/adr/0009-product-name-versus-package.md`). Older docs under
 `docs/` and `architecture/` still say SecureTravels and still describe early
@@ -12,7 +14,7 @@ this file.
 
 ## Stack
 
-Java 25, Spring Boot 3.5, Spring Security, JWT, PostgreSQL 16, Flyway (`V1`–`V37`),
+Java 25, Spring Boot 3.5, Spring Security, JWT, PostgreSQL 16, Flyway (`V1`–`V41`),
 JPA with `ddl-auto: validate`. Next.js 15, React 19, Tailwind 4. The frontend
 calls a typed client generated from the OpenAPI spec.
 
@@ -97,14 +99,39 @@ cd frontend && npm run lint && npm run typecheck && npm run build
 `mvn verify` needs Postgres at `jdbc:postgresql://127.0.0.1:5432/securetravels_test`
 (see `backend/src/test/resources/application-test.yml`).
 
+## Deploy (Vercel + Railway)
+
+Never commit real secrets. Use dashboard env vars only. Template:
+`ops/ENV.production.example`. Checklist: `docs/operations/PRODUCTION_CHECKLIST.md`.
+
+### Railway (API + Postgres)
+
+1. New project → deploy from this repo (Dockerfile / `railway.toml`).
+2. Add Postgres plugin (or set `DB_URL` / `DB_USER` / `DB_PASSWORD`).
+3. Set at least: `SPRING_PROFILES_ACTIVE=prod`, `JWT_SECRET`, `WEBHOOK_SECRET`,
+   `EMAIL_WEBHOOK_SECRET`, `SMS_WEBHOOK_SECRET`, `CORS_ALLOWED_ORIGINS`
+   (exact Vercel app origin, no `*`).
+4. Healthcheck path: `/actuator/health`.
+5. Optional daily backups: `infra/backup/` as a separate Cron service + dedicated bucket.
+
+### Vercel (frontend)
+
+1. Import this repo; **Root Directory** = `frontend`.
+2. Set `API_PROXY_TARGET` to the Railway HTTPS API origin (no path).
+3. Do not set `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` or any backend secrets.
+
+Browser → Vercel `/api` rewrite → Railway. Leave `COOKIE_DOMAIN` empty while
+that proxy is in front. Detail: `docs/deployment/VERCEL.md`, `docs/deployment/RAILWAY.md`.
+
 ## Layout
 
 ```
 backend/     Spring Boot API
 frontend/    Next.js app
-docs/        Design notes. Several are behind the code.
+docs/        Design notes + architecture / DR / ops
+infra/backup/  Railway Cron PostgreSQL backup image
 architecture/adr/   Decisions, including why this stayed one process
-ops/         Prometheus and Grafana, optional Compose profile "monitoring"
+ops/         Env examples, Prometheus/Grafana (optional)
 ```
 
 The old Fastify API and Vite UI were removed from this tree. They remain in

@@ -12,12 +12,16 @@ import {
 import { useAuth } from "@/lib/auth";
 import { canManageTargets } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { TravelOpsHome } from "@/components/dashboard/TravelOpsHome";
+import { WorkdayHours } from "@/components/dashboard/WorkdayHours";
 
 const CARD_FIELDS: { key: string; label: string }[] = [
   { key: "totalLeads", label: "Total leads" },
   { key: "newLeads", label: "New leads" },
+  { key: "hotUncalled", label: "Hot uncalled (ads)" },
+  { key: "firstCallPending", label: "First call pending" },
+  { key: "firstCallOverdue", label: "First call overdue" },
   { key: "followUpDue", label: "Follow-up due" },
   { key: "interested", label: "Interested" },
   { key: "quotationSent", label: "Quotation sent" },
@@ -159,17 +163,16 @@ function DashboardView() {
 
   return (
     <>
-      <div className="flex h-screen bg-slate-50">
-        <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+      <AppShell className="h-dvh overflow-hidden bg-slate-50">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6 md:py-4">
             <div>
               <h1 className="text-lg font-semibold text-slate-900">Operations dashboard</h1>
               <p className="text-xs text-slate-400">
                 Bookings, packages, departures — plus sales pipeline and targets.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex overflow-hidden rounded-md border border-slate-200 text-sm">
                 <button
                   onClick={() => setPeriod("today")}
@@ -195,9 +198,12 @@ function DashboardView() {
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {error && <p className="m-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+            {(user?.role === "SALES" || user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO") && (
+              <WorkdayHours team={user.role !== "SALES"} company={user.role === "ADMIN" || user.role === "CEO"} />
+            )}
 
-            <section className="p-6 pb-2">
-              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <section className="p-4 pb-2 md:p-6">
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <HeroKpi
                   label="Total bookings"
                   value={n(summary?.confirmedBookings ?? summary?.newBookings)}
@@ -209,9 +215,14 @@ function DashboardView() {
                   hint={`${n(summary?.totalLeads)} in pipeline`}
                 />
                 <HeroKpi
-                  label="Earnings"
-                  value={summary ? inr(summary.revenue) : "—"}
-                  hint="Collected payments"
+                  label="Hot uncalled"
+                  value={n(summary?.hotUncalled)}
+                  hint="Ads / website waiting first call"
+                />
+                <HeroKpi
+                  label="First call overdue"
+                  value={n(summary?.firstCallOverdue)}
+                  hint={`${n(summary?.firstCallPending)} still open`}
                 />
               </div>
             </section>
@@ -220,7 +231,7 @@ function DashboardView() {
               <TravelOpsHome />
             </section>
 
-            <section className="p-6 pt-2">
+            <section className="p-4 pt-2 md:p-6">
               <div className="mb-3 text-sm font-medium text-slate-700">
                 Sales pipeline — {summary ? summary.period : period}
               </div>
@@ -235,7 +246,7 @@ function DashboardView() {
               )}
             </section>
 
-            <section className="p-6 pt-4">
+            <section className="p-4 pt-4 md:p-6">
               <div className="mb-2 text-sm font-medium text-slate-700">
                 Per-executive performance · {monthLabel(month)}
               </div>
@@ -292,8 +303,8 @@ function DashboardView() {
               </div>
             </section>
 
-            <section className="p-6 pt-4">
-              <div className="mb-2 flex items-baseline justify-between">
+            <section className="p-4 pt-4 md:p-6">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                 <div className="text-sm font-medium text-slate-700">
                   Monthly targets · {monthLabel(month)}
                 </div>
@@ -422,7 +433,7 @@ function DashboardView() {
             </section>
           </div>
         </main>
-      </div>
+      </AppShell>
     </>
   );
 }

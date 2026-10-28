@@ -30,6 +30,7 @@ type Props = {
   trips: Trip[];
   salesUsers: SalesUser[];
   canWrite: boolean;
+  canReassign?: boolean;
   onClose: () => void;
   onChanged: () => void;
   onStatusChange: (id: string, payload: LeadStatusPayload) => Promise<void>;
@@ -40,6 +41,7 @@ export function LeadDetailDrawer({
   trips,
   salesUsers,
   canWrite,
+  canReassign = false,
   onClose,
   onChanged,
   onStatusChange,
@@ -51,6 +53,7 @@ export function LeadDetailDrawer({
   const [status, setStatus] = useState("NEW");
   const [followUp, setFollowUp] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [ownerId, setOwnerId] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -62,6 +65,7 @@ export function LeadDetailDrawer({
         setStatus(l.status ?? "NEW");
         setFollowUp(l.followUpDate ?? "");
         setRemarks(l.remarks ?? "");
+        setOwnerId(l.ownerId ?? "");
       })
       .catch((e: Error) => setError(e.message));
     api.getLeadActivity(leadId).then(setActivity).catch(() => setActivity([]));
@@ -90,9 +94,11 @@ export function LeadDetailDrawer({
       await api.updateLead(lead.id, {
         followUpDate: followUp || undefined,
         remarks: remarks || undefined,
+        ...(canReassign && ownerId && ownerId !== lead.ownerId ? { ownerId } : {}),
       });
       const fresh = await api.getLead(lead.id);
       setLead(fresh);
+      setOwnerId(fresh.ownerId ?? "");
       onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -102,7 +108,7 @@ export function LeadDetailDrawer({
   }
 
   return (
-    <aside className="flex w-full max-w-md shrink-0 flex-col border-l border-slate-200 bg-white shadow-xl">
+    <aside className="fixed inset-0 z-30 flex w-full flex-col border-slate-200 bg-white shadow-xl md:static md:inset-auto md:max-w-md md:shrink-0 md:border-l">
       <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
@@ -278,9 +284,12 @@ export function LeadDetailDrawer({
               <label className="block text-sm">
                 <span className="text-xs font-semibold text-slate-500">Assigned to</span>
                 <select
-                  disabled
-                  value={lead.ownerId ?? ""}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm"
+                  disabled={!canReassign}
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value)}
+                  className={`mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm ${
+                    canReassign ? "bg-white" : "bg-slate-100"
+                  }`}
                 >
                   <option value="">{lead.ownerName || "Unassigned"}</option>
                   {salesUsers.map((u) => (
@@ -290,6 +299,11 @@ export function LeadDetailDrawer({
                   ))}
                 </select>
               </label>
+              {lead.lastContactedAt ? (
+                <p className="text-xs text-emerald-700">First contact logged · {relativeTime(lead.lastContactedAt)}</p>
+              ) : (
+                <p className="text-xs font-medium text-amber-700">Hot · waiting on first call (5 min SLA)</p>
+              )}
               <label className="block text-sm">
                 <span className="text-xs font-semibold text-slate-500">Next follow up</span>
                 <input
@@ -348,25 +362,13 @@ export function LeadDetailDrawer({
         {tab === "automation" && (
           <div className="space-y-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Upcoming automations
+              What this lead can trigger
             </h3>
-            {[
-              "Follow up with new Instagram leads (WhatsApp)",
-              "Send trek brochure if no reply in 24h",
-              "Create call task on next follow-up date",
-              "Notify owner when heat becomes HOT",
-            ].map((item) => (
-              <div key={item} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm text-slate-700">
-                <div className="flex items-center justify-between gap-2">
-                  <span>{item}</span>
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                    Active
-                  </span>
-                </div>
-              </div>
-            ))}
+            <p className="text-sm text-slate-600">
+              A new lead gets a first call. Interested schedules day 1, 3, 8, and 15. A quotation schedules one follow-up. A confirmed booking closes the open ones.
+            </p>
             <Link href="/automations" className="block text-center text-xs font-medium text-sky-700 hover:underline">
-              Configure automations →
+              Open the follow-up queue
             </Link>
           </div>
         )}

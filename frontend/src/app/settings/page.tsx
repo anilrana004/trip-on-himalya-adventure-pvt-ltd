@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { CRM_STAFF, canEditSettings } from "@/lib/rbac";
+import { ADMINS, canEditSettings } from "@/lib/rbac";
 import { useAuth } from "@/lib/auth";
 import { AdminPage } from "@/components/AdminPage";
 
@@ -47,10 +47,9 @@ export default function SettingsPage() {
     <AdminPage
       title="Settings"
       subtitle="Safe company profile only — secrets / JWT / API keys cannot be stored here"
-      allowedRoles={CRM_STAFF}
+      allowedRoles={ADMINS}
     >
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-      {!canEdit && <p className="mb-3 text-xs text-slate-500">View-only. ADMIN/CEO can edit.</p>}
       <div className="space-y-3 rounded-xl border bg-white p-4">
         {Object.keys(LABELS).map((key) => (
           <label key={key} className="block text-sm">

@@ -11,8 +11,24 @@ public record MetaDiagnosticsResponse(
         String graphVersion,
         String graphUserId,
         Integer visibleAdAccountCount,
-        boolean webhookConfigReady
+        boolean webhookConfigReady,
+        Capabilities capabilities
 ) {
+    /**
+     * Permission split from {@code me/permissions}. Names only — never a token.
+     * Ads calls require {@code ads_read} or {@code ads_management}. Lead fetch
+     * requires {@code leads_retrieval}. Page permissions are reported and do
+     * not by themselves enable either path.
+     */
+    public record Capabilities(
+            boolean adsEnabled,
+            boolean leadsEnabled,
+            java.util.List<String> granted,
+            java.util.List<String> missingForAds,
+            java.util.List<String> missingForLeads,
+            java.util.List<String> missingPageAccess
+    ) {}
+
     public record ConfigFlags(
             boolean accessTokenSet,
             boolean appSecretSet,

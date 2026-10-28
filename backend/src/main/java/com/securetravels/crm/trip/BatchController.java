@@ -40,8 +40,9 @@ public class BatchController {
     public List<UpcomingBatchResponse> upcoming(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(defaultValue = "100") int limit) {
-        return trips.listUpcoming(from, to, limit);
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(defaultValue = "false") boolean includeCancelled) {
+        return trips.listUpcoming(from, to, limit, includeCancelled);
     }
 
     @Operation(summary = "Update a departure batch (capacity/date/guide/transport/status)",

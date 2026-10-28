@@ -97,7 +97,9 @@ public class MetaMarketingController {
     private static String safeMsg(MetaGraphException ex) {
         String msg = ex.getMessage() == null ? "request failed" : ex.getMessage();
         // Never echo token-shaped fragments if Meta ever includes them.
-        return msg.replaceAll("(?i)access_token=[^&\\s]+", "access_token=***");
+        String cleaned = msg.replaceAll("(?i)access_token=[^&\\s]+", "access_token=***");
+        cleaned = cleaned.replaceAll("(?i)EAA[A-Za-z0-9]+", "***");
+        return cleaned;
     }
 
     @FunctionalInterface

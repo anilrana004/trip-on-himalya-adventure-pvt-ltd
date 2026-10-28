@@ -2,12 +2,12 @@
 
 export const TASK_TYPE_LABEL: Record<string, string> = {
   INITIAL_CALL: "First call (within 5 min)",
-  FOLLOW_UP_1D: "Follow-up · Day +1",
-  FOLLOW_UP_3D: "Follow-up · Day +3",
-  FOLLOW_UP_8D: "Follow-up · Day +8",
-  FOLLOW_UP_15D: "Follow-up · Day +15",
+  FOLLOW_UP_1D: "Follow-up 1 — tomorrow",
+  FOLLOW_UP_3D: "Follow-up 2 — 2 days later",
+  FOLLOW_UP_8D: "Follow-up 3 — 5 days later",
+  FOLLOW_UP_15D: "Follow-up 4 — 7 days later",
   QUOTATION: "Quotation follow-up",
-  PAYMENT_REMINDER: "Payment reminder",
+  PAYMENT_REMINDER: "Balance payment due",
   OPS: "Ops handoff",
   REVIEW: "Review",
   CUSTOM: "Custom",

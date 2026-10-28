@@ -48,6 +48,9 @@ public record LeadUpdateRequest(
 
         UUID accountId,
 
+        /** Manager/admin reassignment only — ignored for sales self-edits. */
+        UUID ownerId,
+
         @Future(message = "followUpDate must be in the future")
         LocalDate followUpDate,
 

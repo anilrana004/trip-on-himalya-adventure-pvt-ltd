@@ -32,6 +32,18 @@ public record TripUpdateRequest(
         String itinerary,
         String inclusions,
         String exclusions,
-        Boolean active
+        Boolean active,
+
+        @Size(max = 500, message = "cover image URL is too long")
+        String coverImageUrl,
+
+        @Size(max = 70, message = "search title is too long")
+        String metaTitle,
+
+        @Size(max = 160, message = "search description is too long")
+        String metaDescription,
+
+        @Size(max = 2000, message = "content brief is too long")
+        String contentBrief
 ) {
 }

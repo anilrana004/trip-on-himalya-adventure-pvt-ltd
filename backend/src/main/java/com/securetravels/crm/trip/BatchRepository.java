@@ -38,7 +38,7 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
             """)
     List<Batch> findMinGroupAlertCandidates(@Param("today") LocalDate today, @Param("horizon") LocalDate horizon);
 
-    /** Calendar / dashboard: open departures in a date window (excludes cancelled). */
+    /** Calendar / dashboard: departures in a date window, cancelled excluded. */
     @Query("""
             select b from Batch b
             where b.departureDate >= :from
@@ -47,4 +47,13 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
             order by b.departureDate asc
             """)
     List<Batch> findUpcomingBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** Same window, including cancelled departures, for the batch desk. */
+    @Query("""
+            select b from Batch b
+            where b.departureDate >= :from
+              and b.departureDate <= :to
+            order by b.departureDate asc
+            """)
+    List<Batch> findInWindow(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }

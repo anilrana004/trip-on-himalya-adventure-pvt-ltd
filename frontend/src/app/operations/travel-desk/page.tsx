@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { TravelDesk } from "@/components/ops/TravelDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function TravelDeskPage() {
   return (
-    <ModuleStub
-      title={"Travel Desk"}
-      subtitle={"Pickups, transfers and traveller logistics"}
+    <AdminPage
+      title="Travel Desk"
+      subtitle="Who is travelling, whether the transfer is confirmed, and the note for the pickup"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Today's Operations timeline on Overview covers pickup slots.",
-        "Transport Management tracks vehicle allocation.",
-        "Ops handoff desk confirms transfer status per booking.",
-      ]}
-    />
+    >
+      <TravelDesk />
+    </AdminPage>
   );
 }

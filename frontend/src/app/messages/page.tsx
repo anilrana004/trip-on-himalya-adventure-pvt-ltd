@@ -11,8 +11,9 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { MANAGERS, hasRole } from "@/lib/rbac";
+import { LeadMessageComposer } from "@/components/messages/LeadMessageComposer";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 const CHANNEL_STYLE: Record<string, string> = {
   WHATSAPP: "bg-emerald-50 text-emerald-700",
@@ -151,14 +152,13 @@ function MessagesView() {
   const href = selected ? subjectHref(selected) : null;
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
+    <AppShell className="h-dvh overflow-hidden">
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Messages</h1>
+            <h1 className="text-lg font-semibold text-slate-900">WhatsApp & Email</h1>
             <p className="text-xs text-slate-400">
-              Unified inbox — WhatsApp, email and SMS conversations.
+              Conversations already stored on a lead, booking, or customer.
               {unreadTotal > 0 ? ` · ${unreadTotal} unread in view` : ""}
             </p>
           </div>
@@ -224,8 +224,7 @@ function MessagesView() {
                 <div className="px-6 py-12 text-center text-sm text-slate-400">
                   <p className="font-medium text-slate-600">No conversations yet</p>
                   <p className="mt-2 text-xs">
-                    Threads appear when customers reply on WhatsApp, email or SMS,
-                    or when the team sends outbound messages.
+                    Choose a lead and record a WhatsApp template or an email. A customer reply on those channels appears here too.
                   </p>
                 </div>
               ) : (
@@ -314,8 +313,8 @@ function MessagesView() {
           {/* Conversation pane */}
           <section className="flex min-w-0 flex-1 flex-col bg-slate-50">
             {!selected ? (
-              <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-                Select a conversation to read the timeline
+              <div className="flex flex-1 overflow-y-auto">
+                <LeadMessageComposer onSent={() => void loadList()} />
               </div>
             ) : (
               <>
@@ -385,6 +384,11 @@ function MessagesView() {
                   )}
                 </div>
 
+                {selected.subjectType === "LEAD" && (
+                  <div className="border-b border-slate-200 bg-white">
+                    <LeadMessageComposer leadId={selected.subjectId} onSent={() => void openThread(selected.id)} />
+                  </div>
+                )}
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
                   {timelineLoading ? (
                     <p className="py-10 text-center text-sm text-slate-400">Loading messages…</p>
@@ -428,7 +432,7 @@ function MessagesView() {
           </section>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 

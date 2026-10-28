@@ -49,7 +49,7 @@ export function BatchDetailPanel({
     d.setDate(d.getDate() + nights);
     return d.toISOString().slice(0, 10);
   })();
-  const transport = transportLabel(detail?.transportPlan, batch.tripName);
+  const transport = transportLabel(detail?.transportPlan);
   const amount = bookings.reduce((s, b) => s + Number(b.netAmount ?? b.totalAmount ?? 0), 0);
   const fill = Math.min(100, Number(batch.fillPercent ?? 0));
 
@@ -189,7 +189,7 @@ export function BatchDetailPanel({
               </div>
             ))}
             <Link
-              href="/trips/itineraries"
+              href={`/trips/itineraries?tripId=${batch.tripId}`}
               className="inline-block text-xs font-semibold text-sky-700 hover:underline"
             >
               View Itinerary →

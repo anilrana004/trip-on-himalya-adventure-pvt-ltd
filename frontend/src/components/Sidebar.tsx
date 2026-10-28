@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { NotificationBell } from "@/components/NotificationBell";
 import { NavIconMark, initialsFromName } from "@/components/NavIcons";
-import { navSectionsForRole, roleDisplayLabel } from "@/lib/rbac";
+import { SessionTimer } from "@/components/SessionTimer";
+import { canAccessFinance, isFinanceUser, navSectionsForRole, roleDisplayLabel } from "@/lib/rbac";
 
 const COLLAPSE_KEY = "toh.sidebar.collapsed";
 
@@ -15,6 +16,7 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const sections = navSectionsForRole(user?.role);
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -23,6 +25,19 @@ export function Sidebar() {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobileOpen]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -38,49 +53,55 @@ export function Sidebar() {
 
   function isActive(href: string) {
     if (pathname === href) return true;
-    // Exact-only roots so /operations does not stay active on /operations/desk.
     if (href === "/finance" || href === "/operations" || href === "/trips") return false;
     return pathname.startsWith(`${href}/`);
   }
 
   const initials = initialsFromName(user?.fullName, user?.email);
+  const showLabels = !collapsed || mobileOpen;
 
-  return (
-    <aside
-      className={`flex shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-slate-200 transition-[width] ${
-        collapsed ? "w-[72px]" : "w-60"
-      }`}
-    >
+  const nav = (
+    <>
       <div className="flex items-center justify-between gap-2 border-b border-slate-800 px-3 py-4">
-        <div className={`flex min-w-0 items-center gap-2 ${collapsed ? "justify-center w-full" : ""}`}>
+        <div className={`flex min-w-0 items-center gap-2 ${!showLabels ? "w-full justify-center" : ""}`}>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-orange-500 text-sm font-bold text-white">
             ▲
           </div>
-          {!collapsed && (
+          {showLabels && (
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-cyan-100">Trip On Himalaya</div>
               <div className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Basecamp OS</div>
             </div>
           )}
         </div>
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="rounded p-1 text-slate-500 hover:bg-slate-900 hover:text-slate-200"
-            aria-label="Collapse sidebar"
-            title="Collapse"
-          >
-            ‹
-          </button>
+        {showLabels && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="hidden rounded p-1 text-slate-500 hover:bg-slate-900 hover:text-slate-200 md:inline-flex"
+              aria-label="Collapse sidebar"
+              title="Collapse"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="rounded p-1 text-slate-500 hover:bg-slate-900 hover:text-slate-200 md:hidden"
+              aria-label="Close menu"
+            >
+              ✕
+            </button>
+          </div>
         )}
       </div>
 
-      {collapsed && (
+      {collapsed && !mobileOpen && (
         <button
           type="button"
           onClick={toggleCollapsed}
-          className="mx-auto mt-2 rounded p-1 text-slate-500 hover:bg-slate-900 hover:text-slate-200"
+          className="mx-auto mt-2 hidden rounded p-1 text-slate-500 hover:bg-slate-900 hover:text-slate-200 md:inline-flex"
           aria-label="Expand sidebar"
           title="Expand"
         >
@@ -88,10 +109,10 @@ export function Sidebar() {
         </button>
       )}
 
-      <nav className="flex-1 space-y-4 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
         {sections.map((section) => (
           <div key={section.id}>
-            {!collapsed && (
+            {showLabels && (
               <div className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 {section.label}
               </div>
@@ -104,8 +125,9 @@ export function Sidebar() {
                     key={item.href}
                     href={item.href}
                     title={item.label}
-                    className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition ${
-                      collapsed ? "justify-center px-2" : ""
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition md:min-h-0 ${
+                      !showLabels ? "justify-center px-2" : ""
                     } ${
                       active
                         ? "border-l-2 border-orange-500 bg-orange-950/50 text-orange-300"
@@ -113,7 +135,7 @@ export function Sidebar() {
                     }`}
                   >
                     <NavIconMark name={item.icon} />
-                    {!collapsed && <span>{item.label}</span>}
+                    {showLabels && <span>{item.label}</span>}
                   </Link>
                 );
               })}
@@ -122,7 +144,19 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {!collapsed && (user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO") && (
+      {showLabels && canAccessFinance(user?.role) && !isFinanceUser(user?.role) && (
+        <div className="mx-3 mb-2">
+          <Link
+            href="/finance"
+            onClick={() => setMobileOpen(false)}
+            className="block rounded-md px-3 py-2 text-sm font-medium text-sky-300 hover:bg-slate-900"
+          >
+            Finance
+          </Link>
+        </div>
+      )}
+
+      {showLabels && (user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO") && (
         pathname.startsWith("/finance") ? (
           <div className="mx-3 mb-2 overflow-hidden rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900 to-sky-950/50 p-3">
             <div className="mb-2 h-12 rounded-lg bg-[linear-gradient(135deg,#0ea5e955,#22c55e55)]" />
@@ -134,6 +168,7 @@ export function Sidebar() {
             </p>
             <Link
               href="/finance"
+              onClick={() => setMobileOpen(false)}
               className="mt-2 inline-block rounded-md bg-sky-500 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-sky-400"
             >
               Manage Finances
@@ -154,32 +189,22 @@ export function Sidebar() {
             </p>
             <Link
               href={pathname.startsWith("/batches") ? "/batches" : "/trips"}
+              onClick={() => setMobileOpen(false)}
               className="mt-2 inline-block rounded-md bg-emerald-500 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-emerald-400"
             >
               {pathname.startsWith("/batches") ? "Plan New Batch" : "View Live Catalogue"}
             </Link>
           </div>
-        ) : (
-          <div className="mx-3 mb-2 overflow-hidden rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900 to-orange-950/40 p-3">
-            <div className="mb-2 h-12 rounded-lg bg-[linear-gradient(135deg,#ea580c55,#0ea5e955)]" />
-            <div className="text-xs font-semibold text-slate-100">Turn more leads into trekkers</div>
-            <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Manage · Nurture · Convert</p>
-            <Link
-              href="/leads"
-              className="mt-2 inline-block rounded-md bg-orange-500 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-orange-400"
-            >
-              Explore CRM
-            </Link>
-          </div>
-        )
+        ) : null
       )}
-      {!collapsed && user?.role === "OPS" && (
+      {showLabels && user?.role === "OPS" && (
         <div className="mx-3 mb-2 overflow-hidden rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900 to-sky-950/50 p-3">
           <div className="mb-2 h-12 rounded-lg bg-[linear-gradient(135deg,#0ea5e955,#22c55e55)]" />
           <div className="text-xs font-semibold text-slate-100">Smooth operations, happier trekkers</div>
           <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Plan · Coordinate · Execute</p>
           <Link
             href="/operations"
+            onClick={() => setMobileOpen(false)}
             className="mt-2 inline-block rounded-md bg-sky-500 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-sky-400"
           >
             Ops dashboard
@@ -188,13 +213,13 @@ export function Sidebar() {
       )}
 
       <div className="border-t border-slate-800 p-3">
-        <div className={`mb-2 flex items-center gap-2 px-1 ${collapsed ? "flex-col" : "justify-between"}`}>
+        <div className={`mb-2 flex items-center gap-2 px-1 ${!showLabels ? "flex-col" : "justify-between"}`}>
           {user && (
-            <div className={`flex min-w-0 items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
+            <div className={`flex min-w-0 items-center gap-2 ${!showLabels ? "justify-center" : ""}`}>
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white">
                 {initials}
               </div>
-              {!collapsed && (
+              {showLabels && (
                 <div className="min-w-0 text-xs">
                   <div className="truncate font-medium text-slate-100">{user.fullName || user.email}</div>
                   <div className="uppercase tracking-wide text-teal-400/90">
@@ -206,15 +231,60 @@ export function Sidebar() {
           )}
           <NotificationBell />
         </div>
-        {!collapsed && (
+        {user?.role === "SALES" && <SessionTimer compact={!showLabels} />}
+        {showLabels && (
           <button
             onClick={logout}
-            className="w-full rounded-md px-3 py-2 text-left text-sm font-medium text-rose-400 hover:bg-slate-900"
+            className="mt-1 w-full rounded-md px-3 py-2.5 text-left text-sm font-medium text-rose-400 hover:bg-slate-900"
           >
             Sign out
           </button>
         )}
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-slate-800 bg-slate-950 px-3 text-slate-100 md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="flex h-10 w-10 items-center justify-center rounded-md text-slate-200 hover:bg-slate-900"
+          aria-label="Open menu"
+        >
+          <span className="flex w-5 flex-col gap-1">
+            <span className="h-0.5 w-full rounded bg-current" />
+            <span className="h-0.5 w-full rounded bg-current" />
+            <span className="h-0.5 w-full rounded bg-current" />
+          </span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-cyan-100">Trip On Himalaya</div>
+          <div className="truncate text-[10px] uppercase tracking-wide text-slate-500">
+            {roleDisplayLabel(user?.role)} desk
+          </div>
+        </div>
+        {user?.role === "SALES" && <SessionTimer compact />}
+        <NotificationBell />
+      </header>
+
+      {mobileOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-slate-950/60 md:hidden"
+          aria-label="Close menu backdrop"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-slate-800 bg-slate-950 text-slate-200 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
+          collapsed ? "md:w-[72px]" : "md:w-60"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        {nav}
+      </aside>
+    </>
   );
 }

@@ -14,6 +14,10 @@ public record TripResponse(
         Trip.Difficulty difficulty,
         BigDecimal baseCost,
         int durationDays,
-        boolean active
+        boolean active,
+        String coverImageUrl,
+        String metaTitle,
+        String metaDescription,
+        String contentBrief
 ) {
 }

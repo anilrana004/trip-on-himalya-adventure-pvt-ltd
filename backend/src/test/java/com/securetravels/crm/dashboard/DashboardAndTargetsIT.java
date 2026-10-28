@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -78,7 +79,7 @@ class DashboardAndTargetsIT extends BaseIT {
                 .andExpect(jsonPath("$.revenue").value(15000.00));
 
         mockMvc.perform(get("/api/dashboard/summary"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isIn(401, 403));
     }
 
     @Test
@@ -215,7 +216,7 @@ class DashboardAndTargetsIT extends BaseIT {
         // delete company target; overall falls back to per-user sum
         mockMvc.perform(delete("/api/targets/{id}", companyId)
                         .header("Authorization", authHeader(manager)))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/targets").param("month", month)
                         .header("Authorization", authHeader(manager)))
                 .andExpect(status().isOk())

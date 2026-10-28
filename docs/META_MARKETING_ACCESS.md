@@ -38,6 +38,15 @@ Sign in as MANAGER / ADMIN / CEO on the CRM:
 Diagnostic statuses: `CONFIG_MISSING`, `AUTH_FAILURE`, `PERMISSION_FAILURE`,
 `ACCOUNT_INACCESSIBLE`, `RATE_LIMITED`, `UNAVAILABLE`, `OK`.
 
+The diagnostic calls `GET /me?fields=id` and `GET /me/permissions` only. It
+does not list campaigns. `capabilities.adsEnabled` is true only when the token
+grants `ads_read` or `ads_management`. `capabilities.leadsEnabled` is true only
+when it grants `leads_retrieval`. Page permissions are reported and do not
+turn either switch on. Campaign, insight, and ad-account reads are skipped
+when ads permission is missing. Lead fetch is skipped when `leads_retrieval`
+is missing. A successful diagnostic is not Marketing API Standard Access
+approval.
+
 ### 2.1 Campaign & insights live checklist (Phase 5)
 
 Do **not** edit campaigns or increase spend. Read-only UI only.

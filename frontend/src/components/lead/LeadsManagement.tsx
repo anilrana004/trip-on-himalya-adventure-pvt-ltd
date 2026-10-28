@@ -14,7 +14,7 @@ import {
 } from "@/lib/api";
 import { pickLostReason } from "@/lib/lostReasons";
 import { useAuth } from "@/lib/auth";
-import { canWriteLeads } from "@/lib/rbac";
+import { canManageTeam, canWriteLeads } from "@/lib/rbac";
 import { LeadForm } from "@/components/lead/LeadForm";
 import { LeadDetailDrawer } from "@/components/lead/LeadDetailDrawer";
 import { LeadImportModal } from "@/components/lead/LeadImportModal";
@@ -57,7 +57,7 @@ const AUTOMATIONS = [
   {
     key: "assignment",
     title: "Assignment",
-    body: "Website, Meta, and a new WhatsApp number go to the next sales owner.",
+    body: "Meta and website leads auto-assign to sales. Same trek or campaign sticks to one owner so the queue does not spray. Manual add still works.",
   },
 ];
 
@@ -150,6 +150,7 @@ function FunnelBars({ stages }: { stages: { label: string; count: number; color:
 export function LeadsManagement() {
   const { user } = useAuth();
   const canWrite = canWriteLeads(user?.role);
+  const canReassign = canManageTeam(user?.role);
   const range = useMemo(() => monthRange(), []);
   const [search, setSearch] = useState("");
   const [tableSearch, setTableSearch] = useState("");
@@ -327,7 +328,7 @@ export function LeadsManagement() {
   return (
     <div className="flex min-h-0 flex-1">
       <div className="min-w-0 flex-1 overflow-y-auto bg-slate-50">
-        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-3 py-3 backdrop-blur md:px-5">
           <div className="flex flex-wrap items-center gap-3">
             <input
               id="leads-global-search"
@@ -336,8 +337,8 @@ export function LeadsManagement() {
                 setSearch(e.target.value);
                 setPage(0);
               }}
-              placeholder="Search leads, customers, bookings, treks, or enter a command… Ctrl K"
-              className="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none ring-sky-500 focus:bg-white focus:ring-2"
+              placeholder="Search leads…"
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none ring-sky-500 focus:bg-white focus:ring-2"
             />
             <div className="flex items-center gap-2">
               {canWrite && (
@@ -371,17 +372,17 @@ export function LeadsManagement() {
           </div>
         </header>
 
-        <div className="space-y-5 p-5">
-          <div className="text-xs text-slate-400">
+        <div className="space-y-5 p-3 md:p-5">
+          <div className="hidden text-xs text-slate-400 md:block">
             Leads & Sales <span className="mx-1">›</span>{" "}
             <span className="font-medium text-slate-600">Lead Management</span>
           </div>
 
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Leads Management</h1>
+              <h1 className="text-xl font-semibold text-slate-900 md:text-2xl">Leads</h1>
               <p className="text-sm text-slate-500">
-                Capture, track, convert and automate leads from all your marketing channels.
+                Capture, call, follow up, and convert from every channel.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -531,7 +532,57 @@ export function LeadsManagement() {
 
             {error && <p className="m-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-            <div className="overflow-x-auto">
+            <div className="space-y-3 p-3 md:hidden">
+              {loading && <p className="py-8 text-center text-sm text-slate-400">Loading leads…</p>}
+              {!loading && leads.length === 0 && (
+                <p className="py-8 text-center text-sm text-slate-400">No leads in this view</p>
+              )}
+              {leads.map((lead) => {
+                const trip = lead.tripId ? tripsById.get(lead.tripId) : undefined;
+                const status = lead.status ?? "NEW";
+                const id = lead.id as string;
+                const phone = lead.whatsappNumber || lead.mobileNumber;
+                const wa = phone ? `https://wa.me/${String(phone).replace(/\D/g, "")}` : undefined;
+                return (
+                  <button
+                    key={`m-${id}`}
+                    type="button"
+                    onClick={() => setSelectedId(id)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-slate-900">{lead.customerName}</div>
+                        <div className="mt-0.5 text-sm text-slate-500">{lead.mobileNumber}</div>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[status]}`}>
+                        {STAGE_LABEL[status] ?? status}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span>{SOURCE_LABEL[lead.source ?? ""] ?? lead.source}</span>
+                      <span>·</span>
+                      <span className="truncate">{trip?.name || lead.destination || "No trek yet"}</span>
+                    </div>
+                    {lead.followUpDate && (
+                      <div className="mt-2 text-xs font-medium text-amber-700">Follow-up {lead.followUpDate}</div>
+                    )}
+                    <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <a href={`tel:${lead.mobileNumber}`} className="rounded-lg border px-3 py-2 text-xs font-semibold text-slate-700">
+                        Call
+                      </a>
+                      {wa && (
+                        <a href={wa} target="_blank" rel="noreferrer" className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700">
+                          WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -695,6 +746,7 @@ export function LeadsManagement() {
           trips={trips}
           salesUsers={salesUsers}
           canWrite={canWrite}
+          canReassign={canReassign}
           onClose={() => setSelectedId(null)}
           onChanged={load}
           onStatusChange={handleStatusChange}

@@ -2,18 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { HR_ROLES, MANAGERS, hasRole } from "@/lib/rbac";
+import { ADMINS, HR_ROLES, hasRole } from "@/lib/rbac";
 import { useAuth } from "@/lib/auth";
 import { AdminPage } from "@/components/AdminPage";
 
 export default function AttendancePage() {
   const { user } = useAuth();
-  const isManager = hasRole(user?.role, MANAGERS);
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const isCompany = hasRole(user?.role, ADMINS);
+  const isLineManager = user?.role === "MANAGER";
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof api.getAttendanceDays>>>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
-    api.getBasecampAttendance().then(setRows).catch((e: Error) => setError(e.message));
+    api.getAttendanceDays().then(setRows).catch((e: Error) => setError(e.message));
   }, []);
 
   useEffect(() => {
@@ -22,11 +23,9 @@ export default function AttendancePage() {
 
   async function punch(checkIn: boolean) {
     try {
-      await api.upsertBasecampAttendance({
-        checkIn,
-        checkOut: !checkIn,
-        status: "PRESENT",
-        workDate: new Date().toISOString().slice(0, 10),
+      await api.punchAttendance({
+        type: checkIn ? "CHECK_IN" : "CHECK_OUT",
+        deviceTime: new Date().toISOString(),
       });
       reload();
     } catch (e) {
@@ -37,7 +36,13 @@ export default function AttendancePage() {
   return (
     <AdminPage
       title="Attendance"
-      subtitle={isManager ? "Team attendance (managers see all)" : "Your attendance — check in / out"}
+      subtitle={
+        isCompany
+          ? "Company attendance. The day is counted in India time."
+          : isLineManager
+            ? "You and the people who report to you. The day is counted in India time."
+            : "Your attendance. Check in to start today. The day is counted in India time."
+      }
       allowedRoles={HR_ROLES}
       actions={
         <div className="flex gap-2">
@@ -59,13 +64,25 @@ export default function AttendancePage() {
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  No punches in the last two weeks. Check in to start today&apos;s row.
+                </td>
+              </tr>
+            )}
             {rows.map((r) => (
-              <tr key={String(r.id)} className="border-t">
-                <td className="px-4 py-3 font-medium">{String(r.userName)}</td>
-                <td className="px-4 py-3">{String(r.workDate)}</td>
-                <td className="px-4 py-3 text-xs text-slate-500">{r.checkInAt ? new Date(String(r.checkInAt)).toLocaleTimeString() : "—"}</td>
-                <td className="px-4 py-3 text-xs text-slate-500">{r.checkOutAt ? new Date(String(r.checkOutAt)).toLocaleTimeString() : "—"}</td>
-                <td className="px-4 py-3 text-xs font-semibold">{String(r.status)}</td>
+              <tr key={r.id} className="border-t">
+                <td className="px-4 py-3 font-medium">{r.userName ?? "—"}</td>
+                <td className="px-4 py-3">{r.workDate}</td>
+                <td className="px-4 py-3 text-xs text-slate-500">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString() : "—"}</td>
+                <td className="px-4 py-3 text-xs text-slate-500">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : "—"}</td>
+                <td className="px-4 py-3 text-xs font-semibold">
+                  {r.status.replaceAll("_", " ")}
+                  {r.lateFlagged ? " · late" : ""}
+                  {r.clockSkewFlagged ? " · clock off" : ""}
+                  {r.workedMinutes != null ? ` · ${r.workedMinutes} min` : ""}
+                </td>
               </tr>
             ))}
           </tbody>

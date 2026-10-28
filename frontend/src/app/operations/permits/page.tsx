@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { PermitsDesk } from "@/components/ops/PermitsDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function PermitsPage() {
   return (
-    <ModuleStub
-      title={"Permits & Compliance"}
-      subtitle={"Forest permits and traveller documents"}
+    <AdminPage
+      title="Permits & Compliance"
+      subtitle="ID, medical, and consent checks for travellers on a confirmed departure"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Documents module stores compliance uploads.",
-        "Alerts panel flags pending permits.",
-        "Verify IDs before departure on the travel desk.",
-      ]}
-    />
+    >
+      <PermitsDesk />
+    </AdminPage>
   );
 }

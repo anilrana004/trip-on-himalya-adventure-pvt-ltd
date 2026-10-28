@@ -5,8 +5,73 @@ export type LeadCreatePayload = components["schemas"]["LeadCreateRequest"];
 export type LeadUpdatePayload = components["schemas"]["LeadUpdateRequest"];
 export type LeadStatusPayload = components["schemas"]["LeadStatusRequest"];
 export type LeadActivity = components["schemas"]["LeadActivityResponse"];
-export type Trip = components["schemas"]["TripResponse"];
-export type TripDetail = components["schemas"]["TripDetailResponse"];
+export type TripCopy = {
+  coverImageUrl?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  contentBrief?: string | null;
+};
+
+export type Trip = components["schemas"]["TripResponse"] & TripCopy;
+export type TripDetail = components["schemas"]["TripDetailResponse"] & TripCopy;
+
+export type TrekReview = {
+  id: string;
+  tripId: string;
+  tripName?: string | null;
+  bookingId?: string | null;
+  guestName: string;
+  rating: number;
+  body?: string | null;
+  status: "PENDING" | "PUBLISHED" | "HIDDEN";
+  createdAt?: string;
+};
+
+export type TrekFaq = {
+  id: string;
+  tripId: string;
+  tripName?: string | null;
+  question: string;
+  answer: string;
+  published: boolean;
+  createdAt?: string;
+};
+
+export type TrekHighlight = {
+  id: string;
+  tripId: string;
+  tripName?: string | null;
+  label: string;
+  kind: "SUMMARY" | "CHIP";
+  sortOrder: number;
+  onCard: boolean;
+  published: boolean;
+  createdAt?: string;
+};
+
+export type TrekTag = {
+  id: string;
+  tripId: string;
+  tripName?: string | null;
+  label: string;
+  kind: "TERRAIN" | "SEASON";
+  onCard: boolean;
+  createdAt?: string;
+};
+
+export type TrekWaypoint = {
+  id: string;
+  tripId: string;
+  tripName?: string | null;
+  name: string;
+  kind: "START" | "CAMP" | "SUMMIT" | "PASS" | "END";
+  latitude: number;
+  longitude: number;
+  altitudeM?: number | null;
+  dayNumber?: number | null;
+  sortOrder: number;
+  createdAt?: string;
+};
 export type TripCreatePayload = components["schemas"]["TripCreateRequest"];
 export type TripUpdatePayload = components["schemas"]["TripUpdateRequest"];
 export type Batch = components["schemas"]["BatchResponse"];
@@ -46,6 +111,35 @@ export type PaymentCreatePayload = components["schemas"]["PaymentCreateRequest"]
 export type PaymentStatusPayload = components["schemas"]["PaymentStatusRequest"];
 export type PaymentSummary = components["schemas"]["PaymentSummaryResponse"];
 export type OpsHandoff = components["schemas"]["OperationsHandoffResponse"];
+
+export type TravellerDocument = {
+  id: string;
+  travellerId?: string;
+  bookingId?: string;
+  docType: "ID_PROOF" | "MEDICAL_CERT" | "TRIP_PHOTO" | "CONSENT_FORM";
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  createdAt?: string | null;
+};
+
+export type FieldIncident = {
+  id: string;
+  bookingId: string;
+  bookingRef?: string | null;
+  customerName?: string | null;
+  tripId?: string | null;
+  tripName?: string | null;
+  batchId?: string | null;
+  departureDate?: string | null;
+  kind: "MEDICAL" | "WEATHER" | "ALTITUDE" | "OTHER";
+  summary: string;
+  occurredOn: string;
+  status: "OPEN" | "RESOLVED";
+  resolution?: string | null;
+  reportedByName?: string | null;
+  createdAt?: string | null;
+  resolvedAt?: string | null;
+};
 export type OpsArrangementsPayload = components["schemas"]["OpsArrangementsRequest"];
 export type OpsNotePayload = components["schemas"]["OpsNoteRequest"];
 export type LoginResponse = components["schemas"]["AuthResponse"];
@@ -66,14 +160,144 @@ export type TargetUpsertPayload = Omit<
 > & { userId?: string | null };
 export type SalesUser = { id: string; fullName: string; email: string };
 
+export type PipelineStage = {
+  id: string;
+  key: string;
+  label: string;
+  sortOrder: number;
+  probabilityWeight: number;
+  entryCondition?: string | null;
+  active: boolean;
+};
+
+export type Opportunity = {
+  id: string;
+  leadId: string;
+  accountId?: string | null;
+  stageKey: string;
+  stageLabel: string;
+  probabilityWeight: number;
+  ownerId: string;
+  expectedValue: number;
+  expectedDate: string;
+  status: "OPEN" | "WON" | "LOST";
+  stageMovedAt?: string;
+  closedAt?: string | null;
+  closingNote?: string | null;
+  closedBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type OpportunityListParams = {
+  leadId?: string;
+  ownerId?: string;
+  stage?: string;
+  status?: "OPEN" | "WON" | "LOST";
+  from?: string;
+  to?: string;
+};
+
+export type OpportunityCreatePayload = {
+  leadId: string;
+  stageKey?: string;
+  expectedValue: number;
+  expectedDate: string;
+};
+
+export type RevenueForecast = {
+  from: string;
+  to: string;
+  expected: number;
+  best: number;
+  won: number;
+  openCount: number;
+  byStage: {
+    stageKey: string;
+    stageLabel: string;
+    probabilityWeight: number;
+    count: number;
+    expected: number;
+    best: number;
+  }[];
+  byMonth: { month: string; expected: number; best: number; won: number }[];
+};
+
+export type ForecastReport = {
+  scope: string;
+  from: string;
+  to: string;
+  months: {
+    month: string;
+    openCount: number;
+    expected: number;
+    best: number;
+    wonCount: number;
+    won: number;
+  }[];
+  owners: {
+    ownerId: string;
+    fullName: string;
+    openCount: number;
+    openValue: number;
+    expected: number;
+    wonCount: number;
+    won: number;
+    expectedSharePct: number;
+  }[];
+  stageMix: {
+    stageKey: string;
+    label: string;
+    probabilityWeight: number;
+    openCount: number;
+    openValue: number;
+    expected: number;
+    expectedSharePct: number;
+  }[];
+  totals: {
+    openInWindow: number;
+    openOutsideWindow: number;
+    openValue: number;
+    expected: number;
+    best: number;
+    wonCount: number;
+    won: number;
+    pipelineCoveragePct: number;
+  };
+};
+
+export type PipelineReport = {
+  staleAfterDays?: number | null;
+  stages: {
+    stageKey: string;
+    label: string;
+    openCount: number;
+    avgDaysInStage?: number | null;
+    staleOpenDeals: number;
+    winRatePct: number;
+  }[];
+  totals: {
+    openCount: number;
+    weightedValue: number;
+    wonValue: number;
+    lostCount: number;
+    staleOpenDeals: number;
+    winRatePct: number;
+    openOutsideWindow: number;
+  };
+};
+
 export type TeamUser = {
   id: string;
   email: string;
   fullName: string;
-  role: "SALES" | "OPS" | "MANAGER" | "ADMIN" | "CEO" | "FINANCE";
+  role: "SALES" | "OPS" | "MANAGER" | "ADMIN" | "CEO" | "FINANCE" | "TRANSPORT" | "VENDOR";
   phone?: string | null;
   active: boolean;
   createdAt?: string;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  vendorCategory?: string | null;
 };
 
 export type FinanceOverview = {
@@ -330,6 +554,7 @@ export type TeamUserCreatePayload = {
   role: TeamUser["role"];
   phone?: string;
   password: string;
+  vendorId?: string;
 };
 
 export type TeamUserUpdatePayload = {
@@ -338,6 +563,7 @@ export type TeamUserUpdatePayload = {
   phone?: string | null;
   active?: boolean;
   password?: string;
+  vendorId?: string | null;
 };
 
 export type InboxThread = {
@@ -550,8 +776,10 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
     }
     throw new ApiClientError(res.status, body);
   }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  if (res.status === 204 || res.status === 205) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 function qs(params: Record<string, string | number | boolean | undefined | null>): string {
@@ -570,8 +798,57 @@ export const api = {
 
   me: () => request<components["schemas"]["UserInfo"]>("/api/auth/me"),
 
+  myPresence: () =>
+    request<{
+      id: string;
+      fullName: string | null;
+      loginAt: string;
+      logoutAt: string | null;
+      open: boolean;
+      elapsedSeconds: number;
+    } | null>("/api/auth/presence"),
+
+  getDayHours: (day?: string) =>
+    request<{
+      workDate: string;
+      live: boolean;
+      people: Array<{
+        userId: string;
+        fullName: string | null;
+        email: string | null;
+        seconds: number;
+        open: boolean;
+        sessions: number;
+      }>;
+    }>(`/api/auth/presence/hours${qs({ day })}`),
+
+  getPresenceBoard: () =>
+    request<
+      Array<{
+        id: string;
+        userId: string;
+        fullName: string | null;
+        email: string | null;
+        role: string | null;
+        loginAt: string;
+        logoutAt: string | null;
+        open: boolean;
+        elapsedSeconds: number;
+      }>
+    >("/api/auth/presence/team"),
+
   getLeads: (params: LeadListParams = {}) =>
     request<LeadPage>(`/api/leads${qs({ ...params, size: params.size ?? 20 })}`),
+
+  getLeadSources: () =>
+    request<{ source: string; total: number; open: number; quoted: number; booked: number; lost: number }[]>(
+      "/api/leads/sources",
+    ),
+
+  getWebsiteAttempts: () =>
+    request<{ id: string; status: string; errorMessage?: string | null; leadId?: string | null; createdAt: string }[]>(
+      "/api/capture/website-attempts",
+    ),
 
   getLead: (id: string) => request<Lead>(`/api/leads/${id}`),
 
@@ -593,13 +870,225 @@ export const api = {
   createTrip: (payload: TripCreatePayload) =>
     request<TripDetail>("/api/trips", { method: "POST", body: JSON.stringify(payload) }),
 
-  updateTrip: (id: string, payload: TripUpdatePayload) =>
-    request<TripDetail>(`/api/trips/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  cloneTrip: (id: string, name?: string) =>
+    request<{ trip: TripDetail; highlights: number; faqs: number; tags: number }>(`/api/trips/${id}/clone`, {
+      method: "POST",
+      body: JSON.stringify(name ? { name } : {}),
+    }),
+
+  setTripsActive: (ids: string[], active: boolean) =>
+    request<{ updated: number; unchanged: number; missing: string[] }>("/api/trips/bulk-status", {
+      method: "POST",
+      body: JSON.stringify({ ids, active }),
+    }),
+
+  importTripDrafts: (trips: TripCreatePayload[]) =>
+    request<{ created: number; names: string[] }>("/api/trips/import", {
+      method: "POST",
+      body: JSON.stringify({ trips }),
+    }),
+
+  updateTrip: (
+    id: string,
+    payload: TripUpdatePayload & {
+      coverImageUrl?: string;
+      metaTitle?: string;
+      metaDescription?: string;
+      contentBrief?: string;
+    },
+  ) => request<TripDetail>(`/api/trips/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  getReviews: () => request<TrekReview[]>("/api/reviews"),
+
+  createReview: (payload: { tripId: string; bookingId?: string; guestName: string; rating: number; body?: string }) =>
+    request<TrekReview>("/api/reviews", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateReviewStatus: (id: string, status: "PENDING" | "PUBLISHED" | "HIDDEN") =>
+    request<TrekReview>(`/api/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  getFaqs: () => request<TrekFaq[]>("/api/faqs"),
+
+  createFaq: (payload: { tripId: string; question: string; answer: string; published?: boolean }) =>
+    request<TrekFaq>("/api/faqs", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateFaq: (id: string, payload: { tripId: string; question: string; answer: string; published?: boolean }) =>
+    request<TrekFaq>(`/api/faqs/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteFaq: (id: string) => request<void>(`/api/faqs/${id}`, { method: "DELETE" }),
+
+  copyFaqs: (fromTripId: string, toTripId: string) =>
+    request<{ copied: number; skipped: number }>("/api/faqs/copy", {
+      method: "POST",
+      body: JSON.stringify({ fromTripId, toTripId }),
+    }),
+
+  getHighlights: () => request<TrekHighlight[]>("/api/highlights"),
+
+  createHighlight: (payload: {
+    tripId: string;
+    label: string;
+    kind: "SUMMARY" | "CHIP";
+    onCard?: boolean;
+    published?: boolean;
+    sortOrder?: number;
+  }) => request<TrekHighlight>("/api/highlights", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateHighlight: (
+    id: string,
+    payload: {
+      tripId: string;
+      label: string;
+      kind: "SUMMARY" | "CHIP";
+      onCard?: boolean;
+      published?: boolean;
+      sortOrder?: number;
+    },
+  ) => request<TrekHighlight>(`/api/highlights/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteHighlight: (id: string) => request<void>(`/api/highlights/${id}`, { method: "DELETE" }),
+
+  copyHighlights: (fromTripId: string, toTripId: string) =>
+    request<{ copied: number; skipped: number }>("/api/highlights/copy", {
+      method: "POST",
+      body: JSON.stringify({ fromTripId, toTripId }),
+    }),
+
+  getTags: () => request<TrekTag[]>("/api/tags"),
+
+  createTag: (payload: { tripId: string; label: string; kind: "TERRAIN" | "SEASON"; onCard?: boolean }) =>
+    request<TrekTag>("/api/tags", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateTag: (id: string, payload: { tripId: string; label: string; kind: "TERRAIN" | "SEASON"; onCard?: boolean }) =>
+    request<TrekTag>(`/api/tags/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteTag: (id: string) => request<void>(`/api/tags/${id}`, { method: "DELETE" }),
+
+  copyTags: (fromTripId: string, toTripId: string) =>
+    request<{ copied: number; skipped: number }>("/api/tags/copy", {
+      method: "POST",
+      body: JSON.stringify({ fromTripId, toTripId }),
+    }),
+
+  getWaypoints: () => request<TrekWaypoint[]>("/api/waypoints"),
+
+  getBatchCompliance: (batchId: string) =>
+    request<{
+      batchId: string;
+      tripName?: string;
+      departureDate?: string;
+      totalRequired: number;
+      totalVerified: number;
+      remainingItems: number;
+      readyForDeparture: boolean;
+      travellers: {
+        travellerId: string;
+        fullName?: string;
+        age?: number | null;
+        requiredCount: number;
+        verifiedCount: number;
+        items: {
+          item: "ID_PROOF" | "MEDICAL_FITNESS" | "EMERGENCY_CONTACT" | "MINOR_CONSENT";
+          required: boolean;
+          status: "MISSING" | "IN_PROGRESS" | "VERIFIED";
+          documentId?: string | null;
+        }[];
+      }[];
+    }>(`/api/compliance/batches/${batchId}`),
+
+  markTravellerChecklist: (
+    travellerId: string,
+    items: { item: "ID_PROOF" | "MEDICAL_FITNESS" | "EMERGENCY_CONTACT" | "MINOR_CONSENT"; status: "MISSING" | "IN_PROGRESS" | "VERIFIED" }[],
+  ) =>
+    request<unknown>(`/api/compliance/travellers/${travellerId}`, {
+      method: "PUT",
+      body: JSON.stringify({ items }),
+    }),
+
+  getTravellerCompliance: (travellerId: string) =>
+    request<{
+      travellerId: string;
+      fullName?: string;
+      requiredCount: number;
+      verifiedCount: number;
+      items: {
+        item: "ID_PROOF" | "MEDICAL_FITNESS" | "EMERGENCY_CONTACT" | "MINOR_CONSENT";
+        required: boolean;
+        status: "MISSING" | "IN_PROGRESS" | "VERIFIED";
+        documentId?: string | null;
+      }[];
+    }>(`/api/compliance/travellers/${travellerId}`),
+
+  getTravellerDocuments: (travellerId: string) =>
+    request<TravellerDocument[]>(`/api/documents${qs({ travellerId })}`),
+
+  requestDocumentUpload: (payload: { travellerId: string; docType: TravellerDocument["docType"] }) =>
+    request<{ uploadUrl: string; storageKey: string; expiresAt?: string }>("/api/documents/upload-url", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  confirmDocumentUpload: (payload: {
+    storageKey: string;
+    relatedType: "TRAVELLER";
+    docType: TravellerDocument["docType"];
+    travellerId: string;
+    mimeType?: string;
+    sizeBytes?: number;
+  }) =>
+    request<TravellerDocument>("/api/documents/confirm", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  createWaypoint: (payload: {
+    tripId: string;
+    name: string;
+    kind: TrekWaypoint["kind"];
+    latitude: number;
+    longitude: number;
+    altitudeM?: number | null;
+    dayNumber?: number | null;
+  }) => request<TrekWaypoint>("/api/waypoints", { method: "POST", body: JSON.stringify(payload) }),
+
+  updateWaypoint: (
+    id: string,
+    payload: {
+      tripId: string;
+      name: string;
+      kind: TrekWaypoint["kind"];
+      latitude: number;
+      longitude: number;
+      altitudeM?: number | null;
+      dayNumber?: number | null;
+      sortOrder?: number;
+    },
+  ) => request<TrekWaypoint>(`/api/waypoints/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteWaypoint: (id: string) => request<void>(`/api/waypoints/${id}`, { method: "DELETE" }),
 
   listBatches: (tripId: string) => request<Batch[]>(`/api/trips/${tripId}/batches`),
 
-  getUpcomingBatches: (params: { from?: string; to?: string; limit?: number } = {}) =>
+  getUpcomingBatches: (params: { from?: string; to?: string; limit?: number; includeCancelled?: boolean } = {}) =>
     request<UpcomingBatch[]>(`/api/batches/upcoming${qs({ ...params })}`),
+
+  generateBatches: (
+    tripId: string,
+    payload: {
+      recurrence: {
+        firstDeparture: string;
+        lastDeparture: string;
+        frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+        interval?: number;
+      };
+      maxCapacity: number;
+      guideId?: string;
+      transportPlan?: string;
+    },
+  ) =>
+    request<{ created?: number; skipped?: number; requested?: number }>(
+      `/api/trips/${tripId}/batches/generate`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
 
   createBatch: (tripId: string, payload: BatchCreatePayload) =>
     request<Batch>(`/api/trips/${tripId}/batches`, { method: "POST", body: JSON.stringify(payload) }),
@@ -647,6 +1136,18 @@ export const api = {
 
   completeTask: (id: string) =>
     request<Task>(`/api/tasks/${id}/complete`, { method: "PATCH" }),
+
+  getIncidents: (status?: "OPEN" | "RESOLVED") =>
+    request<FieldIncident[]>(`/api/incidents${qs({ status })}`),
+
+  createIncident: (payload: { bookingId: string; kind: FieldIncident["kind"]; summary: string; occurredOn?: string }) =>
+    request<FieldIncident>("/api/incidents", { method: "POST", body: JSON.stringify(payload) }),
+
+  resolveIncident: (id: string, resolution: string) =>
+    request<FieldIncident>(`/api/incidents/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ resolution }),
+    }),
 
   getOperations: (params: {
     travelDateFrom?: string;
@@ -752,6 +1253,36 @@ export const api = {
   getTimeline: (subjectType: string, subjectId: string) =>
     request<TimelineEntry[]>(`/api/timeline/${subjectType}/${subjectId}`),
 
+  getWhatsAppTemplates: () =>
+    request<{ code: string; label: string; expectedParams: number; enabled: boolean }[]>("/api/whatsapp/templates"),
+
+  sendWhatsApp: (payload: {
+    subjectType: "LEAD" | "CUSTOMER" | "BOOKING";
+    subjectId: string;
+    templateCode: string;
+    mobile: string;
+    bodyValues?: string[];
+  }) =>
+    request<{ id: string; status: string }>("/api/whatsapp/send", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getEmailTemplates: () =>
+    request<{ code: string; label: string; subjectLine: string; expectedParams: number }[]>("/api/v1/email/templates"),
+
+  sendEmail: (payload: {
+    subjectType: "LEAD" | "CUSTOMER" | "BOOKING";
+    subjectId: string;
+    templateCode?: string;
+    email: string;
+    bodyValues?: string[];
+  }) =>
+    request<{ id: string; status: string }>("/api/v1/email/send", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   getFinanceOverview: (params: { from?: string; to?: string } = {}) =>
     request<FinanceOverview>(`/api/finance/overview${qs(params)}`),
 
@@ -832,6 +1363,88 @@ export const api = {
 
   createVendor: (payload: Record<string, unknown>) =>
     request<Guide>("/api/vendors", { method: "POST", body: JSON.stringify(payload) }),
+
+  getAttendanceDays: () =>
+    request<
+      Array<{
+        id: string;
+        userId: string;
+        userName: string | null;
+        workDate: string;
+        checkInAt: string | null;
+        checkOutAt: string | null;
+        status: string;
+        clockSkewFlagged: boolean;
+        lateFlagged: boolean;
+        workedMinutes: number | null;
+        overtimeMinutes: number | null;
+        compOffMinutes: number | null;
+        ruleVersion: number | null;
+        notes: string | null;
+      }>
+    >("/api/attendance/days"),
+
+  getAttendanceSettings: () =>
+    request<{
+      rule: {
+        version: number;
+        effectiveFrom: string;
+        graceMinutes: number;
+        halfDayMinutes: number;
+        fullDayMinutes: number;
+        lateMarksToHalfDay: number;
+        overtimeAfterMinutes: number;
+      } | null;
+      shifts: Array<{ id: string; name: string; start: string; end: string }>;
+      weeklyOff: number[];
+      holidays: Array<{ id: string; date: string; name: string }>;
+      assignments: Array<{ id: string; userId: string; shiftId: string; effectiveFrom: string; effectiveTo: string | null }>;
+    }>("/api/attendance/settings"),
+
+  saveAttendanceRule: (payload: {
+    effectiveFrom: string;
+    graceMinutes: number;
+    halfDayMinutes: number;
+    fullDayMinutes: number;
+    lateMarksToHalfDay: number;
+    overtimeAfterMinutes: number;
+  }) =>
+    request<unknown>("/api/attendance/rules", { method: "POST", body: JSON.stringify(payload) }),
+
+  saveAttendanceShift: (payload: { name: string; start: string; end: string }) =>
+    request<unknown>("/api/attendance/shifts", { method: "POST", body: JSON.stringify(payload) }),
+
+  assignAttendanceShift: (payload: { userId: string; shiftId: string; effectiveFrom: string }) =>
+    request<unknown>("/api/attendance/shift-assignments", { method: "POST", body: JSON.stringify(payload) }),
+
+  saveHoliday: (payload: { date: string; name: string }) =>
+    request<unknown>("/api/attendance/holidays", { method: "POST", body: JSON.stringify(payload) }),
+
+  deleteHoliday: (id: string) => request<unknown>(`/api/attendance/holidays/${id}`, { method: "DELETE" }),
+
+  saveWeeklyOff: (days: number[]) =>
+    request<unknown>("/api/attendance/weekly-off", { method: "PUT", body: JSON.stringify({ days }) }),
+
+  assignReportsToBulk: (assignments: Array<{ userId: string; reportsTo: string | null }>) =>
+    request<void>("/api/attendance/team/reports-to", {
+      method: "PUT",
+      body: JSON.stringify({ assignments }),
+    }),
+
+  cancelBasecampLeave: (id: string) =>
+    request<Record<string, unknown>>(`/api/basecamp/leave/${id}/cancel`, { method: "POST" }),
+
+  punchAttendance: (payload: { type: "CHECK_IN" | "CHECK_OUT"; deviceTime: string }) =>
+    request<{
+      id: string;
+      workDate: string;
+      checkInAt: string | null;
+      checkOutAt: string | null;
+      clockSkewFlagged: boolean;
+    }>("/api/attendance/punches", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   getBasecampAttendance: (params: { from?: string; to?: string } = {}) =>
     request<Record<string, unknown>[]>(`/api/basecamp/attendance${qs(params)}`),
@@ -926,6 +1539,35 @@ export const api = {
     request<MetaUsageSummary>(`/api/marketing/meta/usage${qs({ days, limit })}`),
 
   getMetaDiagnostics: () => request<MetaDiagnostics>("/api/marketing/meta/diagnostics"),
+
+  getPipelineStages: () => request<PipelineStage[]>("/api/pipeline-stages"),
+
+  getOpportunities: (params: OpportunityListParams = {}) =>
+    request<Opportunity[]>(`/api/opportunities${qs({ ...params })}`),
+
+  createOpportunity: (payload: OpportunityCreatePayload) =>
+    request<Opportunity>("/api/opportunities", { method: "POST", body: JSON.stringify(payload) }),
+
+  moveOpportunityStage: (id: string, stageKey: string) =>
+    request<Opportunity>(`/api/opportunities/${id}/stage`, {
+      method: "PATCH",
+      body: JSON.stringify({ stageKey }),
+    }),
+
+  closeOpportunity: (id: string, payload: { outcome: "WON" | "LOST"; note?: string }) =>
+    request<Opportunity>(`/api/opportunities/${id}/close`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getForecast: (from: string, to: string) =>
+    request<RevenueForecast>(`/api/forecast${qs({ from, to })}`),
+
+  getForecastReport: (params: { from: string; to: string; ownerId?: string }) =>
+    request<ForecastReport>(`/api/analytics/forecast${qs(params)}`),
+
+  getPipelineReport: (params: { from?: string; to?: string; ownerId?: string; staleAfterDays?: number } = {}) =>
+    request<PipelineReport>(`/api/analytics/pipeline${qs(params)}`),
 };
 
 export type MetaAdAccount = {
@@ -1011,4 +1653,12 @@ export type MetaDiagnostics = {
   graphUserId?: string | null;
   visibleAdAccountCount?: number | null;
   webhookConfigReady: boolean;
+  capabilities?: {
+    adsEnabled: boolean;
+    leadsEnabled: boolean;
+    granted: string[];
+    missingForAds: string[];
+    missingForLeads: string[];
+    missingPageAccess: string[];
+  };
 };

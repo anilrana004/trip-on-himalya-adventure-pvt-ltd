@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiClientError, type Booking, type PaymentSummary } from "@/lib/api";
+import { api, ApiClientError, type Booking, type Lead, type Opportunity, type PaymentSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { BookingForm } from "@/components/booking/BookingForm";
 
 const MANAGER_ROLES = ["MANAGER", "ADMIN", "CEO"];
@@ -38,13 +38,33 @@ export default function BookingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [query, setQuery] = useState("");
+  const [presetLeadId, setPresetLeadId] = useState<string | undefined>();
+  const [ready, setReady] = useState<Lead[]>([]);
+  const [deals, setDeals] = useState<Opportunity[]>([]);
 
   const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    api
-      .getBookings()
-      .then(setBookings)
+    Promise.all([
+      api.getBookings(),
+      api.getLeads({ size: 100 }).catch(() => ({ content: [] as Lead[] })),
+      api.getOpportunities({ status: "OPEN" }).catch(() => [] as Opportunity[]),
+    ])
+      .then(([rows, leadPage, openDeals]) => {
+        setBookings(rows);
+        setDeals(openDeals);
+        const booked = new Set(rows.map((b) => b.leadId).filter(Boolean));
+        setReady(
+          (leadPage.content ?? []).filter(
+            (lead) =>
+              lead.id &&
+              !booked.has(lead.id) &&
+              (lead.status === "QUOTATION_SENT" || lead.status === "INTERESTED"),
+          ),
+        );
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load bookings"))
       .finally(() => setLoading(false));
   }, []);
@@ -52,6 +72,14 @@ export default function BookingsPage() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    const leadId = new URLSearchParams(window.location.search).get("leadId");
+    if (leadId && canWrite) {
+      setPresetLeadId(leadId);
+      setShowForm(true);
+    }
+  }, [canWrite]);
 
   const open = useCallback(async (listItem: Booking) => {
     setActionError(null);
@@ -89,10 +117,31 @@ export default function BookingsPage() {
   const discountNeedsManager = (b: Booking) =>
     (b.discountAmount ?? 0) > 0 && !canManage;
 
+  const visible = bookings.filter((b) => {
+    if (statusFilter !== "ALL" && b.status !== statusFilter) return false;
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return [b.bookingRef, b.customerName, b.tripName, b.customerPhone]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
+  });
+
+  const quoteValue = bookings
+    .filter((b) => b.status === "QUOTATION")
+    .reduce((sum, b) => sum + Number(b.netAmount || 0), 0);
+  const confirmedValue = bookings
+    .filter((b) => b.status === "CONFIRMED")
+    .reduce((sum, b) => sum + Number(b.netAmount || 0), 0);
+
+  function dealFor(leadId?: string) {
+    return deals.find((d) => d.leadId === leadId);
+  }
+
   return (
     <Protected>
-      <div className="flex min-h-screen">
-        <Sidebar />
+      <AppShell>
         <main className="flex-1 p-6">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div>
@@ -103,7 +152,10 @@ export default function BookingsPage() {
             </div>
             {canWrite && (
               <button
-                onClick={() => setShowForm(true)}
+                onClick={() => {
+                  setPresetLeadId(undefined);
+                  setShowForm(true);
+                }}
                 className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
               >
                 + New booking
@@ -113,14 +165,99 @@ export default function BookingsPage() {
 
           {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Quotations</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{fmtMoney(quoteValue)}</div>
+              <div className="text-xs text-slate-400">{bookings.filter((b) => b.status === "QUOTATION").length} holding seats</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Confirmed</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{fmtMoney(confirmedValue)}</div>
+              <div className="text-xs text-slate-400">{bookings.filter((b) => b.status === "CONFIRMED").length} on the departure list</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Ready to book</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{ready.length}</div>
+              <div className="text-xs text-slate-400">Quoted or interested leads with no reservation yet</div>
+            </div>
+          </div>
+
+          {ready.length > 0 && (
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white">
+              <header className="border-b border-slate-100 px-4 py-3">
+                <h2 className="text-sm font-semibold text-slate-900">Convert from the pipeline</h2>
+                <p className="text-xs text-slate-500">These leads already have a deal or a quotation. A booking is the next record, not a new customer.</p>
+              </header>
+              <ul>
+                {ready.slice(0, 6).map((lead) => {
+                  const deal = dealFor(lead.id);
+                  return (
+                    <li key={lead.id} className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">{lead.customerName}</div>
+                        <div className="text-xs text-slate-500">
+                          {lead.destination || "No destination"}
+                          {deal ? ` · deal ${fmtMoney(Number(deal.expectedValue))} · ${deal.stageLabel}` : ` · ${lead.status}`}
+                          {lead.tripId ? "" : " · trek not attached"}
+                        </div>
+                      </div>
+                      {canWrite && lead.tripId ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPresetLeadId(lead.id);
+                            setShowForm(true);
+                          }}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white"
+                        >
+                          Create booking
+                        </button>
+                      ) : (
+                        <Link href={`/leads/${lead.id}`} className="text-xs font-medium text-sky-700 hover:underline">
+                          {lead.tripId ? "Open lead" : "Attach a trek"}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            {["ALL", "QUOTATION", "CONFIRMED", "COMPLETED", "CANCELLED"].map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-full px-3 py-1 text-sm ${
+                  statusFilter === status ? "bg-slate-900 text-white" : "border border-slate-300 text-slate-700"
+                }`}
+              >
+                {status === "ALL" ? "All" : status.charAt(0) + status.slice(1).toLowerCase()}
+              </button>
+            ))}
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search ref, guest, trek"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+            />
+          </div>
+
           <div className="grid grid-cols-[320px_1fr] items-start gap-6">
             <div className="space-y-2">
               {loading ? (
                 <p className="py-6 text-center text-sm text-slate-400">Loading bookings…</p>
-              ) : bookings.length === 0 ? (
-                <p className="py-6 text-center text-sm text-slate-400">No bookings yet.</p>
+              ) : visible.length === 0 ? (
+                <p className="py-6 text-center text-sm text-slate-400">
+                  {bookings.length === 0
+                    ? "No reservations yet. Convert a quoted lead above, or create one."
+                    : "No bookings match this view."}
+                </p>
               ) : (
-                bookings.map((b) => (
+                visible.map((b) => (
                   <button
                     key={b.id}
                     onClick={() => open(b)}
@@ -183,9 +320,14 @@ export default function BookingsPage() {
                         <span className="text-slate-500">Lead</span>
                         <span className="font-medium text-slate-800">
                           {selected.leadId ? (
-                            <Link href={`/leads/${selected.leadId}`} className="text-slate-900 underline">
-                              View lead →
-                            </Link>
+                            <span className="flex gap-3">
+                              <Link href={`/leads/${selected.leadId}`} className="text-slate-900 underline">
+                                Lead
+                              </Link>
+                              <Link href="/deals" className="text-slate-900 underline">
+                                Deal
+                              </Link>
+                            </span>
                           ) : (
                             "—"
                           )}
@@ -329,15 +471,20 @@ export default function BookingsPage() {
             </div>
           </div>
         </main>
-      </div>
+      </AppShell>
 
       {showForm && (
         <BookingForm
+          presetLeadId={presetLeadId}
           onSaved={async () => {
             setSelected(null);
+            setPresetLeadId(undefined);
             reload();
           }}
-          onClose={() => setShowForm(false)}
+          onClose={() => {
+            setShowForm(false);
+            setPresetLeadId(undefined);
+          }}
         />
       )}
     </Protected>

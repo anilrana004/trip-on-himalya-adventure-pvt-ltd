@@ -114,7 +114,7 @@ public class BasecampController {
     }
 
     @GetMapping(value = "/inventory", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('OPS','MANAGER','ADMIN','CEO')")
+    @PreAuthorize("hasAnyRole('OPS','MANAGER','ADMIN','CEO','FINANCE')")
     public List<Map<String, Object>> inventory(@CurrentUser UserPrincipal caller) {
         return basecamp.listInventory(caller);
     }
@@ -167,7 +167,7 @@ public class BasecampController {
     }
 
     @GetMapping(value = "/settings", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('SALES','OPS','MANAGER','ADMIN','CEO')")
+    @PreAuthorize("hasAnyRole('SALES','OPS','MANAGER','ADMIN','CEO','FINANCE')")
     public Map<String, String> settings(@CurrentUser UserPrincipal caller) {
         return basecamp.getSettings(caller);
     }

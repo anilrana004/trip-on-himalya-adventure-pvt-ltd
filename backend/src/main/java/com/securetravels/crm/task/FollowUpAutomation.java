@@ -1,5 +1,6 @@
 package com.securetravels.crm.task;
 
+import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
 import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.notification.Notification;
@@ -20,8 +21,9 @@ import java.util.UUID;
 /**
 *  Module 2 — follow-up automation rules:
  *   • lead created            → INITIAL_CALL task, due +5 min, SLA +1 h
- *   • lead → INTERESTED       → FOLLOW_UP_1D/3D/8D/15D (from lead creation:
- *                              cumulative day-offsets +1, +3, +8, +15 per spec 19.2)
+ *   • lead → INTERESTED       → four follow-ups from the lead date:
+ *                              tomorrow, then 2 days later, then 5 days later,
+ *                              then 7 days later (+1, +3, +8, +15)
  *   • lead → QUOTATION_SENT   → QUOTATION task, due +2 days
  * Each task raises an in-app notification for the assignee plus an email via
  * the stub notifier. Re-entering a status re-schedules (old open tasks of
@@ -32,36 +34,65 @@ public class FollowUpAutomation {
 
     private static final Logger log = LoggerFactory.getLogger(FollowUpAutomation.class);
 
-    private static final String APP_URL = "http://localhost:3000";
-
     private final TaskRepository tasks;
     private final UserRepository users;
     private final NotificationRepository notifications;
     private final EmailNotifier email;
+    private final String appUrl;
 
     public FollowUpAutomation(TaskRepository tasks, UserRepository users,
-                              NotificationRepository notifications, EmailNotifier email) {
+                              NotificationRepository notifications, EmailNotifier email,
+                              AppProperties props) {
         this.tasks = tasks;
         this.users = users;
         this.notifications = notifications;
         this.email = email;
+        String configured = props.getPublicUrl() == null ? "" : props.getPublicUrl().trim();
+        this.appUrl = configured.endsWith("/") ? configured.substring(0, configured.length() - 1) : configured;
     }
 
     @Transactional
     public void onLeadCreated(UUID leadId, UUID assigneeId) {
-        scheduleOne(leadId, assigneeId, Task.Type.INITIAL_CALL, Instant.now().plus(5, ChronoUnit.MINUTES),
-                1, "Call within 5 minutes",
+        onLeadCreated(leadId, assigneeId, null);
+    }
+
+    @Transactional
+    public void onLeadCreated(UUID leadId, UUID assigneeId, Lead.Source source) {
+        Instant dueAt = Instant.now().plus(5, ChronoUnit.MINUTES);
+        // Paid ads: escalate to manager after 15 minutes if still uncalled.
+        Instant sla = isPaidAds(source)
+                ? Instant.now().plus(15, ChronoUnit.MINUTES)
+                : dueAt.plus(1, ChronoUnit.HOURS);
+        scheduleOne(leadId, assigneeId, Task.Type.INITIAL_CALL, dueAt, sla,
+                "Call within 5 minutes",
                 "New lead assigned to you — call the customer now.");
+    }
+
+    /** Move open follow-up tasks when a manager reassigns the lead owner. */
+    @Transactional
+    public void reassignOpenTasks(UUID leadId, UUID newAssigneeId) {
+        if (leadId == null || newAssigneeId == null) return;
+        List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
+        for (Task task : tasks.findByLeadIdAndStatusIn(leadId, open)) {
+            task.setAssigneeId(newAssigneeId);
+        }
     }
 
     @Transactional
     public void onInterested(Lead lead) {
         cancelOpenFollowUps(lead.getId());
         Instant base = base(lead);
-        for (int day : new int[]{1, 3, 8, 15}) {
-            scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.valueOf("FOLLOW_UP_" + day + "D"),
-                    base.plus(day, ChronoUnit.DAYS), 24, "Follow-up day +" + day,
-                    "Scheduled follow-up for " + lead.getCustomerName() + " is due today.");
+        int[] days = {1, 3, 8, 15};
+        String[] titles = {
+                "Follow-up 1 — tomorrow",
+                "Follow-up 2 — 2 days later",
+                "Follow-up 3 — 5 days later",
+                "Follow-up 4 — 7 days later"
+        };
+        for (int i = 0; i < days.length; i++) {
+            scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.valueOf("FOLLOW_UP_" + days[i] + "D"),
+                    base.plus(days[i], ChronoUnit.DAYS), 24, titles[i],
+                    titles[i] + " for " + lead.getCustomerName() + ".");
         }
     }
 
@@ -96,7 +127,7 @@ public class FollowUpAutomation {
                         + " (due " + task.getDueAt() + ")",
                 leadPath(task.getLeadId())));
         if (manager != null) {
-            email.send(manager.getEmail(), title, reason + " " + APP_URL + leadPath(task.getLeadId()));
+            email.send(manager.getEmail(), title, reason + " " + appUrl + leadPath(task.getLeadId()));
         }
         log.info("[automation] escalated task={} to={} reason={}", task.getId(), target, reason);
     }
@@ -128,13 +159,24 @@ public class FollowUpAutomation {
 
     private void scheduleOne(UUID leadId, UUID assigneeId, Task.Type type, Instant dueAt,
                              int slaHours, String title, String body) {
-        Task task = tasks.save(new Task(leadId, assigneeId, type, dueAt,
-                dueAt.plus(slaHours, ChronoUnit.HOURS)));
+        scheduleOne(leadId, assigneeId, type, dueAt, dueAt.plus(slaHours, ChronoUnit.HOURS), title, body);
+    }
+
+    private void scheduleOne(UUID leadId, UUID assigneeId, Task.Type type, Instant dueAt,
+                             Instant slaDeadline, String title, String body) {
+        Task task = tasks.save(new Task(leadId, assigneeId, type, dueAt, slaDeadline));
         notifications.save(new Notification(assigneeId, Notification.Channel.IN_APP, title, body,
                 leadPath(leadId)));
         users.findById(assigneeId).ifPresent(user ->
-                email.send(user.getEmail(), title, body + " " + APP_URL + leadPath(leadId)));
+                email.send(user.getEmail(), title, body + " " + appUrl + leadPath(leadId)));
         log.info("[automation] lead={} type={} assignee={} dueAt={}", leadId, type, assigneeId, dueAt);
+    }
+
+    private static boolean isPaidAds(Lead.Source source) {
+        return source == Lead.Source.FACEBOOK_ADS
+                || source == Lead.Source.INSTAGRAM
+                || source == Lead.Source.GOOGLE_ADS
+                || source == Lead.Source.WEBSITE;
     }
 
     private String humanType(Task.Type type) {

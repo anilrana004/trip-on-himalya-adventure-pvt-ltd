@@ -1,21 +1,25 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { homePathForRole } from "@/lib/rbac";
 
+const isDev = process.env.NODE_ENV === "development";
 const showDemo =
-  process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS === "true";
+  isDev || process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS === "true";
 
 export default function LoginPage() {
   const { user, login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(isDev ? "admin@securetravels.in" : "");
+  const [password, setPassword] = useState(isDev ? "admin123" : "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) router.replace("/leads");
+  useEffect(() => {
+    if (user) router.replace(homePathForRole(user.role));
+  }, [user, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

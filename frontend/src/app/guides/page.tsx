@@ -5,7 +5,7 @@ import { api, type Guide } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { canManageCatalogue } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { GuidesPanel } from "@/components/trip/GuidesPanel";
 
 function GuidesView() {
@@ -32,8 +32,7 @@ function GuidesView() {
   }, [load]);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
+    <AppShell>
       <main className="flex-1 p-6">
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-slate-900">Guides</h1>
@@ -52,7 +51,7 @@ function GuidesView() {
           </div>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
 

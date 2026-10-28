@@ -1,0 +1,17 @@
+# Optional Railway service config for a Cron Job that only runs backups.
+# Create a separate Railway service from this Dockerfile (do not attach to the API).
+#
+# Railway UI (manual — do not automate without approval):
+#   1. New service → Docker → dockerfilePath = infra/backup/Dockerfile
+#   2. Cron schedule e.g. 0 1 * * * (01:00 UTC daily)
+#   3. Variables: DATABASE_URL (or PG*), STORAGE_* for the BACKUP bucket only
+#   4. Alerts: notify on failed deployment / failed cron
+#
+# Keep STORAGE_* here on a dedicated backup bucket — not the documents bucket.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "infra/backup/Dockerfile"
+
+[deploy]
+restartPolicyType = "NEVER"

@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   api,
   type Booking,
   type Guide,
+  type TrekHighlight,
+  type TrekTag,
+  type TrekReview,
   type Trip,
   type TripDetail,
   type UpcomingBatch,
@@ -16,16 +20,13 @@ import { BatchesPanel } from "@/components/trip/BatchesPanel";
 import { TreksShell } from "@/components/treks/TreksShell";
 import { TrekEditPanel } from "@/components/treks/TrekEditPanel";
 import {
-  coverGradient,
+  coverStyle,
   difficultyClass,
   difficultyLabel,
   inferRegion,
   inr,
   loadFeaturedIds,
-  pseudoRating,
   saveFeaturedIds,
-  seasonHint,
-  terrainTags,
   trekBadge,
 } from "@/components/treks/trekUi";
 
@@ -39,6 +40,9 @@ export function TreksManagement() {
   const [batches, setBatches] = useState<UpcomingBatch[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [guides, setGuides] = useState<Guide[]>([]);
+  const [reviews, setReviews] = useState<TrekReview[]>([]);
+  const [highlights, setHighlights] = useState<TrekHighlight[]>([]);
+  const [tags, setTags] = useState<TrekTag[]>([]);
   const [selected, setSelected] = useState<TripDetail | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formTrip, setFormTrip] = useState<TripDetail | null>(null);
@@ -70,12 +74,18 @@ export function TreksManagement() {
       api.getUpcomingBatches({ limit: 200 }),
       api.getBookings().catch(() => [] as Booking[]),
       api.getGuides(canManage ? false : true).catch(() => [] as Guide[]),
+      api.getReviews().catch(() => [] as TrekReview[]),
+      api.getHighlights().catch(() => [] as TrekHighlight[]),
+      api.getTags().catch(() => [] as TrekTag[]),
     ])
-      .then(([tripList, batchList, bookingList, guideList]) => {
+      .then(([tripList, batchList, bookingList, guideList, reviewList, highlightList, tagList]) => {
         setTrips(tripList);
         setBatches(batchList);
         setBookings(bookingList);
         setGuides(guideList);
+        setReviews(reviewList);
+        setHighlights(highlightList);
+        setTags(tagList);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load treks"))
       .finally(() => setLoading(false));
@@ -148,8 +158,9 @@ export function TreksManagement() {
     if (category !== "all") list = list.filter((t) => t.category === category);
     if (region !== "all") list = list.filter((t) => inferRegion(t.name) === region);
     if (difficulty !== "all") list = list.filter((t) => (t.difficulty ?? "MODERATE") === difficulty);
-    if (season !== "all")
-      list = list.filter((t) => seasonHint(t).toLowerCase().includes(season.toLowerCase()));
+    if (season !== "all") {
+      list = list.filter((t) => tags.some((tag) => tag.tripId === t.id && tag.kind === "SEASON" && tag.label === season));
+    }
     if (status === "active") list = list.filter((t) => t.active);
     if (status === "draft") list = list.filter((t) => !t.active);
     if (featuredOnly === "yes") list = list.filter((t) => t.id && featuredIds.has(t.id));
@@ -158,7 +169,9 @@ export function TreksManagement() {
     if (tableTab === "active") list = list.filter((t) => t.active);
     if (tableTab === "draft") list = list.filter((t) => !t.active);
     if (tableTab === "featured") list = list.filter((t) => t.id && featuredIds.has(t.id));
-    if (tableTab === "seasonal") list = list.filter((t) => Number(t.durationDays) >= 6);
+    if (tableTab === "seasonal") {
+      list = list.filter((t) => tags.some((tag) => tag.tripId === t.id && tag.kind === "SEASON"));
+    }
     if (tableTab === "custom") list = list.filter((t) => t.category === "CUSTOM" || t.bookingType === "CUSTOM_FIT");
 
     list.sort((a, b) => {
@@ -183,6 +196,7 @@ export function TreksManagement() {
     sort,
     featuredIds,
     batchCountByTrip,
+    tags,
   ]);
 
   const activeCount = trips.filter((t) => t.active).length;
@@ -191,10 +205,18 @@ export function TreksManagement() {
     trips.filter((t) => t.category === "CUSTOM" || t.bookingType === "CUSTOM_FIT").length +
     trips.length;
   const featuredCount = trips.filter((t) => t.id && featuredIds.has(t.id)).length;
+  const seasonCount = trips.filter((t) => tags.some((tag) => tag.tripId === t.id && tag.kind === "SEASON")).length;
+  const seasonChoices: [string, string][] = [
+    ["all", "Season"],
+    ...[...new Set(tags.filter((tag) => tag.kind === "SEASON").map((tag) => tag.label))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((label) => [label, label] as [string, string]),
+  ];
+  const publishedReviews = reviews.filter((review) => review.status === "PUBLISHED");
   const avgRating =
-    trips.length === 0
+    publishedReviews.length === 0
       ? 0
-      : Math.round((trips.reduce((s, t) => s + pseudoRating(t.id), 0) / trips.length) * 10) / 10;
+      : Math.round((publishedReviews.reduce((sum, review) => sum + review.rating, 0) / publishedReviews.length) * 10) / 10;
 
   function resetFilters() {
     setQ("");
@@ -280,7 +302,7 @@ export function TreksManagement() {
             label: "Avg. Rating",
             value: avgRating ? `${avgRating} ★` : "—",
             delta: "",
-            hint: `${Math.max(trips.length * 8, 0)} reviews (est.)`,
+            hint: publishedReviews.length === 0 ? "No published reviews" : `${publishedReviews.length} published`,
           },
           {
             label: "Featured Treks",
@@ -340,12 +362,7 @@ export function TreksManagement() {
           [
             season,
             setSeason,
-            [
-              ["all", "Season"],
-              ["Weekend", "Weekend"],
-              ["Spring", "Spring / Autumn"],
-              ["Summer", "Summer / Monsoon"],
-            ],
+            seasonChoices,
           ],
           [
             status,
@@ -430,7 +447,17 @@ export function TreksManagement() {
               {cardTrips.map((t, index) => {
                 const featured = !!(t.id && featuredIds.has(t.id));
                 const badge = trekBadge(t, featured, index);
-                const rating = pseudoRating(t.id);
+                const published = reviews.filter((review) => review.status === "PUBLISHED" && review.tripId === t.id);
+                const summary = highlights.find((row) => row.tripId === t.id && row.kind === "SUMMARY" && row.published);
+                const chips = highlights
+                  .filter((row) => row.tripId === t.id && row.kind === "CHIP" && row.published && row.onCard)
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .slice(0, 3);
+                const cardTags = tags.filter((tag) => tag.tripId === t.id && tag.onCard).slice(0, 3);
+                const rating =
+                  published.length === 0
+                    ? "No reviews"
+                    : `${(published.reduce((sum, review) => sum + review.rating, 0) / published.length).toFixed(1)} ★`;
                 return (
                   <button
                     key={t.id}
@@ -440,7 +467,7 @@ export function TreksManagement() {
                       selected?.id === t.id ? "border-sky-400 ring-2 ring-sky-100" : "border-slate-200"
                     }`}
                   >
-                    <div className="relative h-32" style={{ background: coverGradient(t) }}>
+                    <div className="relative h-32" style={coverStyle(t)}>
                       {badge && (
                         <span
                           className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
@@ -465,22 +492,39 @@ export function TreksManagement() {
                       <div className="mt-0.5 text-[11px] text-slate-500">
                         {inferRegion(t.name)} · {t.durationDays}D · {difficultyLabel(t.difficulty)}
                       </div>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {terrainTags(t).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
+                      {summary && (
+                        <p className="mt-1 line-clamp-2 text-[11px] text-slate-600">{summary.label}</p>
+                      )}
+                      {chips.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {chips.map((chip) => (
+                            <span
+                              key={chip.id}
+                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                            >
+                              {chip.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {cardTags.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {cardTags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-800"
+                            >
+                              {tag.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="mt-2 flex items-center justify-between text-xs">
                         <span className="font-semibold text-slate-900">
                           {inr(t.baseCost)}
                           <span className="font-normal text-slate-400">/person</span>
                         </span>
-                        <span className="text-amber-600">{rating} ★</span>
+                        <span className="text-slate-500">{rating}</span>
                       </div>
                       <div className="mt-1 text-[11px] text-slate-400">
                         {batchCountByTrip.get(t.id ?? "") ?? 0} upcoming batches
@@ -506,7 +550,7 @@ export function TreksManagement() {
                   ["active", `Active (${activeCount})`],
                   ["draft", `Draft (${draftCount})`],
                   ["featured", `Featured (${featuredCount})`],
-                  ["seasonal", "Seasonal"],
+                  ["seasonal", `Season (${seasonCount})`],
                   ["custom", "Custom Packages"],
                 ] as [TableTab, string][]
               ).map(([id, label]) => (
@@ -522,6 +566,17 @@ export function TreksManagement() {
                 </button>
               ))}
             </div>
+            {canManage && selectedRows.size > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-sky-50 px-3 py-2 text-xs">
+                <span className="font-medium text-slate-700">{selectedRows.size} selected</span>
+                <Link
+                  href={`/trips/bulk?ids=${[...selectedRows].join(",")}`}
+                  className="font-semibold text-sky-800 hover:underline"
+                >
+                  Publish, unpublish, or clone
+                </Link>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[960px] text-left text-xs">
                 <thead className="bg-slate-50/80 text-[10px] uppercase tracking-wide text-slate-400">
@@ -583,7 +638,7 @@ export function TreksManagement() {
                           <div className="flex items-center gap-2">
                             <div
                               className="h-9 w-12 shrink-0 rounded-md"
-                              style={{ background: coverGradient(t) }}
+                              style={coverStyle(t)}
                             />
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-slate-800">{t.name}</div>

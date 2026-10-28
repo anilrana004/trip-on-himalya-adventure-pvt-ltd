@@ -20,17 +20,9 @@ public record OperationsReadinessResponse(
         Totals totals) {
 
     /**
-     * UNAVAILABLE, not "0 incidents".
-     *
-     * <p>Phase 3 Module 1 (the mobile trip log that records incidents) is not
-     * built, so there is no incident table to count. Reporting zero would be a
-     * fabrication: it asserts that no incident occurred on any trip, which is a
-     * positive claim backed by no evidence, and it is the exact kind of green
-     * dashboard that hides a missing feature until something goes wrong.
-     *
-     * <p>The distinction the UI must preserve: {@code available=false} means
-     * nobody is watching. {@code available=true, open=0} means somebody is, and
-     * they have nothing to report.
+     * Counts rows in {@code field_incidents}. {@code available=true} and
+     * {@code open=0} means the log exists and nobody has written an incident.
+     * It does not claim the trail itself was trouble-free.
      */
     public record IncidentSummary(
             boolean available,

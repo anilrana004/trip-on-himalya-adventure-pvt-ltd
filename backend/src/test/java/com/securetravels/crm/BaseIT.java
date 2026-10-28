@@ -37,7 +37,7 @@ public abstract class BaseIT {
     @BeforeEach
     void truncateAll() {
         jdbcTemplate.execute("""
-TRUNCATE attendance_events, staff_attendance, attendance_period_locks, audit_log, leads, customer360, trips, vendors, batches, bookings,
+TRUNCATE attendance_events, staff_attendance, attendance_period_locks, login_sessions, audit_log, leads, customer360, trips, vendors, batches, bookings,
                          travellers, seat_holds, payments, operations_handoffs, refresh_tokens,
                          users, tasks, notifications, sales_targets, webhook_logs, assignment_state,
                          documents, traveller_checklists,

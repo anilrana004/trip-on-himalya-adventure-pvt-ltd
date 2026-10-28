@@ -1,19 +1,17 @@
 "use client";
 
+import { FormsDesk } from "@/components/lead/FormsDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { MANAGERS } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
 export default function FormsPage() {
   return (
-    <ModuleStub
+    <AdminPage
       title="Forms & Lead Capture"
-      subtitle="Multi-channel capture into Leads Management"
+      subtitle="Website forms, WhatsApp, and desk entry — each one becomes a lead"
       allowedRoles={MANAGERS}
-      bullets={[
-        "Manual Add Lead and CSV Import for desk capture.",
-        "Website webhook for organic / landing page forms.",
-        "WhatsApp inbound creates WHATSAPP-sourced leads automatically.",
-      ]}
-    />
+    >
+      <FormsDesk />
+    </AdminPage>
   );
 }

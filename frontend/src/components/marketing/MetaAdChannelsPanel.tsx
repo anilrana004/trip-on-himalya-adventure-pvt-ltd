@@ -32,12 +32,19 @@ export function MetaAdChannelsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const [list, usageSummary] = await Promise.all([
-        api.listMetaAdAccounts(),
+      const [report, usageSummary] = await Promise.all([
+        api.getMetaDiagnostics(),
         api.getMetaUsage(15, 20).catch(() => null),
       ]);
-      setAccounts(list);
+      setDiagnostics(report);
       setUsage(usageSummary);
+      if (!report.capabilities?.adsEnabled) {
+        setAccounts([]);
+        setSyncedAt(new Date().toISOString());
+        return;
+      }
+      const list = await api.listMetaAdAccounts();
+      setAccounts(list);
       setSyncedAt(new Date().toISOString());
     } catch (err) {
       setError(formatApiError(err, "Could not load Meta ad accounts"));
@@ -131,6 +138,18 @@ export function MetaAdChannelsPanel() {
             <div>Visible ad accounts (sample): {diagnostics.visibleAdAccountCount ?? "—"}</div>
             <div>Graph user id: {diagnostics.graphUserId || "—"}</div>
             <div>Allowlist configured: {diagnostics.config.adAccountAllowlistSet ? "yes" : "no"}</div>
+            <div>Campaigns and insights: {diagnostics.capabilities?.adsEnabled ? "enabled" : "off"}</div>
+            <div>Lead retrieval: {diagnostics.capabilities?.leadsEnabled ? "enabled" : "off"}</div>
+            <div>Granted: {diagnostics.capabilities?.granted?.length ? diagnostics.capabilities.granted.join(", ") : "—"}</div>
+            <div>
+              Missing for ads: {diagnostics.capabilities?.missingForAds?.length ? diagnostics.capabilities.missingForAds.join(", ") : "—"}
+            </div>
+            <div>
+              Missing for leads: {diagnostics.capabilities?.missingForLeads?.length ? diagnostics.capabilities.missingForLeads.join(", ") : "—"}
+            </div>
+            <div>
+              Missing page access: {diagnostics.capabilities?.missingPageAccess?.length ? diagnostics.capabilities.missingPageAccess.join(", ") : "—"}
+            </div>
           </dl>
         </section>
       )}
@@ -143,7 +162,9 @@ export function MetaAdChannelsPanel() {
           <p className="px-4 py-8 text-center text-sm text-slate-500">Loading…</p>
         ) : accounts.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-slate-500">
-            No accounts yet. Configure Meta credentials on Railway, then refresh.
+            {diagnostics && !diagnostics.capabilities?.adsEnabled
+              ? "Ad accounts stay unloaded until the diagnostic shows ads_read or ads_management."
+              : "No accounts yet. Configure Meta credentials on Railway, then refresh."}
           </p>
         ) : (
           <div className="overflow-x-auto">

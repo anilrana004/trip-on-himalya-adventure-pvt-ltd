@@ -104,7 +104,16 @@ public class DashboardService {
                        AND created_at >= CAST(? AS timestamptz))                          AS new_bookings,
                   (SELECT count(*) FROM bookings WHERE status IN ('CONFIRMED','COMPLETED')) AS confirmed_bookings,
                   (SELECT COALESCE(sum(amount), 0) FROM payments
-                       WHERE status IN ('COMPLETED','PARTIAL'))                           AS revenue
+                       WHERE status IN ('COMPLETED','PARTIAL'))                           AS revenue,
+                  (SELECT count(*) FROM tasks
+                        WHERE type = 'INITIAL_CALL' AND status IN ('PENDING','OVERDUE')) AS first_call_pending,
+                  (SELECT count(*) FROM tasks
+                        WHERE type = 'INITIAL_CALL' AND status IN ('PENDING','OVERDUE')
+                          AND due_at < now())                                            AS first_call_overdue,
+                  (SELECT count(*) FROM leads
+                        WHERE status = 'NEW'
+                          AND last_contacted_at IS NULL
+                          AND source IN ('FACEBOOK_ADS','INSTAGRAM','GOOGLE_ADS','WEBSITE')) AS hot_uncalled
                 """, from, asOf, from);
 
         return new DashboardSummaryResponse(
@@ -119,7 +128,10 @@ public class DashboardService {
                 l(row.get("lost")),
                 l(row.get("new_bookings")),
                 l(row.get("confirmed_bookings")),
-                bd(row.get("revenue")));
+                bd(row.get("revenue")),
+                l(row.get("first_call_pending")),
+                l(row.get("first_call_overdue")),
+                l(row.get("hot_uncalled")));
     }
 
     // ------------------------------------------------------------------

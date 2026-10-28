@@ -1,19 +1,17 @@
 ﻿"use client";
 
+import { OpsItineraryDesk } from "@/components/ops/OpsItineraryDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { OPS_DESK } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
-export default function Page() {
+export default function OperationsItineraryPage() {
   return (
-    <ModuleStub
-      title={"Trip Itinerary Management"}
-      subtitle={"Day-wise trek plans and camp stops"}
+    <AdminPage
+      title="Trip Itinerary Management"
+      subtitle="The written day plan and the camps already saved on each trek"
       allowedRoles={OPS_DESK}
-      bullets={[
-        "Trek catalogue holds package structure.",
-        "Live map on Overview shows next stops for active batches.",
-        "Update guides via Guide & Staff Management.",
-      ]}
-    />
+    >
+      <OpsItineraryDesk />
+    </AdminPage>
   );
 }

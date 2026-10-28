@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { FINANCE_ERP_TABS, financeNavForRole } from "@/lib/rbac";
+import { FINANCE_ERP_TABS, financeNavForRole, homePathForRole, isFinanceUser } from "@/lib/rbac";
 import { NavIconMark } from "@/components/NavIcons";
 
 export function FinanceShell({
@@ -121,6 +121,11 @@ export function FinanceShell({
               <div className="text-sm font-medium text-slate-100">{user.fullName || user.email}</div>
               <div className="text-[11px] uppercase tracking-wide text-sky-400">{user.role}</div>
             </div>
+          )}
+          {user && !isFinanceUser(user.role) && (
+            <Link href={homePathForRole(user.role)} className="mb-2 block rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-900">
+              Back to CRM
+            </Link>
           )}
           <button
             onClick={logout}

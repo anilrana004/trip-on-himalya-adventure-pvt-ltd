@@ -61,6 +61,11 @@ public class TripService {
 
     @Transactional
     public TripDetailResponse create(TripCreateRequest request, UserPrincipal caller) {
+        return create(request, caller, true);
+    }
+
+    @Transactional
+    public TripDetailResponse create(TripCreateRequest request, UserPrincipal caller, boolean active) {
         requireManager(caller);
 
         Trip trip = new Trip();
@@ -74,11 +79,16 @@ public class TripService {
         trip.setItinerary(XssSanitizer.text(request.itinerary()));
         trip.setInclusions(XssSanitizer.text(request.inclusions()));
         trip.setExclusions(XssSanitizer.text(request.exclusions()));
-        trip.setActive(true);
+        trip.setActive(active);
 
         Trip saved = trips.save(trip);
         auditService.record("TRIP", saved.getId(), AuditAction.CREATE, "name", null, saved.getName());
         return toDetail(saved);
+    }
+
+    /** Next unused public address. Used when a clone needs its own slug. */
+    public String unusedSlug(String raw) {
+        return nextAvailableSlug(slugify(raw == null || raw.isBlank() ? "trip" : raw));
     }
 
     /**
@@ -103,9 +113,8 @@ public class TripService {
 
         Trip trip = getTrip(id);
         auditChange(trip, "name", trip.getName(), request.name(), trip::setName);
-        if (request.slug() != null && !request.slug().isBlank() && !request.slug().equals(trip.getSlug())) {
-            String next = nextAvailableSlug(request.slug());
-            auditChange(trip, "slug", trip.getSlug(), next, trip::setSlug);
+        if (request.slug() != null && !request.slug().isBlank()) {
+            applySlug(trip, request.slug());
         }
         if (request.category() != null) {
             auditChange(trip, "category", trip.getCategory().name(), request.category().name(),
@@ -133,6 +142,26 @@ public class TripService {
         }
         if (request.exclusions() != null) {
             auditChange(trip, "exclusions", trip.getExclusions(), XssSanitizer.text(request.exclusions()), trip::setExclusions);
+        }
+        if (request.coverImageUrl() != null) {
+            String next = normalizeCover(request.coverImageUrl());
+            if (!java.util.Objects.equals(trip.getCoverImageUrl(), next)) {
+                auditService.record("TRIP", trip.getId(), AuditAction.UPDATE, "cover_image_url",
+                        trip.getCoverImageUrl(), next);
+                trip.setCoverImageUrl(next);
+            }
+        }
+        if (request.metaTitle() != null) {
+            applyText(trip, "meta_title", trip.getMetaTitle(), normalizeCopy(request.metaTitle(), 70, "Search title"),
+                    trip::setMetaTitle);
+        }
+        if (request.metaDescription() != null) {
+            applyText(trip, "meta_description", trip.getMetaDescription(),
+                    normalizeCopy(request.metaDescription(), 160, "Search description"), trip::setMetaDescription);
+        }
+        if (request.contentBrief() != null) {
+            applyText(trip, "content_brief", trip.getContentBrief(),
+                    normalizeCopy(request.contentBrief(), 2000, "Content brief"), trip::setContentBrief);
         }
         if (request.active() != null) {
             auditChange(trip, "active", String.valueOf(trip.isActive()), String.valueOf(request.active()),
@@ -238,18 +267,26 @@ public class TripService {
                 .toList();
     }
 
-    /**
-     * Departures for calendar / home dashboard. Defaults: today → +90 days, max 100 rows.
-     */
     @Transactional(readOnly = true)
     public List<UpcomingBatchResponse> listUpcoming(LocalDate from, LocalDate to, int limit) {
+        return listUpcoming(from, to, limit, false);
+    }
+
+    /**
+     * Departures for calendar / home dashboard. Defaults: today → +90 days, max 100 rows.
+     * {@code includeCancelled} is for the batch desk; other callers keep cancelled rows out.
+     */
+    @Transactional(readOnly = true)
+    public List<UpcomingBatchResponse> listUpcoming(LocalDate from, LocalDate to, int limit, boolean includeCancelled) {
         LocalDate start = from != null ? from : LocalDate.now();
         LocalDate end = to != null ? to : start.plusDays(90);
         if (end.isBefore(start)) {
             throw new BadRequestException("to must be on or after from");
         }
         int cap = Math.max(1, Math.min(limit > 0 ? limit : 100, 200));
-        List<Batch> rows = batches.findUpcomingBetween(start, end);
+        List<Batch> rows = includeCancelled
+                ? batches.findInWindow(start, end)
+                : batches.findUpcomingBetween(start, end);
         Map<UUID, Trip> tripCache = new HashMap<>();
         Map<UUID, String> guideCache = new HashMap<>();
         int amber = props.getCapacity().getAlertFillPercent();
@@ -376,6 +413,41 @@ public class TripService {
         return base.isBlank() ? "trip" : base;
     }
 
+    private void applySlug(Trip trip, String raw) {
+        String requested = slugify(raw);
+        if (requested.length() > 100) {
+            throw new BadRequestException("Keep the public address to 100 characters");
+        }
+        if (requested.equals(trip.getSlug())) {
+            return;
+        }
+        trips.findBySlug(requested).ifPresent(owner -> {
+            if (!owner.getId().equals(trip.getId())) {
+                throw new ConflictException("That address is already used by another trek");
+            }
+        });
+        auditChange(trip, "slug", trip.getSlug(), requested, trip::setSlug);
+    }
+
+    private void applyText(Trip trip, String field, String current, String next, Consumer<String> apply) {
+        if (java.util.Objects.equals(current, next)) {
+            return;
+        }
+        auditService.record("TRIP", trip.getId(), AuditAction.UPDATE, field, current, next);
+        apply.accept(next);
+    }
+
+    private static String normalizeCopy(String raw, int max, String label) {
+        String text = XssSanitizer.text(raw == null ? "" : raw.trim());
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        if (text.length() > max) {
+            throw new BadRequestException(label + " must be at most " + max + " characters");
+        }
+        return text;
+    }
+
     private String nextAvailableSlug(String base) {
         String candidate = base;
         int n = 2;
@@ -384,6 +456,17 @@ public class TripService {
             n++;
         }
         return candidate;
+    }
+
+    private static String normalizeCover(String raw) {
+        String trimmed = raw == null ? "" : raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > 500 || !trimmed.startsWith("https://")) {
+            throw new BadRequestException("Cover image must be an https URL, at most 500 characters");
+        }
+        return trimmed;
     }
 
     private static void requireManager(UserPrincipal caller) {
@@ -405,7 +488,9 @@ public class TripService {
         return new TripDetailResponse(
                 trip.getId(), trip.getName(), trip.getSlug(), trip.getCategory(), trip.getBookingType(),
                 trip.getDifficulty(), trip.getBaseCost(), trip.getDurationDays(), trip.getItinerary(),
-                trip.getInclusions(), trip.getExclusions(), trip.isActive(), trip.getCreatedAt(),
+                trip.getInclusions(), trip.getExclusions(), trip.isActive(), trip.getCoverImageUrl(),
+                trip.getMetaTitle(), trip.getMetaDescription(), trip.getContentBrief(),
+                trip.getCreatedAt(),
                 trip.getUpdatedAt(), batchResponses);
     }
 

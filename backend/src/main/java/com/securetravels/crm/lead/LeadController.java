@@ -4,6 +4,7 @@ import com.securetravels.crm.common.security.CurrentUser;
 import com.securetravels.crm.lead.dto.LeadActivityResponse;
 import com.securetravels.crm.lead.dto.LeadCreateRequest;
 import com.securetravels.crm.lead.dto.LeadResponse;
+import com.securetravels.crm.lead.dto.LeadSourceSummary;
 import com.securetravels.crm.lead.dto.LeadStatusRequest;
 import com.securetravels.crm.lead.dto.LeadUpdateRequest;
 import com.securetravels.crm.user.UserPrincipal;
@@ -74,6 +75,14 @@ public class LeadController {
             @CurrentUser UserPrincipal caller) {
         return leadService.list(ownerId, status, source, heat, tripId, from, to, travelFrom, travelTo,
                 search, page, size, caller);
+    }
+
+    @Operation(summary = "Enquiry counts by source. Sales see their own book; managers see the team.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping(path = "/sources", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public List<LeadSourceSummary> sources(@CurrentUser UserPrincipal caller) {
+        return leadService.sources(caller);
     }
 
     @Operation(summary = "Get one lead", security = @SecurityRequirement(name = "bearerAuth"))

@@ -68,7 +68,7 @@ export function difficultyClass(d?: string | null) {
 }
 
 /** Deterministic cover from trip identity (no external dependency). */
-export function coverGradient(trip: Pick<Trip, "id" | "name" | "category">) {
+export function coverGradient(trip: { id?: string | null; name?: string | null; category?: string | null }) {
   const seed = [...(trip.id || trip.name || "trek")].reduce((a, c) => a + c.charCodeAt(0), 0);
   const hues = [
     ["#0f766e", "#164e63"],
@@ -82,6 +82,18 @@ export function coverGradient(trip: Pick<Trip, "id" | "name" | "category">) {
   return `linear-gradient(135deg, ${a}, ${b})`;
 }
 
+export function coverStyle(trip: { id?: string | null; name?: string | null; category?: string | null; coverImageUrl?: string | null }) {
+  const url = trip.coverImageUrl;
+  if (url && url.startsWith("https://")) {
+    return {
+      backgroundImage: `linear-gradient(to top, rgba(15,23,42,.45), transparent 55%), url(${JSON.stringify(url)})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    };
+  }
+  return { background: coverGradient(trip) };
+}
+
 export function trekBadge(trip: Trip, featured: boolean, index: number): { label: string; className: string } | null {
   if (featured) return { label: "Featured", className: "bg-amber-400 text-amber-950" };
   if (trip.category === "CUSTOM") return { label: "Custom", className: "bg-violet-500 text-white" };
@@ -91,11 +103,6 @@ export function trekBadge(trip: Trip, featured: boolean, index: number): { label
   if (index === 2) return { label: "New", className: "bg-emerald-500 text-white" };
   if (index === 3) return { label: "Trending", className: "bg-violet-500 text-white" };
   return null;
-}
-
-export function pseudoRating(id?: string) {
-  const seed = [...(id || "x")].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return Math.round((4.2 + (seed % 8) / 10) * 10) / 10;
 }
 
 export function terrainTags(trip: Trip): string[] {

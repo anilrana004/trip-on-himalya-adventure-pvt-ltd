@@ -89,19 +89,12 @@ export function tabForStatus(s: UiBatchStatus): BatchTab {
   return "upcoming";
 }
 
-export function permitStatus(b: UpcomingBatch, ui: UiBatchStatus) {
-  if (ui === "Cancelled") return { label: "Pending", className: "bg-rose-50 text-rose-700" };
-  if (ui === "On Trek" || ui === "Completed" || ui === "Confirmed")
-    return { label: "Approved", className: "bg-emerald-50 text-emerald-700" };
-  if (ui === "Starting" || ui === "Preparing")
-    return { label: "In Process", className: "bg-amber-50 text-amber-700" };
-  const seed = [...(b.id || "")].reduce((a, c) => a + c.charCodeAt(0), 0);
-  if (seed % 5 === 0) return { label: "Pending", className: "bg-rose-50 text-rose-700" };
-  if (seed % 3 === 0) return { label: "In Process", className: "bg-amber-50 text-amber-700" };
-  return { label: "Approved", className: "bg-emerald-50 text-emerald-700" };
+export function permitStatus(_b: UpcomingBatch, ui: UiBatchStatus) {
+  if (ui === "Cancelled") return { label: "—", className: "bg-slate-100 text-slate-500" };
+  return { label: "Not tracked", className: "bg-slate-100 text-slate-500" };
 }
 
-export function transportLabel(plan?: string | null, tripName?: string) {
+export function transportLabel(plan?: string | null) {
   if (plan && plan.trim()) {
     const p = plan.toLowerCase();
     if (p.includes("innova")) return "Innova";
@@ -109,8 +102,7 @@ export function transportLabel(plan?: string | null, tripName?: string) {
     if (p.includes("bus")) return "Bus";
     return plan.length > 22 ? `${plan.slice(0, 20)}…` : plan;
   }
-  const seed = [...(tripName || "x")].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return seed % 2 === 0 ? "Tempo Traveller" : "Innova";
+  return "—";
 }
 
 export function baseCampFor(tripName?: string) {

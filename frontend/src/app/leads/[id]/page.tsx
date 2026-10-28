@@ -8,7 +8,7 @@ import { LOST_REASON_LABEL, pickLostReason } from "@/lib/lostReasons";
 import { useAuth } from "@/lib/auth";
 import { canWriteLeads, SALES_DESK } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { LeadForm } from "@/components/lead/LeadForm";
 import { FollowUpPanel } from "@/components/lead/FollowUpPanel";
 
@@ -136,14 +136,13 @@ export default function LeadDetailPage() {
 
   return (
     <Protected allowedRoles={SALES_DESK}>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 p-6">
+      <AppShell>
+        <main className="flex-1 p-4 md:p-6">
           <Link href="/leads" className="text-sm text-slate-500 hover:text-slate-800">
             ← Back to leads
           </Link>
 
-          <div className="mt-3 mb-6 flex items-start justify-between gap-4">
+          <div className="mt-3 mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-xl font-semibold text-slate-900">{lead.customerName}</h1>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -237,7 +236,7 @@ export default function LeadDetailPage() {
             </section>
           </div>
         </main>
-      </div>
+      </AppShell>
 
       {editing && canWrite && lead && (
         <LeadForm
@@ -263,15 +262,14 @@ function Field({ label, value }: { label: string; value: string }) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <Protected allowedRoles={SALES_DESK}>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 p-6">
+      <AppShell>
+        <main className="flex-1 p-4 md:p-6">
           <Link href="/leads" className="text-sm text-slate-500 hover:text-slate-800">
             ← Back to leads
           </Link>
           <p className="mt-6 text-sm text-slate-500">{children}</p>
         </main>
-      </div>
+      </AppShell>
     </Protected>
   );
 }

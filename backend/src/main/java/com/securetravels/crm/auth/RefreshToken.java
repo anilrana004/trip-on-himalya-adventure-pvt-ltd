@@ -41,6 +41,9 @@ public class RefreshToken extends CreatedOnly {
     @Column(name = "replaced_by", length = 64)
     private String replacedBy;
 
+    @Column(name = "login_session_id")
+    private UUID loginSessionId;
+
     protected RefreshToken() {}
 
     public RefreshToken(UUID userId, String tokenHash, Instant expiresAt) {
@@ -55,6 +58,8 @@ public class RefreshToken extends CreatedOnly {
     public Instant getExpiresAt() { return expiresAt; }
     public boolean isRevoked() { return revoked; }
     public String getReplacedBy() { return replacedBy; }
+    public UUID getLoginSessionId() { return loginSessionId; }
+    public void setLoginSessionId(UUID loginSessionId) { this.loginSessionId = loginSessionId; }
 
     public void revoke(String replacedBy) {
         this.revoked = true;

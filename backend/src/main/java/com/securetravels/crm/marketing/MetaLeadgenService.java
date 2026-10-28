@@ -8,11 +8,14 @@ import com.securetravels.crm.common.util.PhoneUtils;
 import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.lead.LeadService;
 import com.securetravels.crm.lead.dto.LeadCreateRequest;
+import com.securetravels.crm.trip.Trip;
+import com.securetravels.crm.trip.TripRepository;
 import com.securetravels.crm.user.User;
 import com.securetravels.crm.webhook.RoundRobinService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Ingest Meta Lead Ads webhooks (ADR 0008). Signature-verified, idempotent on
@@ -39,16 +43,20 @@ public class MetaLeadgenService {
     private final MetaLeadgenEventRepository events;
     private final LeadService leadService;
     private final RoundRobinService roundRobin;
+    private final TripRepository trips;
+    private final MetaAccessGuard access;
 
     public MetaLeadgenService(ObjectMapper objectMapper, AppProperties props, MetaGraphClient graph,
                               MetaLeadgenEventRepository events, LeadService leadService,
-                              RoundRobinService roundRobin) {
+                              RoundRobinService roundRobin, TripRepository trips, MetaAccessGuard access) {
         this.objectMapper = objectMapper;
         this.props = props;
         this.graph = graph;
         this.events = events;
         this.leadService = leadService;
         this.roundRobin = roundRobin;
+        this.trips = trips;
+        this.access = access;
     }
 
     public String verifySubscription(String mode, String verifyToken, String challenge) {
@@ -140,6 +148,7 @@ public class MetaLeadgenService {
                 events.save(event);
                 return;
             }
+            access.requireLeads();
 
             JsonNode leadJson = graph.get(
                     "leadgen.get",
@@ -173,6 +182,13 @@ public class MetaLeadgenService {
 
             String email = firstPresent(fields, "email", "email_address");
             Lead.Source source = resolveSource(leadJson.path("platform").asText(null), fields);
+            String destination = firstPresent(fields,
+                    "destination", "trek", "trek_name", "trip", "trip_name", "package",
+                    "which_trek", "interested_trek", "tour_name", "which_tour");
+            UUID tripId = resolveTripId(destination);
+            if (destination == null && tripId != null) {
+                destination = trips.findById(tripId).map(Trip::getName).orElse(null);
+            }
 
             String remarks = buildRemarks(event, fields);
 
@@ -182,8 +198,8 @@ public class MetaLeadgenService {
                     digits,
                     email,
                     source,
-                    null,
-                    null,
+                    destination,
+                    tripId,
                     null,
                     1,
                     null,
@@ -194,7 +210,7 @@ public class MetaLeadgenService {
                     true,
                     "meta lead ads form submission");
 
-            User owner = roundRobin.pickNextSalesUser();
+            User owner = roundRobin.assignForEnquiry(tripId, destination, event.getCampaignId());
             LeadService.LeadIngestResult result =
                     leadService.createFromMeta(request, owner.getId(), event.getMetaLeadId());
 
@@ -282,6 +298,14 @@ public class MetaLeadgenService {
             }
         }
         return map;
+    }
+
+    private UUID resolveTripId(String destination) {
+        if (destination == null || destination.isBlank()) {
+            return null;
+        }
+        List<Trip> matches = trips.findActiveNameMatches(destination.trim(), PageRequest.of(0, 1));
+        return matches.isEmpty() ? null : matches.get(0).getId();
     }
 
     private static String firstPresent(Map<String, String> fields, String... keys) {

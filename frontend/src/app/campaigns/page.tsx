@@ -2,16 +2,16 @@
 
 import { MANAGERS } from "@/lib/rbac";
 import { AdminPage } from "@/components/AdminPage";
-import { MetaCampaignsPanel } from "@/components/marketing/MetaCampaignsPanel";
+import { CampaignsDesk } from "@/components/marketing/CampaignsDesk";
 
 export default function CampaignsPage() {
   return (
     <AdminPage
       title="Campaigns"
-      subtitle="Meta Ads campaigns and performance for authorized accounts"
+      subtitle="Enquiries by the channel that created them, and the next step on each one"
       allowedRoles={MANAGERS}
     >
-      <MetaCampaignsPanel />
+      <CampaignsDesk />
     </AdminPage>
   );
 }

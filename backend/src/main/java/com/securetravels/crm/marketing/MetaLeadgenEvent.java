@@ -76,6 +76,7 @@ public class MetaLeadgenEvent {
     public String getAdgroupId() { return adgroupId; }
     public String getCampaignId() { return campaignId; }
     public Status getStatus() { return status; }
+    public String getErrorMessage() { return errorMessage; }
     public UUID getLeadId() { return leadId; }
 
     public void markProcessed(UUID leadId) {

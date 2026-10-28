@@ -68,7 +68,7 @@ class AnalyticsAccessIT extends BaseIT {
     }
 
     @Test
-    @DisplayName("an OPS user can read operations readiness and is told incidents are unavailable")
+    @DisplayName("an OPS user can read operations readiness and the incident log count")
     void opsCanReadOperations() throws Exception {
         createUser("ready.ops@x.in", "Ready Ops", Role.OPS, "ops123");
         String token = login("ready.ops@x.in", "ops123");
@@ -76,11 +76,8 @@ class AnalyticsAccessIT extends BaseIT {
         mockMvc.perform(get("/api/analytics/operations")
                         .header("Authorization", authHeader(token)))
                 .andExpect(status().isOk())
-                // The unavailable state must survive serialisation to the client;
-                // a default-constructed or null-omitted field would show the UI as
-                // "no incidents" instead of "not tracked".
-                .andExpect(jsonPath("$.incidentSummary.available").value(false))
-                .andExpect(jsonPath("$.incidentSummary.openIncidents").doesNotExist());
+                .andExpect(jsonPath("$.incidentSummary.available").value(true))
+                .andExpect(jsonPath("$.incidentSummary.openIncidents").value(0));
     }
 
     @Test

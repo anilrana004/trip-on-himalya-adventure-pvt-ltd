@@ -9,15 +9,16 @@ const DIFFICULTIES = ["EASY", "MODERATE", "DIFFICULT", "VERY_DIFFICULT"] as cons
 
 type TripFormProps = {
   trip?: TripDetail | null;
+  presetBookingType?: "FIXED_BATCH" | "CUSTOM_FIT";
   onSaved: () => void;
   onClose: () => void;
 };
 
-export function TripForm({ trip, onSaved, onClose }: TripFormProps) {
+export function TripForm({ trip, presetBookingType, onSaved, onClose }: TripFormProps) {
   const [form, setForm] = useState({
     name: trip?.name ?? "",
-    category: (trip?.category ?? "LEISURE") as TripCreatePayload["category"],
-    bookingType: (trip?.bookingType ?? "FIXED_BATCH") as TripCreatePayload["bookingType"],
+    category: (trip?.category ?? (presetBookingType === "CUSTOM_FIT" ? "CUSTOM" : "TREK")) as TripCreatePayload["category"],
+    bookingType: (trip?.bookingType ?? presetBookingType ?? "FIXED_BATCH") as TripCreatePayload["bookingType"],
     difficulty: (trip?.difficulty ?? "MODERATE") as (typeof DIFFICULTIES)[number],
     baseCost: trip?.baseCost != null ? String(trip.baseCost) : "",
     durationDays: trip ? String(trip.durationDays) : "",

@@ -83,6 +83,7 @@ public class Task extends CreatedUpdated {
     public UUID getBookingId() { return bookingId; }
     public void setBookingId(UUID bookingId) { this.bookingId = bookingId; }
     public UUID getAssigneeId() { return assigneeId; }
+    public void setAssigneeId(UUID assigneeId) { this.assigneeId = assigneeId; }
     public Type getType() { return type; }
     public Status getStatus() { return status; }
     public Instant getDueAt() { return dueAt; }

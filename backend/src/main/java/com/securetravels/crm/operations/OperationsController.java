@@ -65,7 +65,7 @@ public class OperationsController {
             security = @SecurityRequirement(name = "bearerAuth"))
     @PatchMapping(path = "/{id}/arrangements", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('OPS', 'MANAGER', 'ADMIN', 'CEO')")
+    @PreAuthorize("hasAnyRole('OPS', 'MANAGER', 'ADMIN', 'CEO', 'TRANSPORT', 'VENDOR')")
     public OperationsHandoffResponse updateArrangements(@PathVariable UUID id,
                                                         @Valid @RequestBody OpsArrangementsRequest request,
                                                         @CurrentUser UserPrincipal caller) {

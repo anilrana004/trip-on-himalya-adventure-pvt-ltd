@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -66,6 +67,20 @@ public class GlobalExceptionHandler {
      * so a malformed parameter cannot be used to reflect content into the error
      * body.
      */
+    /**
+     * A required query or form parameter that the caller simply omitted.
+     * Same class of mistake as a type mismatch: 400, not a 500.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> onMissingParameter(MissingServletRequestParameterException ex) {
+        String name = ex.getParameterName();
+        return ResponseEntity.badRequest().body(new ApiError(
+                HttpStatus.BAD_REQUEST.value(),
+                "MISSING_PARAMETER",
+                "Parameter '" + name + "' is required",
+                List.of(new ApiError.FieldError(name, "required"))));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiError> onTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String name = ex.getName();

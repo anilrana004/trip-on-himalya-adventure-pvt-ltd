@@ -37,6 +37,7 @@ class MetaMarketingServiceTest {
     private MetaAdAccountRepository accounts;
     private MetaApiCallLogRepository callLogs;
     private AppProperties props;
+    private MetaAccessGuard access;
     private MetaMarketingService service;
 
     @BeforeEach
@@ -44,10 +45,11 @@ class MetaMarketingServiceTest {
         graph = mock(MetaGraphClient.class);
         accounts = mock(MetaAdAccountRepository.class);
         callLogs = mock(MetaApiCallLogRepository.class);
+        access = mock(MetaAccessGuard.class);
         props = new AppProperties();
         props.getMeta().setAccessToken("token");
         props.getMeta().setAdAccountIds("act_111");
-        service = new MetaMarketingService(graph, accounts, callLogs, props);
+        service = new MetaMarketingService(graph, accounts, callLogs, props, access);
         when(accounts.findByMetaAccountId(anyString())).thenReturn(Optional.empty());
         when(accounts.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -205,6 +207,21 @@ class MetaMarketingServiceTest {
         assertThatThrownBy(() -> service.insights("act_111", "last_7d", "2026-01-01", "2026-01-31", "campaign"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("either datePreset or since/until");
+    }
+
+    @Test
+    void adsPermissionBlocksCampaignAndInsightCalls() {
+        org.mockito.Mockito.doThrow(new ForbiddenException(
+                        "Campaigns and insights are disabled. Grant ads_read or ads_management."))
+                .when(access).requireAds();
+
+        assertThatThrownBy(() -> service.listCampaigns("act_111", null, 10))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("ads_read");
+        assertThatThrownBy(() -> service.insights("act_111", "last_7d", null, null, "campaign"))
+                .isInstanceOf(ForbiddenException.class);
+        verify(graph, never()).get(anyString(), any(), anyString(), anyMap());
+        verify(graph, never()).getAllPages(anyString(), any(), anyString(), anyMap(), anyInt(), any());
     }
 
     @Test

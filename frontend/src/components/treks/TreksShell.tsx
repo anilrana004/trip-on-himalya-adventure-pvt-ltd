@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sidebar } from "@/components/Sidebar";
-import { TREKS_ERP_TABS } from "@/lib/rbac";
+import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/lib/auth";
+import { TREKS_ERP_TABS, hasRole } from "@/lib/rbac";
 
 export function TreksShell({
   title,
@@ -21,10 +22,11 @@ export function TreksShell({
   showTabs?: boolean;
 }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const tabs = TREKS_ERP_TABS.filter((tab) => !tab.roles || hasRole(user?.role, tab.roles));
 
   return (
-    <div className="flex min-h-screen bg-[#f4f6f9]">
-      <Sidebar />
+    <AppShell className="bg-[#f4f6f9]">
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 px-6 py-4 backdrop-blur">
           <div className="mb-1 text-[11px] font-medium text-slate-400">
@@ -39,7 +41,7 @@ export function TreksShell({
           </div>
           {showTabs && (
             <div className="mt-4 -mb-4 flex gap-1 overflow-x-auto border-t border-slate-100 pt-3">
-              {TREKS_ERP_TABS.map((tab) => {
+              {tabs.map((tab) => {
                 const active =
                   tab.href === "/trips"
                     ? pathname === "/trips"
@@ -63,6 +65,6 @@ export function TreksShell({
         </header>
         <div className="flex-1 p-6">{children}</div>
       </main>
-    </div>
+    </AppShell>
   );
 }

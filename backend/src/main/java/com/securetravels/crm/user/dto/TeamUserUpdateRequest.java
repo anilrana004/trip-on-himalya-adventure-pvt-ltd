@@ -4,6 +4,8 @@ import com.securetravels.crm.user.Role;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.util.UUID;
+
 /** Partial update — null fields are left unchanged. */
 public record TeamUserUpdateRequest(
         @Size(max = 120, message = "fullName too long")
@@ -18,6 +20,8 @@ public record TeamUserUpdateRequest(
         Boolean active,
 
         @Size(min = 8, max = 72, message = "password must be 8–72 characters")
-        String password
+        String password,
+
+        UUID vendorId
 ) {
 }

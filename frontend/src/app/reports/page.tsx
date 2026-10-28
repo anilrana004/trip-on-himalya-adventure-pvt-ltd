@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { ADMINS, ALL_STAFF, OPS_DESK, type Role } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { FilterBar, type AppliedFilter } from "@/components/report/filterBar";
 import { SalesFunnel } from "@/components/report/salesFunnel";
 import { TripPerformance } from "@/components/report/tripPerformance";
@@ -35,8 +35,7 @@ function ReportsView() {
   const current = TABS.find((t) => t.id === tab);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
+    <AppShell className="bg-slate-50">
       <main className="flex-1 overflow-y-auto p-6">
         <div className="mb-4">
           <h1 className="text-xl font-semibold text-slate-900">Reports</h1>
@@ -72,7 +71,7 @@ function ReportsView() {
         {tab === "customers" && <CustomerInsights filter={filter} />}
         {tab === "audit" && <AuditLog />}
       </main>
-    </div>
+    </AppShell>
   );
 }
 

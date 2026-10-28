@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.util.UUID;
+
 public record TeamUserCreateRequest(
         @NotBlank(message = "email is required")
         @Email(message = "email must be valid")
@@ -27,6 +29,8 @@ public record TeamUserCreateRequest(
 
         @NotBlank(message = "password is required")
         @Size(min = 8, max = 72, message = "password must be 8–72 characters")
-        String password
+        String password,
+
+        UUID vendorId
 ) {
 }

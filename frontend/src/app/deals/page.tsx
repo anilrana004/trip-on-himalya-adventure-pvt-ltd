@@ -1,19 +1,17 @@
 "use client";
 
-import { MANAGERS } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
+import { SALES_DESK } from "@/lib/rbac";
+import { AdminPage } from "@/components/AdminPage";
+import { DealsBoard } from "@/components/deals/DealsBoard";
 
 export default function DealsPage() {
   return (
-    <ModuleStub
+    <AdminPage
       title="Deals / Opportunities"
-      subtitle="High-intent leads moving toward booking confirmation"
-      allowedRoles={MANAGERS}
-      bullets={[
-        "Filter Leads Management to Proposal Sent and Interested stages.",
-        "Use Convert to Booking from the lead detail drawer when ready.",
-        "Track conversion in Reports & Forecasting.",
-      ]}
-    />
+      subtitle="One deal per lead. Stage changes follow the lead, and a won deal can confirm the booking."
+      allowedRoles={SALES_DESK}
+    >
+      <DealsBoard />
+    </AdminPage>
   );
 }

@@ -69,6 +69,22 @@ public class Trip extends Auditable {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    /** Public https cover. Null means the catalogue still shows the generated colour cover. */
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
+    /** Search-result title. Null means the public page uses the trek name. */
+    @Column(name = "meta_title", length = 70)
+    private String metaTitle;
+
+    /** Search-result description. Null means the page has no written snippet yet. */
+    @Column(name = "meta_description", length = 160)
+    private String metaDescription;
+
+    /** Internal note for the line marketing and sales use when this trek is quoted. */
+    @Column(name = "content_brief", columnDefinition = "text")
+    private String contentBrief;
+
     public Trip() {}
 
     public UUID getId() { return id; }
@@ -83,6 +99,10 @@ public class Trip extends Auditable {
     public String getInclusions() { return inclusions; }
     public String getExclusions() { return exclusions; }
     public boolean isActive() { return active; }
+    public String getCoverImageUrl() { return coverImageUrl; }
+    public String getMetaTitle() { return metaTitle; }
+    public String getMetaDescription() { return metaDescription; }
+    public String getContentBrief() { return contentBrief; }
 
     public void setName(String name) { this.name = name; }
     public void setSlug(String slug) { this.slug = slug; }
@@ -95,4 +115,8 @@ public class Trip extends Auditable {
     public void setInclusions(String inclusions) { this.inclusions = inclusions; }
     public void setExclusions(String exclusions) { this.exclusions = exclusions; }
     public void setActive(boolean active) { this.active = active; }
+    public void setCoverImageUrl(String coverImageUrl) { this.coverImageUrl = coverImageUrl; }
+    public void setMetaTitle(String metaTitle) { this.metaTitle = metaTitle; }
+    public void setMetaDescription(String metaDescription) { this.metaDescription = metaDescription; }
+    public void setContentBrief(String contentBrief) { this.contentBrief = contentBrief; }
 }

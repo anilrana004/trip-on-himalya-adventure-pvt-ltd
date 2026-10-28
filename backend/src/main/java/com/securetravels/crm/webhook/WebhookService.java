@@ -12,10 +12,12 @@ import com.securetravels.crm.lead.dto.LeadResponse;
 import com.securetravels.crm.user.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -85,12 +87,38 @@ public class WebhookService {
                     "Duplicate lead; existing lead returned");
         }
 
-        User owner = roundRobin.pickNextSalesUser();
-        LeadResponse created = leadService.createAutomated(toCreateRequest(req), owner.getId());
+        LeadCreateRequest createReq = toCreateRequest(req);
+        User owner = roundRobin.assignForEnquiry(createReq.tripId(), createReq.destination(), null);
+        LeadResponse created = leadService.createAutomated(createReq, owner.getId());
 
         log(SOURCE, payload, created.id(), WebhookLog.Status.success, null);
         return new WebhookLeadResponse(true, false, created.id(), owner.getId(), owner.getFullName(),
                 "Lead created and assigned to " + owner.getFullName() + ". 5-minute call task scheduled.");
+    }
+
+    /**
+     * Latest website-form posts for managers. Payload text stays in the table
+     * and is not copied onto the response.
+     */
+    @Transactional(readOnly = true)
+    public List<WebhookAttemptResponse> recentAttempts() {
+        return webhookLogs.latestAttempts(PageRequest.of(0, 40)).stream()
+                .map(row -> new WebhookAttemptResponse(
+                        row.getId(),
+                        row.getStatus(),
+                        safeError(row.getErrorMessage()),
+                        row.getLeadId(),
+                        row.getCreatedAt()))
+                .toList();
+    }
+
+    static String safeError(String message) {
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+        String cleaned = message.replaceAll("(?i)access_token=[^&\\s]+", "access_token=***");
+        cleaned = cleaned.replaceAll("\\b[6-9]\\d{9}\\b", "***");
+        return cleaned.length() > 200 ? cleaned.substring(0, 200) : cleaned;
     }
 
     @Transactional

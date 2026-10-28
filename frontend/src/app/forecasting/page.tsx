@@ -1,19 +1,17 @@
 "use client";
 
-import { MANAGERS } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
+import { SALES_DESK } from "@/lib/rbac";
+import { AdminPage } from "@/components/AdminPage";
+import { ForecastingDesk } from "@/components/forecast/ForecastingDesk";
 
 export default function ForecastingPage() {
   return (
-    <ModuleStub
+    <AdminPage
       title="Forecasting"
-      subtitle="Expected bookings and revenue from the live lead funnel"
-      allowedRoles={MANAGERS}
-      bullets={[
-        "Leads Funnel and Source Performance on Leads Management drive the short-term outlook.",
-        "Reports & Analytics has team conversion and trip performance.",
-        "Finance ERP Trek P&L closes the loop after bookings confirm.",
-      ]}
-    />
+      subtitle="Weighted revenue from open deals, split by stage, owner and expected close month"
+      allowedRoles={SALES_DESK}
+    >
+      <ForecastingDesk />
+    </AdminPage>
   );
 }

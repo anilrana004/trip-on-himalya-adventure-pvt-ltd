@@ -31,17 +31,22 @@ export function OperationsReadiness({ filter }: { filter: ReportFilterParams }) 
 
   return (
     <div className="space-y-4">
+      {inc?.available && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-semibold text-slate-800">Incidents logged</div>
+          <p className="mt-1 text-sm text-slate-600">
+            {num(inc.openIncidents)} open. {num(inc.incidentsInPeriod)} in this window.
+            {inc.reason ? <span className="text-slate-500"> {inc.reason}</span> : null}
+          </p>
+        </div>
+      )}
       {inc && !inc.available && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-semibold text-slate-800">Incidents</div>
           <p className="mt-1 text-sm text-slate-600">
-            Incident tracking is not active yet. This is reported as <b>unavailable</b> rather than zero so
-            the dashboard never implies “no incidents”.
+            Incident tracking is not active yet. This is reported as unavailable rather than zero.
             {inc.reason ? <span className="text-slate-500"> {inc.reason}</span> : null}
           </p>
-          {inc.openIncidents !== undefined && (
-            <div className="mt-1 text-sm text-slate-500">Open incidents: {num(inc.openIncidents)}</div>
-          )}
         </div>
       )}
 

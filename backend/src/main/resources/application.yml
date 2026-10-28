@@ -42,6 +42,7 @@ server:
     include-message: never
 
 app:
+  public-url: ${APP_PUBLIC_URL:http://localhost:3001}
   jwt:
     secret: ${JWT_SECRET:securetravels-phase1-jwt-secret-change-me-32b-plus}
     access-minutes: 15

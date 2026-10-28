@@ -38,6 +38,12 @@ public class LeadScoringService {
     }
 
     private boolean isHot(Lead l, LocalDate today) {
+        // Paid / inbound ads stay HOT until first contact — queue must clear fast.
+        if (l.getStatus() == Lead.Status.NEW
+                && l.getLastContactedAt() == null
+                && isPaidOrInboundAds(l.getSource())) {
+            return true;
+        }
         if (l.getTravelDate() != null && !l.getTravelDate().isAfter(today.plusDays(30))) return true;
         if (l.getBudget() != null && l.getBudget().compareTo(BUDGET_HOT) >= 0) return true;
         if (l.getNumPersons() >= 4
@@ -48,9 +54,17 @@ public class LeadScoringService {
     }
 
     private boolean isWarm(Lead l, LocalDate today) {
+        if (isPaidOrInboundAds(l.getSource())) return true;
         if (l.getTravelDate() != null && !l.getTravelDate().isAfter(today.plusDays(90))) return true;
         if (l.getBudget() != null && l.getBudget().compareTo(BUDGET_WARM) >= 0) return true;
         if (l.getNumPersons() >= 2) return true;
         return l.getSource() == Lead.Source.REFERRAL;
+    }
+
+    private static boolean isPaidOrInboundAds(Lead.Source source) {
+        return source == Lead.Source.FACEBOOK_ADS
+                || source == Lead.Source.INSTAGRAM
+                || source == Lead.Source.GOOGLE_ADS
+                || source == Lead.Source.WEBSITE;
     }
 }

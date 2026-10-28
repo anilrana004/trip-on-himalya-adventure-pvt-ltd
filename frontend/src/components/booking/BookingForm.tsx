@@ -14,6 +14,8 @@ import { useAuth } from "@/lib/auth";
 type BookingFormProps = {
   onSaved: () => void;
   onClose: () => void;
+  /** Opened from a lead or deal so the reservation starts on that record. */
+  presetLeadId?: string;
 };
 
 type TravellerRow = {
@@ -25,7 +27,7 @@ type TravellerRow = {
 
 const GENDERS = ["M", "F", "Other"];
 
-export function BookingForm({ onSaved, onClose }: BookingFormProps) {
+export function BookingForm({ onSaved, onClose, presetLeadId }: BookingFormProps) {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [trips, setTrips] = useState<TripDetail[]>([]);
@@ -50,16 +52,19 @@ export function BookingForm({ onSaved, onClose }: BookingFormProps) {
             (user?.role === "SALES" ? l.ownerId === user.id : true)
         );
         setLeads(candidates);
+        if (presetLeadId && candidates.some((l) => l.id === presetLeadId)) {
+          setSelectedLead(presetLeadId);
+        }
       })
       .catch(() => setError("Could not load leads"));
-  }, [user]);
+  }, [user, presetLeadId]);
 
   useEffect(() => {
     api
       .getTrips(true)
       .then((list) => {
         setTrips(list);
-        setSelectedTrip(list[0]?.id ?? "");
+        setSelectedTrip((current) => current || list[0]?.id || "");
       })
       .catch(() => setError("Could not load trips"));
   }, []);
@@ -77,6 +82,16 @@ export function BookingForm({ onSaved, onClose }: BookingFormProps) {
       })
       .catch(() => setError("Could not load trip detail"));
   }, [selectedTrip]);
+
+  useEffect(() => {
+    const lead = leads.find((l) => l.id === selectedLead);
+    if (!lead) return;
+    if (lead.tripId) setSelectedTrip(lead.tripId);
+    if (lead.travelDate) setTravelDate(lead.travelDate);
+    if (lead.customerName) {
+      setRows((rs) => (rs[0]?.fullName ? rs : [{ ...rs[0], fullName: lead.customerName || "" }]));
+    }
+  }, [selectedLead, leads]);
 
   const isFixed = tripDetail?.bookingType === "FIXED_BATCH";
   const openBatches = useMemo(

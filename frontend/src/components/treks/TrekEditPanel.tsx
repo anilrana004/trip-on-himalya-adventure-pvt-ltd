@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type TripDetail, ApiClientError } from "@/lib/api";
 import {
-  coverGradient,
+  coverStyle,
   difficultyLabel,
   inferRegion,
   inr,
@@ -134,15 +134,15 @@ export function TrekEditPanel({
           <div>
             <div
               className="relative mb-3 h-36 overflow-hidden rounded-xl"
-              style={{ background: coverGradient(trip) }}
+              style={coverStyle(trip)}
             >
               <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/50 to-transparent p-3">
-                <button
-                  type="button"
-                  className="rounded-md bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-800"
-                >
-                  Change Cover Image
-                </button>
+                  <Link
+                    href={`/trips/media?tripId=${trip.id}`}
+                    className="rounded-md bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-800"
+                  >
+                    Set cover
+                  </Link>
               </div>
             </div>
             <p className="text-xs text-slate-500">Gallery · 1 cover · Manage full media library</p>
@@ -198,7 +198,7 @@ export function TrekEditPanel({
           <form onSubmit={save} className="space-y-3">
             <div
               className="relative h-28 overflow-hidden rounded-xl"
-              style={{ background: coverGradient(trip) }}
+              style={coverStyle(trip)}
             >
               <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/45 to-transparent p-3">
                 <span className="text-[11px] font-semibold text-white">Cover preview</span>
@@ -349,14 +349,16 @@ export function TrekEditPanel({
           </div>
           <div className="space-y-1">
             {[
-              ["/trips/bulk", "Clone Trek"],
+              [`/trips/bulk?tripId=${trip.id}`, "Clone Trek"],
               ["/trips/packages", "Create Similar Package"],
               ["/batches", "Manage Batches"],
               ["/trips/pricing", "Update Pricing"],
-              ["/trips/itineraries", "Manage Itinerary"],
-              ["/trips/highlights", "Add Highlights"],
+              [`/trips/itineraries?tripId=${trip.id}`, "Manage Itinerary"],
+              [`/trips/map?tripId=${trip.id}`, "Route map"],
+              [`/trips/highlights?tripId=${trip.id}`, "Add Highlights"],
               ["/trips/faqs", "Manage FAQs"],
-              ["/trips/seo", "SEO Settings"],
+              [`/trips/categories?tripId=${trip.id}`, "Categories & Tags"],
+              [`/trips/seo?tripId=${trip.id}`, "SEO Settings"],
             ].map(([href, label]) => (
               <Link
                 key={label}

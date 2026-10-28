@@ -46,13 +46,16 @@ public class MetaMarketingService {
     private final MetaAdAccountRepository accounts;
     private final MetaApiCallLogRepository callLogs;
     private final AppProperties props;
+    private final MetaAccessGuard access;
 
     public MetaMarketingService(MetaGraphClient graph, MetaAdAccountRepository accounts,
-                                MetaApiCallLogRepository callLogs, AppProperties props) {
+                                MetaApiCallLogRepository callLogs, AppProperties props,
+                                MetaAccessGuard access) {
         this.graph = graph;
         this.accounts = accounts;
         this.callLogs = callLogs;
         this.props = props;
+        this.access = access;
     }
 
     /**
@@ -71,20 +74,49 @@ public class MetaMarketingService {
         String version = present(meta.getGraphVersion()) ? meta.getGraphVersion().trim() : "v22.0";
 
         if (!flags.accessTokenSet()) {
-            return new MetaDiagnosticsResponse(
+            return report(
                     flags,
                     MetaDiagnosticsResponse.ConnectivityStatus.CONFIG_MISSING,
                     "META_ACCESS_TOKEN is not set on the server. Configure it in Railway Variables.",
                     version,
                     null,
                     null,
-                    webhookReady);
+                    webhookReady,
+                    MetaAccessGuard.Snapshot.unconfigured());
+        }
+
+        MetaAccessGuard.Snapshot snap = access.inspect();
+        if (snap.graphError() != null) {
+            return report(
+                    flags,
+                    classify(snap.graphError()),
+                    actionable(snap.graphError()),
+                    version,
+                    null,
+                    null,
+                    webhookReady,
+                    snap);
+        }
+
+        if (!snap.adsEnabled()) {
+            String message = "Token authenticated, but campaigns and insights stay off until ads_read or ads_management is granted.";
+            if (snap.leadsEnabled()) {
+                message += " Lead retrieval is separately enabled.";
+            } else {
+                message += " Lead retrieval also stays off until leads_retrieval is granted.";
+            }
+            return report(
+                    flags,
+                    MetaDiagnosticsResponse.ConnectivityStatus.PERMISSION_FAILURE,
+                    message,
+                    version,
+                    snap.graphUserId(),
+                    null,
+                    webhookReady,
+                    snap);
         }
 
         try {
-            JsonNode me = graph.get("diagnostics.me", null, "me", Map.of("fields", "id"));
-            String graphUserId = textOrNull(me, "id");
-
             int visible;
             Set<String> allow = configuredAllowlist();
             if (!allow.isEmpty()) {
@@ -106,31 +138,53 @@ public class MetaMarketingService {
             String message = visible == 0
                     ? "Token authenticated, but no ad accounts were visible. Check Business asset assignment / META_AD_ACCOUNT_IDS."
                     : "Meta Graph connectivity OK. Token can see ad account data.";
+            if (!snap.leadsEnabled()) {
+                message += " Lead retrieval stays off until leads_retrieval is granted.";
+            }
             var status = visible == 0
                     ? MetaDiagnosticsResponse.ConnectivityStatus.ACCOUNT_INACCESSIBLE
                     : MetaDiagnosticsResponse.ConnectivityStatus.OK;
 
-            return new MetaDiagnosticsResponse(
-                    flags, status, message, version, graphUserId, visible, webhookReady);
+            return report(flags, status, message, version, snap.graphUserId(), visible, webhookReady, snap);
         } catch (MetaGraphException ex) {
-            return new MetaDiagnosticsResponse(
-                    flags,
-                    classify(ex),
-                    actionable(ex),
-                    version,
-                    null,
-                    null,
-                    webhookReady);
+            return report(flags, classify(ex), actionable(ex), version, snap.graphUserId(), null, webhookReady, snap);
         } catch (ServiceUnavailableException ex) {
-            return new MetaDiagnosticsResponse(
+            return report(
                     flags,
                     MetaDiagnosticsResponse.ConnectivityStatus.CONFIG_MISSING,
                     ex.getMessage(),
                     version,
                     null,
                     null,
-                    webhookReady);
+                    webhookReady,
+                    snap);
         }
+    }
+
+    private static MetaDiagnosticsResponse report(
+            MetaDiagnosticsResponse.ConfigFlags flags,
+            MetaDiagnosticsResponse.ConnectivityStatus status,
+            String message,
+            String version,
+            String graphUserId,
+            Integer visible,
+            boolean webhookReady,
+            MetaAccessGuard.Snapshot snap) {
+        return new MetaDiagnosticsResponse(
+                flags,
+                status,
+                message,
+                version,
+                graphUserId,
+                visible,
+                webhookReady,
+                new MetaDiagnosticsResponse.Capabilities(
+                        snap.adsEnabled(),
+                        snap.leadsEnabled(),
+                        snap.granted(),
+                        snap.missingForAds(),
+                        snap.missingForLeads(),
+                        snap.missingPageAccess()));
     }
 
     private static MetaDiagnosticsResponse.ConnectivityStatus classify(MetaGraphException ex) {
@@ -205,6 +259,7 @@ public class MetaMarketingService {
     @Transactional
     public List<MetaAdAccountResponse> listAdAccounts() {
         requireConfigured();
+        access.requireAds();
         Map<String, String> query = Map.of(
                 "fields", "id,account_id,name,currency,account_status",
                 "limit", "50");
@@ -237,6 +292,7 @@ public class MetaMarketingService {
 
     public MetaPageResponse<MetaCampaignResponse> listCampaigns(String accountId, String after, int limit) {
         requireConfigured();
+        access.requireAds();
         String act = assertAuthorizedAccount(accountId);
         int pageSize = Math.min(Math.max(limit, 1), 100);
         Map<String, String> query = new LinkedHashMap<>();
@@ -267,6 +323,7 @@ public class MetaMarketingService {
     public MetaInsightsResponse insights(String accountId, String datePreset, String since, String until,
                                          String level) {
         requireConfigured();
+        access.requireAds();
         String act = assertAuthorizedAccount(accountId);
 
         boolean hasRange = notBlank(since) || notBlank(until);

@@ -1,21 +1,12 @@
 ﻿"use client";
 
-import { TreksModuleStub } from "@/components/treks/TreksModuleStub";
+import { Protected } from "@/components/Protected";
+import { ReviewsDesk } from "@/components/treks/ReviewsDesk";
 
 export default function Page() {
   return (
-    <TreksModuleStub
-      title="Reviews & Ratings"
-      breadcrumb="Reviews & Ratings"
-      subtitle="Customer ratings and testimonials for trek products"
-      bullets={[
-        "Average rating on Manage Treks KPIs",
-        "Moderate published reviews",
-        "Surface bestsellers from review volume",
-      ]}
-      links={[
-        { href: "/trips", label: "Manage Treks" },
-      ]}
-    />
+    <Protected>
+      <ReviewsDesk />
+    </Protected>
   );
 }

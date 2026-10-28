@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type Payment } from "@/lib/api";
+import { api, type Booking, type Payment } from "@/lib/api";
 import { FINANCE_PORTAL, canWritePayments } from "@/lib/rbac";
 import { useAuth } from "@/lib/auth";
 import { Protected } from "@/components/Protected";
+import { PaymentForm } from "@/components/payment/PaymentForm";
 import { FinanceShell, inr, KpiCard } from "@/components/finance/FinanceShell";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -20,16 +21,23 @@ function ReceivablesView() {
   const { user } = useAuth();
   const canWrite = canWritePayments(user?.role);
   const [rows, setRows] = useState<Payment[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
 
   const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    api
-      .getPayments({ status: status || undefined })
-      .then(setRows)
+    Promise.all([
+      api.getPayments({ status: status || undefined }),
+      api.getBookings().catch(() => [] as Booking[]),
+    ])
+      .then(([payments, book]) => {
+        setRows(payments);
+        setBookings(book);
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [status]);
@@ -51,6 +59,18 @@ function ReceivablesView() {
     return { collected, open, overdue };
   }, [rows]);
 
+  const trekByBooking = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const booking of bookings) {
+      if (booking.id && booking.tripName) map.set(booking.id, booking.tripName);
+    }
+    return map;
+  }, [bookings]);
+
+  function tripName(bookingId?: string) {
+    return bookingId ? trekByBooking.get(bookingId) : undefined;
+  }
+
   async function mark(id: string, next: "COMPLETED" | "REFUNDED") {
     try {
       await api.updatePaymentStatus(id, {
@@ -66,22 +86,34 @@ function ReceivablesView() {
   return (
     <FinanceShell
       title="Receivables ledger"
-      subtitle="All booking advances, balances and overdue trek payments"
+      subtitle="Each line is a payment recorded on a CRM booking"
       actions={
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">All statuses</option>
-          {Object.keys(STATUS_STYLE).map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          {canWrite && (
+            <button type="button" onClick={() => setShowForm(true)} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
+              Record a payment
+            </button>
+          )}
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+          >
+            <option value="">All statuses</option>
+            {Object.keys(STATUS_STYLE).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       }
     >
+      {showForm && (
+        <div className="mb-4">
+          <PaymentForm onSaved={() => { setShowForm(false); reload(); }} onClose={() => setShowForm(false)} />
+        </div>
+      )}
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -118,14 +150,15 @@ function ReceivablesView() {
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-slate-400">
-                  No payment lines
+                  No payment has been recorded on a booking.
                 </td>
               </tr>
             )}
             {rows.map((p) => (
               <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/60">
-                <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                  {(p.bookingId as string)?.slice(0, 8)}…
+                <td className="px-4 py-3">
+                  <div className="font-medium text-slate-800">{p.customerName || "Traveller"}</div>
+                  <div className="text-xs text-slate-400">{p.bookingRef || "Booking"}{tripName(p.bookingId) ? ` · ${tripName(p.bookingId)}` : ""}</div>
                 </td>
                 <td className="px-4 py-3 text-slate-700">{p.amountType}</td>
                 <td className="px-4 py-3 font-semibold tabular-nums">{inr(Number(p.amount))}</td>

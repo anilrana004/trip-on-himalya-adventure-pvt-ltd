@@ -1,19 +1,17 @@
 "use client";
 
+import { LandingPagesDesk } from "@/components/marketing/LandingPagesDesk";
+import { AdminPage } from "@/components/AdminPage";
 import { MANAGERS } from "@/lib/rbac";
-import { ModuleStub } from "@/components/ModuleStub";
 
 export default function LandingPagesPage() {
   return (
-    <ModuleStub
+    <AdminPage
       title="Landing Pages"
-      subtitle="Trek landing experiences that feed the CRM"
+      subtitle="Trek pages and the website enquiries that name them"
       allowedRoles={MANAGERS}
-      bullets={[
-        "Website forms post into POST /api/webhook/lead with HMAC.",
-        "Leads arrive with source WEBSITE and optional campaign notes.",
-        "Use Forms & Lead Capture for field mapping guidance.",
-      ]}
-    />
+    >
+      <LandingPagesDesk />
+    </AdminPage>
   );
 }
