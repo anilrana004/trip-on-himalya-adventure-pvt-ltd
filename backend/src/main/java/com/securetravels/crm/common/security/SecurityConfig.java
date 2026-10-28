@@ -160,17 +160,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        // Use patterns (supports http://localhost:*) so Next.js rewrites that
-        // forward the browser Origin do not 403 with "Invalid CORS request".
+        // Use patterns so Vercel preview hosts (…-git-….vercel.app) work when
+        // operators set the production APP_PUBLIC_URL / CORS_ALLOWED_ORIGINS.
         List<String> origins = props.getCors().getAllowedOrigins();
         if (origins == null || origins.isEmpty()) {
             cfg.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*"));
         } else {
-            boolean hasWildcard = origins.stream().anyMatch(o -> o.contains("*"));
-            if (hasWildcard) {
-                cfg.setAllowedOriginPatterns(origins);
+            List<String> patterns = CorsOriginPatterns.expand(origins);
+            boolean needsPatterns = patterns.stream().anyMatch(o -> o.contains("*"));
+            if (needsPatterns) {
+                cfg.setAllowedOriginPatterns(patterns);
             } else {
-                cfg.setAllowedOrigins(origins);
+                cfg.setAllowedOrigins(patterns);
             }
         }
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

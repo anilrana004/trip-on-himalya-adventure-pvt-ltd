@@ -36,8 +36,15 @@ APP_PUBLIC_URL=https://YOUR-APP.vercel.app
 # If CORS_ALLOWED_ORIGINS is omitted, APP_PUBLIC_URL alone is enough (must be https).
 BOOTSTRAP_ADMIN_EMAIL=admin@securetravels.in
 BOOTSTRAP_ADMIN_PASSWORD=<strong password>
+# Optional recovery: set true once, redeploy, sign in, then delete the force var.
+# BOOTSTRAP_ADMIN_FORCE_PASSWORD=true
 FINANCE_BOOTSTRAP_PASSWORD=<strong password>
 ```
+
+**Login passwords:** production does **not** accept local demo passwords
+(`admin123` / `finance123`). Sign in with `BOOTSTRAP_ADMIN_PASSWORD` (CRM) or
+`FINANCE_BOOTSTRAP_PASSWORD` (Finance ERP) from Railway Variables.
+
 
 Generate secrets:
 
@@ -75,6 +82,7 @@ If your Postgres service is **not** named `Postgres`, change the reference, e.g.
 | `127.0.0.1:5432 refused` | Missing/wrong `DATABASE_URL`; add Postgres plugin reference |
 | `API proxy not configured` | Set Vercel `API_PROXY_TARGET` + redeploy |
 | Unexposed service | Generate Domain on Railway |
-| CORS / cookie issues | `CORS_ALLOWED_ORIGINS` = exact Vercel URL; leave `COOKIE_DOMAIN` empty |
+| CORS / cookie issues | `CORS_ALLOWED_ORIGINS` / `APP_PUBLIC_URL` = production Vercel https URL (preview hosts are derived) |
+| `Invalid email or password` / demo-password message | Use Railway `BOOTSTRAP_ADMIN_PASSWORD`, not `admin123`. To rotate: set new password + `BOOTSTRAP_ADMIN_FORCE_PASSWORD=true`, redeploy, then unset force |
 
 Full detail: [`RAILWAY.md`](./RAILWAY.md), [`VERCEL.md`](./VERCEL.md).

@@ -14,13 +14,8 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * A fresh production database has no users, so no account can log in to create
- * the first real user. {@link BootstrapAdminRunner} must create exactly one CEO
- * account from the env vars when the table is empty, and must never create a
- * duplicate once any user exists.
- *
- * <p>Runs against the real test database (no MockMvc needed — this is a
- * CommandLineRunner, so it is invoked directly rather than over HTTP).
+ * Production must always be able to create a CEO desk login from env vars,
+ * even when finance was seeded first. Demo {@code admin123} is never used here.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -54,6 +49,19 @@ class BootstrapAdminRunnerTest {
     }
 
     @Test
+    @DisplayName("password only -> defaults email to admin@securetravels.in")
+    void defaultsEmailWhenUnset() {
+        truncateUsers();
+
+        assertThat(runner.bootstrap(null, "DefaultEmailPass1!")).isTrue();
+
+        User admin = users.findAll().get(0);
+        assertThat(admin.getEmail()).isEqualTo("admin@securetravels.in");
+        assertThat(admin.getRole()).isEqualTo(Role.CEO);
+        assertThat(passwordEncoder.matches("DefaultEmailPass1!", admin.getPasswordHash())).isTrue();
+    }
+
+    @Test
     @DisplayName("bootstrap password is stored BCrypt-hashed, never in plaintext")
     void storesHashedPassword() {
         truncateUsers();
@@ -66,41 +74,55 @@ class BootstrapAdminRunnerTest {
     }
 
     @Test
-    @DisplayName("non-empty DB + env vars set -> no duplicate created")
-    void doesNotDuplicateWhenUsersExist() {
+    @DisplayName("finance already present -> still creates CEO when email is new")
+    void createsCeoWhenFinanceAlreadyExists() {
         truncateUsers();
-        users.save(new User("existing.owner@securetravels.in",
-                passwordEncoder.encode("already-here"), "Existing", Role.MANAGER, null));
+        users.save(new User("finance@securetravels.in",
+                passwordEncoder.encode("already-here"), "Finance", Role.FINANCE, null));
         assertThat(users.count()).isEqualTo(1);
 
-        boolean created = runner.bootstrap("second.admin@securetravels.in", "AnotherPass1!");
+        boolean created = runner.bootstrap("admin@securetravels.in", "CeoPass1!");
 
-        assertThat(created).isFalse();
-        assertThat(users.count()).isEqualTo(1);
-        assertThat(users.findAll().get(0).getEmail()).isEqualTo("existing.owner@securetravels.in");
+        assertThat(created).isTrue();
+        assertThat(users.count()).isEqualTo(2);
+        assertThat(users.findByEmailIgnoreCase("admin@securetravels.in")).isPresent();
+        assertThat(users.findByEmailIgnoreCase("admin@securetravels.in").orElseThrow().getRole())
+                .isEqualTo(Role.CEO);
     }
 
     @Test
-    @DisplayName("running twice on an empty-then-populated DB stays idempotent")
+    @DisplayName("same email twice without force -> idempotent no-op")
     void secondInvocationIsNoOp() {
         truncateUsers();
 
         assertThat(runner.bootstrap("once.only@securetravels.in", "FirstPass1!")).isTrue();
-        assertThat(runner.bootstrap("twice.only@securetravels.in", "SecondPass1!")).isFalse();
+        assertThat(runner.bootstrap("once.only@securetravels.in", "SecondPass1!")).isFalse();
 
         assertThat(users.count()).isEqualTo(1);
-        assertThat(users.findAll().get(0).getEmail()).isEqualTo("once.only@securetravels.in");
+        assertThat(passwordEncoder.matches("FirstPass1!", users.findAll().get(0).getPasswordHash())).isTrue();
     }
 
     @Test
-    @DisplayName("missing email or password -> no user created, no crash")
+    @DisplayName("force flag rotates password for existing admin")
+    void forceRotatesPassword() {
+        truncateUsers();
+        runner.bootstrap("admin@securetravels.in", "OldPass1!");
+
+        assertThat(runner.bootstrap("admin@securetravels.in", "NewPass2!", true)).isTrue();
+
+        User admin = users.findByEmailIgnoreCase("admin@securetravels.in").orElseThrow();
+        assertThat(passwordEncoder.matches("NewPass2!", admin.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("OldPass1!", admin.getPasswordHash())).isFalse();
+    }
+
+    @Test
+    @DisplayName("missing password -> no user created, no crash")
     void missingEnvVarsAreSafeNoOps() {
         truncateUsers();
 
-        assertThat(runner.bootstrap(null, "SomePass1!")).isFalse();
         assertThat(runner.bootstrap("someone@securetravels.in", null)).isFalse();
         assertThat(runner.bootstrap("someone@securetravels.in", "   ")).isFalse();
-        assertThat(runner.bootstrap("  ", "SomePass1!")).isFalse();
+        assertThat(runner.bootstrap(null, null)).isFalse();
         assertThat(runner.bootstrap("", "")).isFalse();
 
         assertThat(users.count()).isZero();

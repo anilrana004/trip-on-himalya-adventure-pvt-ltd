@@ -14,22 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Locale;
 
 /**
- * First-boot escape hatch: a brand-new production database has zero users, so
- * there is no account that can log in to create the first real user — a
- * locked-out system. This runner creates exactly one CEO account from
- * {@code BOOTSTRAP_ADMIN_EMAIL} + {@code BOOTSTRAP_ADMIN_PASSWORD} when, and
- * only when, the users table is empty.
+ * Ensures a CEO desk login exists from {@code BOOTSTRAP_ADMIN_EMAIL} +
+ * {@code BOOTSTRAP_ADMIN_PASSWORD}. Finance (or any other) seed must not block
+ * creating this account — operators sign in as CEO first, then manage the team.
  *
- * <p><b>Deliberately NOT wired to {@code app.bootstrap-demo-data}.</b> That flag
- * is a local-dev convenience switched off in production; this is a separate
- * one-shot that is always safe to leave enabled, because the table-empty check
- * makes it naturally idempotent — the moment any user exists (including the
- * bootstrap one) it becomes a no-op forever.
+ * <p>Default email when only the password is set: {@code admin@securetravels.in}.
+ * Set {@code BOOTSTRAP_ADMIN_FORCE_PASSWORD=true} to re-hash the password for an
+ * existing account (ops recovery after a forgotten bootstrap secret). Unset
+ * force after the next successful login.
  *
- * <p>Reads the environment directly rather than via {@link AppProperties} so
- * that a missing password can never fall back to a checked-in default. Both
- * variables must be present and non-blank, otherwise the runner does nothing
- * and logs at INFO.
+ * <p>Deliberately NOT wired to {@code app.bootstrap-demo-data}. Demo
+ * {@code admin123} never applies on Railway {@code prod}.
  */
 @Component
 @Order(10) // before BootstrapFinanceUserRunner (20) so finance alone cannot block first CEO
@@ -39,6 +34,8 @@ public class BootstrapAdminRunner implements CommandLineRunner {
 
     private static final String ENV_EMAIL = "BOOTSTRAP_ADMIN_EMAIL";
     private static final String ENV_PASSWORD = "BOOTSTRAP_ADMIN_PASSWORD";
+    private static final String ENV_FORCE = "BOOTSTRAP_ADMIN_FORCE_PASSWORD";
+    private static final String DEFAULT_EMAIL = "admin@securetravels.in";
 
     /** Role for the first account: CEO is the top of the flat hierarchy and
      *  satisfies every hasAnyRole(...) check, so it cannot be locked out of
@@ -55,30 +52,55 @@ public class BootstrapAdminRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        bootstrap(System.getenv(ENV_EMAIL), System.getenv(ENV_PASSWORD));
+        bootstrap(
+                System.getenv(ENV_EMAIL),
+                System.getenv(ENV_PASSWORD),
+                isTruthy(System.getenv(ENV_FORCE)));
     }
 
     /**
      * Package-visible so tests can exercise both branches without mutating the
      * process environment (which is not reliably writable in a forked JVM).
      *
-     * @return {@code true} if an account was created by this call
+     * @return {@code true} if an account was created or its password was reset
      */
     @Transactional
     boolean bootstrap(String rawEmail, String rawPassword) {
-        String email = trimToNull(rawEmail);
-        String password = rawPassword;
+        return bootstrap(rawEmail, rawPassword, false);
+    }
 
-        if (email == null || password == null || password.isBlank()) {
-            log.info("[bootstrap-admin] skipped: set {} and {} to create the first account on an empty database", ENV_EMAIL, ENV_PASSWORD);
+    @Transactional
+    boolean bootstrap(String rawEmail, String rawPassword, boolean forcePassword) {
+        String password = rawPassword;
+        if (password == null || password.isBlank()) {
+            log.info("[bootstrap-admin] skipped: set {} (and optionally {}) to create the CEO desk login",
+                    ENV_PASSWORD, ENV_EMAIL);
             return false;
         }
 
+        String email = trimToNull(rawEmail);
+        if (email == null) {
+            email = DEFAULT_EMAIL;
+            log.info("[bootstrap-admin] {} unset — using default {}", ENV_EMAIL, DEFAULT_EMAIL);
+        }
+
         String normalisedEmail = email.toLowerCase(Locale.ROOT);
-        // Finance (or any other) user must not block creating the CEO desk login.
-        if (users.existsByEmailIgnoreCase(normalisedEmail)) {
-            log.info("[bootstrap-admin] skipped: {} already exists", normalisedEmail);
-            return false;
+        var existing = users.findByEmailIgnoreCase(normalisedEmail);
+        if (existing.isPresent()) {
+            if (!forcePassword) {
+                log.info("[bootstrap-admin] skipped: {} already exists (set {}=true to rotate password from env)",
+                        normalisedEmail, ENV_FORCE);
+                return false;
+            }
+            User admin = existing.get();
+            admin.setPasswordHash(passwordEncoder.encode(password));
+            if (!admin.isActive()) {
+                admin.setActive(true);
+            }
+            users.save(admin);
+            log.info("[bootstrap-admin] password rotated for existing {} account; unset {} after sign-in",
+                    BOOTSTRAP_ROLE, ENV_FORCE);
+            return true;
         }
 
         User admin = new User(
@@ -89,11 +111,16 @@ public class BootstrapAdminRunner implements CommandLineRunner {
                 null);
         users.save(admin);
 
-        // Never echo the password. Email is not secret, but keep it out of the
-        // log line too so this stays safe to paste into a ticket.
-        log.info("[bootstrap-admin] created initial {} account on an empty database; unset {} / {} once you have signed in and changed the password",
+        // Never echo the password. Email is not secret, but keep volume low in tickets.
+        log.info("[bootstrap-admin] created {} account; unset {} / {} once you have signed in and changed the password",
                 BOOTSTRAP_ROLE, ENV_EMAIL, ENV_PASSWORD);
         return true;
+    }
+
+    private static boolean isTruthy(String value) {
+        if (value == null) return false;
+        String v = value.trim().toLowerCase(Locale.ROOT);
+        return v.equals("1") || v.equals("true") || v.equals("yes") || v.equals("on");
     }
 
     private static String trimToNull(String value) {

@@ -5,43 +5,64 @@ import com.securetravels.crm.common.security.JwtService;
 import com.securetravels.crm.user.User;
 import com.securetravels.crm.user.UserRepository;
 import io.jsonwebtoken.Claims;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class AuthService {
+
+    /** Local DemoDataSeeder passwords — never valid on Railway prod. */
+    private static final Set<String> DEMO_PASSWORDS = Set.of("admin123", "finance123", "manager123", "sales123");
 
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
     private final LoginSessionRepository loginSessions;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final Environment environment;
 
     public AuthService(UserRepository users, RefreshTokenRepository refreshTokens,
                        LoginSessionRepository loginSessions, PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService, Environment environment) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.loginSessions = loginSessions;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.environment = environment;
     }
 
     @Transactional
     public AuthResponse login(String email, String rawPassword) {
         User user = users.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+                .orElseThrow(() -> badCredentials(rawPassword));
         if (!user.isActive() || !passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-            throw new BadCredentialsException("Invalid email or password");
+            throw badCredentials(rawPassword);
         }
         refreshTokens.deleteByUserIdAndRevokedTrue(user.getId());
         return issuePair(user);
+    }
+
+    private BadCredentialsException badCredentials(String rawPassword) {
+        if (productionProfile() && rawPassword != null && DEMO_PASSWORDS.contains(rawPassword)) {
+            return new BadCredentialsException(
+                    "Demo passwords are disabled in production. Use BOOTSTRAP_ADMIN_PASSWORD "
+                            + "(or FINANCE_BOOTSTRAP_PASSWORD) from Railway → Variables.");
+        }
+        return new BadCredentialsException("Invalid email or password");
+    }
+
+    private boolean productionProfile() {
+        return Arrays.stream(environment.getActiveProfiles()).anyMatch("prod"::equals);
     }
 
     /** The reuse revoke must commit. A rollback-on-401 would leave the stolen successor alive. */

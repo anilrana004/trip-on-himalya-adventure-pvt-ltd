@@ -88,9 +88,13 @@ export default function FinanceLoginPage() {
           {submitting ? "Signing in…" : "Enter Finance ERP"}
         </button>
 
-        {showDemo && (
+        {showDemo ? (
           <p className="mt-4 text-center text-xs text-slate-400">
             Demo: finance@securetravels.in · finance123
+          </p>
+        ) : (
+          <p className="mt-4 text-center text-xs text-slate-400">
+            Production uses FINANCE_BOOTSTRAP_PASSWORD from Railway — not finance123.
           </p>
         )}
         <p className="mt-3 text-center text-xs text-slate-500">
