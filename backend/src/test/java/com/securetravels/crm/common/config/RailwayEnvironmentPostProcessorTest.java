@@ -35,6 +35,25 @@ class RailwayEnvironmentPostProcessorTest {
     }
 
     @Test
+    void railwayIgnoresLocalhostDatasourceDefault() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("RAILWAY_PROJECT_ID", "proj");
+        // application.yml default — must NOT count as a configured production DB
+        env.setProperty("spring.datasource.url", "jdbc:postgresql://127.0.0.1:5432/securetravels_crm");
+        env.setProperty("JWT_SECRET", "abcdefghijklmnopqrstuvwxyz0123456789ABCD");
+        env.setProperty("WEBHOOK_SECRET", "a-real-webhook-secret-not-the-default");
+        env.setProperty("EMAIL_WEBHOOK_SECRET", "email-secret");
+        env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret");
+        env.setProperty("CORS_ALLOWED_ORIGINS", "https://app.example.com");
+
+        assertThatThrownBy(() ->
+                        new RailwayEnvironmentPostProcessor().postProcessEnvironment(env, new SpringApplication()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DATABASE_URL")
+                .hasMessageContaining("127.0.0.1");
+    }
+
+    @Test
     void railwayWithFullConfigMapsDatabaseAndAllowsBoot() {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("RAILWAY_PROJECT_ID", "proj");

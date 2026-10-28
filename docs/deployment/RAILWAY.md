@@ -7,13 +7,17 @@ public HTTPS domain**.
 
 Vercel hosts only the Next.js UI. It never holds JWT or DB secrets.
 
-## Why the deploy showed CRASHED + 0 Variables
+## Why the deploy showed CRASHED / login failed
 
 | Symptom | Cause |
 |---|---|
-| **0 Variables** | Secrets are **not** set in `railway.toml`. The old `[variables]` block was ignored by Railway. Variables live only in the **Variables** tab. |
-| **Crashed** | API **refuses to boot** without `JWT_SECRET`, webhook secrets, `CORS_ALLOWED_ORIGINS`, and a database URL. That is intentional. |
+| **`Connection to 127.0.0.1:5432 refused`** | No Railway Postgres wired. App fell back to the laptop default in `application.yml`. Set `DATABASE_URL=${{Postgres.DATABASE_URL}}` and remove any localhost `DB_URL`. |
+| **0 Variables** | Secrets are **not** set in `railway.toml`. Variables live only in the **Variables** tab. |
+| **Crashed** | API **refuses to boot** without secrets, CORS, and a **non-localhost** database. That is intentional. |
 | **Unexposed service** | No public domain → Vercel `API_PROXY_TARGET` cannot reach login. |
+| **Vercel: API proxy not configured** | Set `API_PROXY_TARGET` on Vercel to the Railway HTTPS origin and redeploy. |
+
+Short path: [`GO_LIVE_LOGIN.md`](./GO_LIVE_LOGIN.md).
 
 Frontend-only commits no longer redeploy this API (`watchPatterns` in `railway.toml`).
 

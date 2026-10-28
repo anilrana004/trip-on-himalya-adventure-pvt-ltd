@@ -4,12 +4,13 @@ import org.springframework.core.env.Environment;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Shared production gate for Trip On Himalaya CRM / Finance ERP / IVR-facing API.
  *
  * <p>Same bar as a Salesforce / Zoho org: the desk does not boot on demo secrets,
- * open CORS, or a missing database. Used by the Railway early boot check and
+ * open CORS, or a localhost database. Used by the Railway early boot check and
  * {@link ProdSecretsValidator}.
  */
 public final class RequiredProductionConfig {
@@ -47,29 +48,51 @@ public final class RequiredProductionConfig {
         return missing;
     }
 
-    /** Database must exist before Hibernate/Flyway touch the JVM on Railway. */
+    /**
+     * Database must be a real Railway (or managed) Postgres — never the local
+     * {@code 127.0.0.1} default from {@code application.yml}.
+     */
     public static List<String> databaseProblems(Environment env) {
         List<String> missing = new ArrayList<>();
-        String jdbc = firstNonBlank(
-                env.getProperty("DB_URL"),
-                env.getProperty("spring.datasource.url"),
-                env.getProperty("SPRING_DATASOURCE_URL"),
+        // Only operator-supplied URLs count. Ignore spring.datasource.url default
+        // (jdbc:postgresql://127.0.0.1:5432/…) which is for laptop docker-compose.
+        String explicit = firstNonBlank(
                 env.getProperty("DATABASE_URL"),
                 env.getProperty("POSTGRES_URL"),
-                env.getProperty("DATABASE_PRIVATE_URL"));
-        if (jdbc.isBlank()) {
-            missing.add("DATABASE_URL (add Railway Postgres and reference ${{Postgres.DATABASE_URL}})");
+                env.getProperty("DATABASE_PRIVATE_URL"),
+                env.getProperty("DB_URL"),
+                env.getProperty("SPRING_DATASOURCE_URL"));
+
+        if (explicit.isBlank() || isUnresolvedReference(explicit) || isLoopbackDatabase(explicit)) {
+            missing.add(
+                    "DATABASE_URL — add Railway Postgres, then set DATABASE_URL=${{Postgres.DATABASE_URL}} "
+                            + "(match the Postgres service name). Do not use 127.0.0.1 or localhost.");
+            return missing;
         }
         return missing;
+    }
+
+    static boolean isLoopbackDatabase(String url) {
+        String u = url.toLowerCase(Locale.ROOT);
+        return u.contains("127.0.0.1")
+                || u.contains("localhost")
+                || u.contains("0.0.0.0")
+                || u.contains("[::1]");
+    }
+
+    static boolean isUnresolvedReference(String value) {
+        // Operator pasted the template literally without a Postgres plugin.
+        return value.contains("${{") || value.contains("${Postgres");
     }
 
     public static String refusalMessage(List<String> problems) {
         return "Trip On Himalaya CRM API refused to start — production configuration incomplete:\n  - "
                 + String.join("\n  - ", problems)
                 + "\n\nFix (permanent): Railway → this API service → Variables. "
-                + "Import ops/ENV.production.example (or root .env.example), generate secrets with "
-                + "ops/gen-prod-secrets.ps1, attach Postgres, set CORS_ALLOWED_ORIGINS to your Vercel URL, "
-                + "then Settings → Networking → Generate Domain. Full runbook: docs/deployment/RAILWAY.md";
+                + "Add Postgres, set DATABASE_URL=${{Postgres.DATABASE_URL}}, generate secrets with "
+                + "ops/gen-prod-secrets.ps1, set CORS_ALLOWED_ORIGINS to your Vercel URL, "
+                + "Settings → Networking → Generate Domain, then Vercel API_PROXY_TARGET=that https origin. "
+                + "Runbook: docs/deployment/RAILWAY.md";
     }
 
     static String firstNonBlank(String... values) {
