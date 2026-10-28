@@ -13,16 +13,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * Railway Postgres exposes {@code DATABASE_URL} (postgres://user:pass@host:port/db).
+ * Railway Postgres exposes {@code DATABASE_URL} (postgres:// or postgresql://).
  * This app expects {@code DB_URL} / {@code DB_USER} / {@code DB_PASSWORD}. Map the
  * Railway form early so the datasource can boot when only the plugin vars exist.
  *
- * <p>On Railway, also fail <em>before</em> Hibernate/Flyway if secrets or DB are
- * missing — a clear crash message instead of a silent restart loop. Secrets are
- * never invented here; operators set them in the Railway Variables tab.
+ * <p>{@code DATABASE_URL} always wins over a leftover laptop {@code DB_URL}
+ * pointing at {@code 127.0.0.1} — that stale variable was causing production
+ * Hikari to ignore a correct Railway Postgres URL.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor {
@@ -39,16 +40,23 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
                 environment.getProperty("POSTGRES_URL"),
                 environment.getProperty("DATABASE_PRIVATE_URL"));
 
-        if (existingJdbc == null && databaseUrl != null) {
+        boolean shouldMapRailwayUrl = databaseUrl != null
+                && (existingJdbc == null || isLoopbackJdbc(existingJdbc));
+
+        if (shouldMapRailwayUrl) {
             try {
                 MappedDb mapped = mapDatabaseUrl(databaseUrl);
                 extras.put("DB_URL", mapped.jdbcUrl());
                 extras.put("spring.datasource.url", mapped.jdbcUrl());
-                if (isBlank(environment.getProperty("DB_USER")) && mapped.user() != null) {
+                if (mapped.user() != null
+                        && (isBlank(environment.getProperty("DB_USER"))
+                        || isLoopbackJdbc(existingJdbc))) {
                     extras.put("DB_USER", mapped.user());
                     extras.put("spring.datasource.username", mapped.user());
                 }
-                if (isBlank(environment.getProperty("DB_PASSWORD")) && mapped.password() != null) {
+                if (mapped.password() != null
+                        && (isBlank(environment.getProperty("DB_PASSWORD"))
+                        || isLoopbackJdbc(existingJdbc))) {
                     extras.put("DB_PASSWORD", mapped.password());
                     extras.put("spring.datasource.password", mapped.password());
                 }
@@ -70,6 +78,17 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
                 throw new IllegalStateException(RequiredProductionConfig.refusalMessage(problems));
             }
         }
+    }
+
+    static boolean isLoopbackJdbc(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        String u = url.toLowerCase(Locale.ROOT);
+        return u.contains("127.0.0.1")
+                || u.contains("localhost")
+                || u.contains("0.0.0.0")
+                || u.contains("[::1]");
     }
 
     static MappedDb mapDatabaseUrl(String raw) {

@@ -71,6 +71,28 @@ class RailwayEnvironmentPostProcessorTest {
     }
 
     @Test
+    void railwayDatabaseUrlOverridesStaleLocalhostDbUrl() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("RAILWAY_PROJECT_ID", "proj");
+        env.setProperty("DB_URL", "jdbc:postgresql://127.0.0.1:5432/securetravels_crm");
+        env.setProperty("DB_USER", "postgres");
+        env.setProperty("DB_PASSWORD", "local");
+        env.setProperty("DATABASE_URL", "postgresql://postgres:secret@postgres.railway.internal:5432/railway");
+        env.setProperty("JWT_SECRET", "abcdefghijklmnopqrstuvwxyz0123456789ABCD");
+        env.setProperty("WEBHOOK_SECRET", "a-real-webhook-secret-not-the-default");
+        env.setProperty("EMAIL_WEBHOOK_SECRET", "email-secret");
+        env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret");
+        env.setProperty("CORS_ALLOWED_ORIGINS", "https://app.example.com");
+
+        new RailwayEnvironmentPostProcessor().postProcessEnvironment(env, new SpringApplication());
+
+        assertThat(env.getProperty("DB_URL"))
+                .isEqualTo("jdbc:postgresql://postgres.railway.internal:5432/railway");
+        assertThat(env.getProperty("DB_USER")).isEqualTo("postgres");
+        assertThat(env.getProperty("DB_PASSWORD")).isEqualTo("secret");
+    }
+
+    @Test
     void passesThroughJdbcUrl() {
         var mapped = RailwayEnvironmentPostProcessor.mapDatabaseUrl(
                 "jdbc:postgresql://localhost:5432/crm");
