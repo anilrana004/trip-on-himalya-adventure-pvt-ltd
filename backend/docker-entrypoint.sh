@@ -82,12 +82,27 @@ echo "[entrypoint] PORT=${PORT:-8080} SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_A
 # Bind all interfaces; Railway proxies to this PORT.
 export SERVER_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
+# Browser → Vercel BFF → this API. CORS must list the Vercel https origin.
+# APP_PUBLIC_URL is accepted as a stand-in when CORS_ALLOWED_ORIGINS is empty.
+if [ -z "${CORS_ALLOWED_ORIGINS:-}" ] && [ -n "${APP_PUBLIC_URL:-}" ]; then
+  case "$APP_PUBLIC_URL" in
+    https://*)
+      export CORS_ALLOWED_ORIGINS="${APP_PUBLIC_URL%/}"
+      echo "[entrypoint] CORS_ALLOWED_ORIGINS derived from APP_PUBLIC_URL=${CORS_ALLOWED_ORIGINS}"
+      ;;
+  esac
+fi
+if [ -n "${CORS_ALLOWED_ORIGINS:-}" ]; then
+  echo "[entrypoint] CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}"
+else
+  echo "[entrypoint] WARNING: CORS_ALLOWED_ORIGINS and APP_PUBLIC_URL unset — set one to https://<vercel-app>.vercel.app"
+fi
+
 # JAVA_TOOL_OPTIONS is picked up by the JVM automatically. Operators sometimes
-# paste a secret into this variable by mistake → "Unrecognized option" and the
-# process never boots. Only keep values that look like real JVM flags.
+# paste a secret into this variable by mistake → "Unrecognized option".
 case "${JAVA_TOOL_OPTIONS:-}" in
-  ""|-XX:*|*-XX:*)
-    : # ok — empty or contains -XX:
+  ""|*-XX:*)
+    : # empty or already contains JVM -XX flags
     ;;
   *)
     echo "[entrypoint] WARNING: JAVA_TOOL_OPTIONS looks invalid (not JVM flags). Resetting."
@@ -95,7 +110,6 @@ case "${JAVA_TOOL_OPTIONS:-}" in
     export JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
     ;;
 esac
-# Ensure memory flags exist even when the var was empty.
 if [ -z "${JAVA_TOOL_OPTIONS:-}" ]; then
   export JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 fi

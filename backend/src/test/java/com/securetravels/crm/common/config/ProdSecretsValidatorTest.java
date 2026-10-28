@@ -27,12 +27,14 @@ class ProdSecretsValidatorTest {
         env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret-value");
 
         ProdSecretsValidator validator = new ProdSecretsValidator(env);
-        assertThat(validator.problems()).contains("JWT_SECRET", "EMAIL_WEBHOOK_SECRET");
+        assertThat(validator.problems())
+                .anyMatch(p -> p.startsWith("JWT_SECRET"))
+                .anyMatch(p -> p.startsWith("EMAIL_WEBHOOK_SECRET"));
         assertThatThrownBy(() -> validator.run(new DefaultApplicationArguments()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("JWT_SECRET")
                 .hasMessageContaining("EMAIL_WEBHOOK_SECRET")
-                .hasMessageContaining("RAILWAY.md");
+                .hasMessageContaining("GO_LIVE_LOGIN.md");
     }
 
     @Test

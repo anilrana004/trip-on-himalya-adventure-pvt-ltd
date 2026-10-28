@@ -66,6 +66,15 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             }
         }
 
+        // BFF pattern: APP_PUBLIC_URL (Vercel) may stand in for CORS_ALLOWED_ORIGINS.
+        String resolvedCors = RequiredProductionConfig.resolveCorsOrigins(environment);
+        if (!resolvedCors.isBlank()
+                && (environment.getProperty("CORS_ALLOWED_ORIGINS") == null
+                || environment.getProperty("CORS_ALLOWED_ORIGINS").isBlank())) {
+            extras.put("CORS_ALLOWED_ORIGINS", resolvedCors);
+            extras.put("app.cors.allowed-origins", resolvedCors);
+        }
+
         if (!extras.isEmpty()) {
             environment.getPropertySources().addFirst(new MapPropertySource("railwayDbMapping", extras));
         }

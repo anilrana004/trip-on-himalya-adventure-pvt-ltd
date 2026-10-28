@@ -29,9 +29,25 @@ class RailwayEnvironmentPostProcessorTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("DATABASE_URL")
                 .hasMessageContaining("JWT_SECRET")
-                .hasMessageContaining("RAILWAY.md");
+                .hasMessageContaining("GO_LIVE_LOGIN.md");
         assertNull(env.getProperty("JWT_SECRET"));
         assertNull(env.getProperty("app.jwt.secret"));
+    }
+
+    @Test
+    void mapsAppPublicUrlIntoCorsWhenCorsUnset() {
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("RAILWAY_PROJECT_ID", "proj");
+        env.setProperty("DATABASE_URL", "postgresql://postgres:secret@postgres.railway.internal:5432/railway");
+        env.setProperty("JWT_SECRET", "abcdefghijklmnopqrstuvwxyz0123456789ABCD");
+        env.setProperty("WEBHOOK_SECRET", "a-real-webhook-secret-not-the-default");
+        env.setProperty("EMAIL_WEBHOOK_SECRET", "email-secret");
+        env.setProperty("SMS_WEBHOOK_SECRET", "sms-secret");
+        env.setProperty("APP_PUBLIC_URL", "https://my-crm.vercel.app");
+
+        new RailwayEnvironmentPostProcessor().postProcessEnvironment(env, new SpringApplication());
+
+        assertThat(env.getProperty("CORS_ALLOWED_ORIGINS")).isEqualTo("https://my-crm.vercel.app");
     }
 
     @Test

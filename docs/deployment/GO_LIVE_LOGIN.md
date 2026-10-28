@@ -33,6 +33,7 @@ EMAIL_WEBHOOK_SECRET=<from ops/gen-prod-secrets.ps1>
 SMS_WEBHOOK_SECRET=<from ops/gen-prod-secrets.ps1>
 CORS_ALLOWED_ORIGINS=https://YOUR-APP.vercel.app
 APP_PUBLIC_URL=https://YOUR-APP.vercel.app
+# If CORS_ALLOWED_ORIGINS is omitted, APP_PUBLIC_URL alone is enough (must be https).
 BOOTSTRAP_ADMIN_EMAIL=admin@securetravels.in
 BOOTSTRAP_ADMIN_PASSWORD=<strong password>
 FINANCE_BOOTSTRAP_PASSWORD=<strong password>

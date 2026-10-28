@@ -12,6 +12,10 @@ import java.util.Locale;
  * <p>Same bar as a Salesforce / Zoho org: the desk does not boot on demo secrets,
  * open CORS, or a localhost database. Used by the Railway early boot check and
  * {@link ProdSecretsValidator}.
+ *
+ * <p>Browser traffic is same-origin via the Vercel {@code /api} BFF. CORS must
+ * still list that app origin. Operators may set {@code CORS_ALLOWED_ORIGINS}
+ * or {@code APP_PUBLIC_URL} (https) — never the localhost yaml default.
  */
 public final class RequiredProductionConfig {
 
@@ -41,11 +45,41 @@ public final class RequiredProductionConfig {
         if (sms.isBlank()) {
             missing.add("SMS_WEBHOOK_SECRET");
         }
-        String cors = firstNonBlank(env.getProperty("CORS_ALLOWED_ORIGINS"), env.getProperty("app.cors.allowed-origins"));
-        if (cors.isBlank() || cors.contains("*") || cors.contains("localhost") || cors.contains("127.0.0.1")) {
-            missing.add("CORS_ALLOWED_ORIGINS (exact Vercel/app https origin; no * or localhost)");
+        if (!isProductionSafeOriginList(resolveCorsOrigins(env))) {
+            missing.add(
+                    "CORS_ALLOWED_ORIGINS or APP_PUBLIC_URL "
+                            + "(exact https://your-app.vercel.app — no *, no localhost)");
         }
         return missing;
+    }
+
+    /**
+     * Prefer explicit CORS, then the public app URL. Never treat the
+     * {@code application.yml} localhost default as a production CORS allowlist.
+     */
+    public static String resolveCorsOrigins(Environment env) {
+        String explicit = firstNonBlank(
+                env.getProperty("CORS_ALLOWED_ORIGINS"),
+                env.getProperty("APP_PUBLIC_URL"),
+                env.getProperty("app.public-url"));
+        if (isProductionSafeOriginList(explicit)) {
+            return stripTrailingSlash(explicit.trim());
+        }
+        return "";
+    }
+
+    public static boolean isProductionSafeOriginList(String cors) {
+        if (cors == null || cors.isBlank()) {
+            return false;
+        }
+        String value = cors.trim();
+        if (!value.startsWith("https://")) {
+            return false;
+        }
+        String lower = value.toLowerCase(Locale.ROOT);
+        return !lower.contains("*")
+                && !lower.contains("localhost")
+                && !lower.contains("127.0.0.1");
     }
 
     /**
@@ -54,8 +88,6 @@ public final class RequiredProductionConfig {
      */
     public static List<String> databaseProblems(Environment env) {
         List<String> missing = new ArrayList<>();
-        // Only operator-supplied URLs count. Ignore spring.datasource.url default
-        // (jdbc:postgresql://127.0.0.1:5432/…) which is for laptop docker-compose.
         String explicit = firstNonBlank(
                 env.getProperty("DATABASE_URL"),
                 env.getProperty("POSTGRES_URL"),
@@ -81,18 +113,25 @@ public final class RequiredProductionConfig {
     }
 
     static boolean isUnresolvedReference(String value) {
-        // Operator pasted the template literally without a Postgres plugin.
         return value.contains("${{") || value.contains("${Postgres");
     }
 
     public static String refusalMessage(List<String> problems) {
         return "Trip On Himalaya CRM API refused to start — production configuration incomplete:\n  - "
                 + String.join("\n  - ", problems)
-                + "\n\nFix (permanent): Railway → this API service → Variables. "
-                + "Add Postgres, set DATABASE_URL=${{Postgres.DATABASE_URL}}, generate secrets with "
-                + "ops/gen-prod-secrets.ps1, set CORS_ALLOWED_ORIGINS to your Vercel URL, "
-                + "Settings → Networking → Generate Domain, then Vercel API_PROXY_TARGET=that https origin. "
-                + "Runbook: docs/deployment/RAILWAY.md";
+                + "\n\nFix (permanent): Railway → API → Variables. Set:\n"
+                + "  CORS_ALLOWED_ORIGINS=https://<your-vercel-app>.vercel.app\n"
+                + "  (or APP_PUBLIC_URL to that same https URL)\n"
+                + "Also keep DATABASE_URL=${{Postgres.DATABASE_URL}} and JWT/webhook secrets. "
+                + "Then Vercel API_PROXY_TARGET=https://<railway-domain>. "
+                + "Runbook: docs/deployment/GO_LIVE_LOGIN.md";
+    }
+
+    static String stripTrailingSlash(String value) {
+        if (value.endsWith("/")) {
+            return value.substring(0, value.length() - 1);
+        }
+        return value;
     }
 
     static String firstNonBlank(String... values) {
