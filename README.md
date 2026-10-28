@@ -101,24 +101,26 @@ cd frontend && npm run lint && npm run typecheck && npm run build
 
 ## Deploy (Vercel + Railway)
 
-Never commit real secrets. Use dashboard env vars only. Template:
-`ops/ENV.production.example`. Checklist: `docs/operations/PRODUCTION_CHECKLIST.md`.
+**First login:** follow [`docs/deployment/GO_LIVE_LOGIN.md`](docs/deployment/GO_LIVE_LOGIN.md)
+(Postgres → Variables → Generate Domain → Vercel `API_PROXY_TARGET`). That fixes
+`127.0.0.1:5432` and “API proxy not configured”.
+
+Never commit real secrets. Template: `ops/ENV.production.example`. Secrets:
+`ops/gen-prod-secrets.ps1`. Checklist: `docs/operations/PRODUCTION_CHECKLIST.md`.
 
 ### Railway (API + Postgres)
 
-1. New project → deploy from this repo (Dockerfile / `railway.toml`).
-2. Add Postgres plugin (or set `DB_URL` / `DB_USER` / `DB_PASSWORD`).
-3. Set at least: `SPRING_PROFILES_ACTIVE=prod`, `JWT_SECRET`, `WEBHOOK_SECRET`,
-   `EMAIL_WEBHOOK_SECRET`, `SMS_WEBHOOK_SECRET`, `CORS_ALLOWED_ORIGINS`
-   (exact Vercel app origin, no `*`).
-4. Healthcheck path: `/actuator/health`.
+1. Deploy from this repo (root Dockerfile / `railway.toml`).
+2. Add Postgres; set `DATABASE_URL=${{Postgres.DATABASE_URL}}` (never localhost).
+3. Set JWT / webhook secrets + `CORS_ALLOWED_ORIGINS` (exact Vercel origin).
+4. Generate public domain; healthcheck `/actuator/health`.
 5. Optional daily backups: `infra/backup/` as a separate Cron service + dedicated bucket.
 
 ### Vercel (frontend)
 
 1. Import this repo; **Root Directory** = `frontend`.
-2. Complete Railway Variables + public domain first (`docs/deployment/RAILWAY.md`).
-3. Set Vercel `API_PROXY_TARGET` to the Railway HTTPS API origin (no path).
+2. Complete Railway Variables + public domain first.
+3. Set `API_PROXY_TARGET` to the Railway HTTPS origin (no `/api` path) → Redeploy.
 4. Do not set `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` or any backend secrets.
 
 Browser → Vercel `/api` App Router proxy → Railway. Leave `COOKIE_DOMAIN` empty while
