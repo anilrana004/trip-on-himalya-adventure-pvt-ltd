@@ -1,4 +1,10 @@
 spring:
+  # Prod never uses the laptop 127.0.0.1 default from application.yml.
+  # Railway: set DATABASE_URL=${{Postgres.DATABASE_URL}} — mapped to DB_URL at boot.
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
   jpa:
     show-sql: false
 
