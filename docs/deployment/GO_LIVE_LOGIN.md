@@ -4,9 +4,11 @@ Do these steps in order. Skipping Postgres or `API_PROXY_TARGET` is why login fa
 
 ## A. Railway API (fixes `127.0.0.1:5432 refused`)
 
-If logs still say `127.0.0.1:5432`, **`DATABASE_URL` is not set on the API
-service**. Secrets alone are not enough. The container entrypoint now exits
-immediately with this message if Postgres is missing.
+If health shows **Application failed to respond**, the container is exiting.
+Common cause: `DATABASE_URL` is correct **and** a leftover `DB_URL=127.0.0.1`
+exists — **delete `DB_URL` / `DB_USER` / `DB_PASSWORD`**, keep only
+`DATABASE_URL`, redeploy. Deploy logs should print
+`[entrypoint] datasource host=postgres.railway.internal:5432`.
 
 ### Click path (do exactly this)
 

@@ -34,6 +34,8 @@ spring:
 
 server:
   port: ${PORT:8080}
+  # Railway (and Docker) proxy to the container; bind all interfaces.
+  address: ${SERVER_ADDRESS:0.0.0.0}
   # Railway terminates TLS. Trust X-Forwarded-Proto so the refresh cookie
   # is marked Secure only when the browser connection actually is.
   forward-headers-strategy: framework
