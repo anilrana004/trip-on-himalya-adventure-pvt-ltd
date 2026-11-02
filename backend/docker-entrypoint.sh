@@ -82,20 +82,26 @@ echo "[entrypoint] PORT=${PORT:-8080} SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_A
 # Bind all interfaces; Railway proxies to this PORT.
 export SERVER_ADDRESS="${SERVER_ADDRESS:-0.0.0.0}"
 
-# Browser → Vercel BFF → this API. CORS must list the Vercel https origin.
-# APP_PUBLIC_URL is accepted as a stand-in when CORS_ALLOWED_ORIGINS is empty.
-if [ -z "${CORS_ALLOWED_ORIGINS:-}" ] && [ -n "${APP_PUBLIC_URL:-}" ]; then
-  case "$APP_PUBLIC_URL" in
+# Browser → Vercel BFF → this API. CORS must list desk + storefront https origins.
+append_cors() {
+  case "${1:-}" in
     https://*)
-      export CORS_ALLOWED_ORIGINS="${APP_PUBLIC_URL%/}"
-      echo "[entrypoint] CORS_ALLOWED_ORIGINS derived from APP_PUBLIC_URL=${CORS_ALLOWED_ORIGINS}"
+      local origin="${1%/}"
+      if [ -z "${CORS_ALLOWED_ORIGINS:-}" ]; then
+        CORS_ALLOWED_ORIGINS="$origin"
+      elif ! printf '%s' ",${CORS_ALLOWED_ORIGINS}," | grep -q ",${origin},"; then
+        CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS},${origin}"
+      fi
       ;;
   esac
-fi
-if [ -n "${CORS_ALLOWED_ORIGINS:-}" ]; then
+}
+append_cors "${APP_PUBLIC_URL:-}"
+append_cors "${STOREFRONT_PUBLIC_URL:-}"
+export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-}"
+if [ -n "${CORS_ALLOWED_ORIGINS}" ]; then
   echo "[entrypoint] CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}"
 else
-  echo "[entrypoint] WARNING: CORS_ALLOWED_ORIGINS and APP_PUBLIC_URL unset — set one to https://<vercel-app>.vercel.app"
+  echo "[entrypoint] WARNING: set APP_PUBLIC_URL and/or STOREFRONT_PUBLIC_URL (https Vercel origins)"
 fi
 
 # JAVA_TOOL_OPTIONS is picked up by the JVM automatically. Operators sometimes

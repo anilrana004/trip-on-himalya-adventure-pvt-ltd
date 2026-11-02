@@ -31,9 +31,10 @@ JWT_SECRET=<from ops/gen-prod-secrets.ps1>
 WEBHOOK_SECRET=<from ops/gen-prod-secrets.ps1>
 EMAIL_WEBHOOK_SECRET=<from ops/gen-prod-secrets.ps1>
 SMS_WEBHOOK_SECRET=<from ops/gen-prod-secrets.ps1>
-CORS_ALLOWED_ORIGINS=https://YOUR-APP.vercel.app
-APP_PUBLIC_URL=https://YOUR-APP.vercel.app
-# If CORS_ALLOWED_ORIGINS is omitted, APP_PUBLIC_URL alone is enough (must be https).
+CORS_ALLOWED_ORIGINS=https://YOUR-CRM.vercel.app,https://YOUR-STORE.vercel.app
+APP_PUBLIC_URL=https://YOUR-CRM.vercel.app
+STOREFRONT_PUBLIC_URL=https://YOUR-STORE.vercel.app
+# APP_PUBLIC_URL + STOREFRONT_PUBLIC_URL are merged into CORS when set (https only).
 BOOTSTRAP_ADMIN_EMAIL=admin@securetravels.in
 BOOTSTRAP_ADMIN_PASSWORD=<strong password>
 # Optional recovery: set true once, redeploy, sign in, then delete the force var.

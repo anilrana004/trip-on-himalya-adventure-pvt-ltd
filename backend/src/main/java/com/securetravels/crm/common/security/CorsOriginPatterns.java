@@ -25,11 +25,17 @@ public final class CorsOriginPatterns {
             if (raw == null || raw.isBlank()) {
                 continue;
             }
-            String origin = stripTrailingSlash(raw.trim());
-            out.add(origin);
-            String preview = vercelPreviewPattern(origin);
-            if (preview != null) {
-                out.add(preview);
+            // Spring may hand us one list entry that still contains commas.
+            for (String part : raw.split(",")) {
+                if (part == null || part.isBlank()) {
+                    continue;
+                }
+                String origin = stripTrailingSlash(part.trim());
+                out.add(origin);
+                String preview = vercelPreviewPattern(origin);
+                if (preview != null) {
+                    out.add(preview);
+                }
             }
         }
         return new ArrayList<>(out);

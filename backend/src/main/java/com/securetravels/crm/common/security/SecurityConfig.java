@@ -42,6 +42,7 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/refresh",
             "/api/auth/logout",
+            "/api/storefront/**",
             "/api/webhook/**",
             // Phase 5 Module 2. The SES and SMS-gateway webhooks are
             // unauthenticated by necessity (the provider holds no JWT), so they

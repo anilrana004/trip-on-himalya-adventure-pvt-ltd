@@ -3,8 +3,10 @@ package com.securetravels.crm.common.config;
 import org.springframework.core.env.Environment;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Shared production gate for Trip On Himalaya CRM / Finance ERP / IVR-facing API.
@@ -14,8 +16,9 @@ import java.util.Locale;
  * {@link ProdSecretsValidator}.
  *
  * <p>Browser traffic is same-origin via the Vercel {@code /api} BFF. CORS must
- * still list that app origin. Operators may set {@code CORS_ALLOWED_ORIGINS}
- * or {@code APP_PUBLIC_URL} (https) — never the localhost yaml default.
+ * still list desk and storefront origins. Operators may set
+ * {@code CORS_ALLOWED_ORIGINS} (comma-separated), {@code APP_PUBLIC_URL}, and/or
+ * {@code STOREFRONT_PUBLIC_URL} — never the localhost yaml default.
  */
 public final class RequiredProductionConfig {
 
@@ -48,31 +51,55 @@ public final class RequiredProductionConfig {
         if (!isProductionSafeOriginList(resolveCorsOrigins(env))) {
             missing.add(
                     "CORS_ALLOWED_ORIGINS or APP_PUBLIC_URL "
-                            + "(exact https://your-app.vercel.app — no *, no localhost)");
+                            + "(https desk/storefront origins — no *, no localhost)");
         }
         return missing;
     }
 
     /**
-     * Prefer explicit CORS, then the public app URL. Never treat the
+     * Merge explicit CORS with desk + storefront public URLs. Never treat the
      * {@code application.yml} localhost default as a production CORS allowlist.
      */
     public static String resolveCorsOrigins(Environment env) {
-        String explicit = firstNonBlank(
-                env.getProperty("CORS_ALLOWED_ORIGINS"),
-                env.getProperty("APP_PUBLIC_URL"),
-                env.getProperty("app.public-url"));
-        if (isProductionSafeOriginList(explicit)) {
-            return stripTrailingSlash(explicit.trim());
+        Set<String> origins = new LinkedHashSet<>();
+        addOrigins(origins, env.getProperty("CORS_ALLOWED_ORIGINS"));
+        addOrigins(origins, env.getProperty("APP_PUBLIC_URL"));
+        addOrigins(origins, env.getProperty("app.public-url"));
+        addOrigins(origins, env.getProperty("STOREFRONT_PUBLIC_URL"));
+        addOrigins(origins, env.getProperty("app.storefront-public-url"));
+
+        List<String> safe = origins.stream()
+                .filter(RequiredProductionConfig::isProductionSafeOrigin)
+                .toList();
+        if (safe.isEmpty()) {
+            return "";
         }
-        return "";
+        return String.join(",", safe);
     }
 
     public static boolean isProductionSafeOriginList(String cors) {
         if (cors == null || cors.isBlank()) {
             return false;
         }
-        String value = cors.trim();
+        String[] parts = cors.split(",");
+        boolean any = false;
+        for (String part : parts) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            if (!isProductionSafeOrigin(part.trim())) {
+                return false;
+            }
+            any = true;
+        }
+        return any;
+    }
+
+    public static boolean isProductionSafeOrigin(String origin) {
+        if (origin == null || origin.isBlank()) {
+            return false;
+        }
+        String value = stripTrailingSlash(origin.trim());
         if (!value.startsWith("https://")) {
             return false;
         }
@@ -120,11 +147,23 @@ public final class RequiredProductionConfig {
         return "Trip On Himalaya CRM API refused to start — production configuration incomplete:\n  - "
                 + String.join("\n  - ", problems)
                 + "\n\nFix (permanent): Railway → API → Variables. Set:\n"
-                + "  CORS_ALLOWED_ORIGINS=https://<your-vercel-app>.vercel.app\n"
-                + "  (or APP_PUBLIC_URL to that same https URL)\n"
+                + "  CORS_ALLOWED_ORIGINS=https://<crm>.vercel.app,https://<storefront>.vercel.app\n"
+                + "  (or APP_PUBLIC_URL + STOREFRONT_PUBLIC_URL)\n"
                 + "Also keep DATABASE_URL=${{Postgres.DATABASE_URL}} and JWT/webhook secrets. "
                 + "Then Vercel API_PROXY_TARGET=https://<railway-domain>. "
                 + "Runbook: docs/deployment/GO_LIVE_LOGIN.md";
+    }
+
+    static void addOrigins(Set<String> into, String raw) {
+        if (raw == null || raw.isBlank()) {
+            return;
+        }
+        for (String part : raw.split(",")) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            into.add(stripTrailingSlash(part.trim()));
+        }
     }
 
     static String stripTrailingSlash(String value) {

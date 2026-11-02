@@ -18,9 +18,10 @@ Java 25, Spring Boot 3.5, Spring Security, JWT, PostgreSQL 16, Flyway (`V1`–`V
 JPA with `ddl-auto: validate`. Next.js 15, React 19, Tailwind 4. The frontend
 calls a typed client generated from the OpenAPI spec.
 
-Backend `:8080`. Frontend dev server `:3000`. Docker Compose publishes the UI on
-host **3002** (container 3000) because Grafana, when started, uses 3001.
-Postgres `:5432`.
+Backend `:8080`. CRM frontend `:3000`. Customer **storefront** (`storefront/`)
+`:3001` — separate Vercel project; see `docs/deployment/STOREFRONT.md`.
+Docker Compose publishes the CRM UI on host **3002** (container 3000) because
+Grafana, when started, uses 3001. Postgres `:5432`.
 
 ```bash
 docker compose up --build

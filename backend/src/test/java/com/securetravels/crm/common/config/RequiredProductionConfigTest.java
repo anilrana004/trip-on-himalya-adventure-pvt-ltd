@@ -30,14 +30,27 @@ class RequiredProductionConfigTest {
     }
 
     @Test
-    @DisplayName("explicit CORS_ALLOWED_ORIGINS wins")
-    void explicitCorsWins() {
+    @DisplayName("CORS merges desk + storefront public URLs")
+    void mergesDeskAndStorefront() {
+        MockEnvironment env = baseSecrets();
+        env.setProperty("APP_PUBLIC_URL", "https://trip-crm.vercel.app/");
+        env.setProperty("STOREFRONT_PUBLIC_URL", "https://trip-store.vercel.app");
+
+        assertThat(RequiredProductionConfig.resolveCorsOrigins(env))
+                .isEqualTo("https://trip-crm.vercel.app,https://trip-store.vercel.app");
+        assertThat(RequiredProductionConfig.secretProblems(env)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("explicit CORS_ALLOWED_ORIGINS merges with public URLs")
+    void explicitCorsMerges() {
         MockEnvironment env = baseSecrets();
         env.setProperty("CORS_ALLOWED_ORIGINS", "https://app.example.com");
         env.setProperty("APP_PUBLIC_URL", "https://other.vercel.app");
 
         assertThat(RequiredProductionConfig.resolveCorsOrigins(env))
-                .isEqualTo("https://app.example.com");
+                .contains("https://app.example.com")
+                .contains("https://other.vercel.app");
         assertThat(RequiredProductionConfig.secretProblems(env)).isEmpty();
     }
 
@@ -47,6 +60,8 @@ class RequiredProductionConfigTest {
         assertThat(RequiredProductionConfig.isProductionSafeOriginList("http://app.vercel.app")).isFalse();
         assertThat(RequiredProductionConfig.isProductionSafeOriginList("https://*.vercel.app")).isFalse();
         assertThat(RequiredProductionConfig.isProductionSafeOriginList("https://app.vercel.app")).isTrue();
+        assertThat(RequiredProductionConfig.isProductionSafeOriginList(
+                "https://a.vercel.app,https://b.vercel.app")).isTrue();
     }
 
     private static MockEnvironment baseSecrets() {
