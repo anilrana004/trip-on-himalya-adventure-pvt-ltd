@@ -4,11 +4,26 @@ The customer site lives in `/storefront`. Deploy it as its **own** Vercel
 project with Root Directory `storefront`. Do not bundle it into the CRM
 `frontend` project.
 
+Abercrombie & Kent–depth information architecture, scoped to **Indian
+Himalayan treks, yatras, and road journeys** only. Copy and brand are Trip On
+Himalaya — not A&K.
+
 ```text
 Browser (store)
-  → GET  /treks  (RSC) → Railway GET /api/storefront/trips
-  → POST /api/enquiry  → HMAC → Railway POST /api/webhook/lead
+  → GET  /journeys (RSC) → Railway GET /api/storefront/trips
+  → POST /api/enquiry    → HMAC → Railway POST /api/webhook/lead
 ```
+
+## Surfaces
+
+| Path | Purpose |
+|---|---|
+| `/` | Hero, destinations, featured journeys, ways, why us |
+| `/destinations` | Region hubs |
+| `/journeys` | Journey finder |
+| `/ways` | How guests travel |
+| `/tailormade` `/offers` `/about` `/speak-to-us` | Private, offers, story, contact |
+| `/treks/*` | Redirects to `/journeys/*` |
 
 ## Railway
 

@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #0b1220;
-  --ink-soft: #152238;
-  --snow: #f3f6f8;
-  --mist: #d7e0e8;
-  --ice: #7eb8c9;
-  --ice-deep: #3d7a8c;
-  --ridge: #8b7355;
-  --ember: #c45c26;
-  --line: rgba(243, 246, 248, 0.14);
+  --ink: #0c121c;
+  --ink-soft: #151d2b;
+  --snow: #f6f3ee;
+  --paper: #ebe6de;
+  --mist: #c9c2b6;
+  --ice: #9bb7a8;
+  --ice-deep: #5f7f72;
+  --ember: #b85c38;
+  --line: rgba(246, 243, 238, 0.12);
   color-scheme: dark;
 }
 
@@ -19,10 +19,10 @@
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-snow: var(--snow);
+  --color-paper: var(--paper);
   --color-mist: var(--mist);
   --color-ice: var(--ice);
   --color-ice-deep: var(--ice-deep);
-  --color-ridge: var(--ridge);
   --color-ember: var(--ember);
 }
 
@@ -40,14 +40,14 @@ body {
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--ice) 45%, transparent);
+  background: color-mix(in oklab, var(--ice) 40%, transparent);
   color: var(--ink);
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -57,27 +57,36 @@ body {
 
 @keyframes drift {
   from {
-    transform: scale(1.08) translate3d(0, 0, 0);
+    transform: scale(1.06) translate3d(0, 0, 0);
   }
   to {
-    transform: scale(1.14) translate3d(-1.5%, 1%, 0);
+    transform: scale(1.12) translate3d(-1.2%, 0.8%, 0);
   }
 }
 
 .animate-rise {
-  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 0.95s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
 .animate-rise-delay {
-  animation: rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+  animation: rise 1.05s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
 }
-
 .animate-rise-delay-2 {
-  animation: rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+  animation: rise 1.05s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+}
+.hero-drift {
+  animation: drift 32s ease-in-out alternate infinite;
 }
 
-.hero-drift {
-  animation: drift 28s ease-in-out alternate infinite;
+.section-pad {
+  @apply mx-auto max-w-6xl px-5 py-20 md:px-8 md:py-28;
+}
+
+.eyebrow {
+  @apply text-[11px] font-medium uppercase tracking-[0.22em] text-mist/80;
+}
+
+.display {
+  font-family: var(--font-display), Georgia, serif;
 }
 
 @media (prefers-reduced-motion: reduce) {

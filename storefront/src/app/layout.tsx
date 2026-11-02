@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, Fraunces } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SITE } from "@/lib/site";
 import "./globals.css";
 
 const display = Fraunces({
@@ -18,11 +19,11 @@ const body = DM_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "Trip On Himalaya",
-    template: "%s · Trip On Himalaya",
+    default: `${SITE.brand} · Luxury Indian Himalayan Journeys`,
+    template: `%s · ${SITE.brand}`,
   },
   description:
-    "Himalayan treks, yatras, and road journeys planned from Dehradun. Browse the live catalogue and enquire with the Trip On Himalaya desk.",
+    "Extraordinary Indian treks, yatras, and Himalayan road journeys planned from Dehradun. Browse destinations, journey finder, tailor-made travel, and speak to our desk.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

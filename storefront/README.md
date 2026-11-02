@@ -1,14 +1,27 @@
 # Trip On Himalaya — Storefront
 
-Customer-facing catalogue and enquiry site. **Separate Vercel project** from the CRM desk (`frontend/`). Same Railway API, public read paths only, HMAC enquiry intake.
+Luxury Indian Himalayan travel site (Abercrombie & Kent–depth IA) for treks,
+yatras, and road journeys. **Separate Vercel project** from the CRM desk.
+
+## Surfaces
+
+| Path | Purpose |
+|---|---|
+| `/` | Brand hero, destinations, featured journeys, ways to travel, why us |
+| `/destinations` | Region hubs (Uttarakhand, Himachal, Ladakh, Spiti, …) |
+| `/destinations/[region]` | Journeys in that region |
+| `/journeys` | Journey finder (category, region, search, sort) |
+| `/journeys/[slug]` | Full itinerary + enquire |
+| `/ways` · `/ways/[style]` | Fixed group, private, active, spiritual, road, weekend |
+| `/tailormade` | Private travel brief + form |
+| `/offers` | Value + signature picks |
+| `/about` | Why Trip On Himalaya |
+| `/speak-to-us` | Phone + enquiry (CRM webhook) |
+| `/treks/*` | Redirects → `/journeys/*` |
 
 ## Local
 
 ```bash
-# API on :8080 (dev profile or Docker)
-cd ../backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev
-
-cd ../storefront
 cp .env.example .env.local
 # API_PROXY_TARGET=http://localhost:8080
 # WEBHOOK_SECRET=<same as backend>
@@ -16,27 +29,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3001
+http://localhost:3001
 
-## Vercel (second project)
+## Vercel
 
-| Setting | Value |
-|---|---|
-| Root Directory | `storefront` |
-| Framework | Next.js |
-| `API_PROXY_TARGET` | Railway HTTPS origin (no `/api`) |
-| `WEBHOOK_SECRET` | Same value as Railway `WEBHOOK_SECRET` |
-| `NEXT_PUBLIC_CRM_URL` | Optional link to CRM Vercel URL |
-| `NEXT_PUBLIC_WHATSAPP_E164` | Optional |
-
-On Railway, set `STOREFRONT_PUBLIC_URL=https://<this-storefront>.vercel.app` (and keep `APP_PUBLIC_URL` for the CRM). CORS merges both.
-
-## Surfaces
-
-- `/` — brand hero + featured treks
-- `/treks` — full live catalogue
-- `/treks/[slug]` — detail + enquire
-- `/enquire` — general enquiry
-- `POST /api/enquiry` — server-signed webhook to `/api/webhook/lead`
-
-Never put JWT or DB secrets on this project.
+Root Directory: `storefront`. Env: `API_PROXY_TARGET`, `WEBHOOK_SECRET`.
+Railway: `STOREFRONT_PUBLIC_URL`. See `docs/deployment/STOREFRONT.md`.
