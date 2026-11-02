@@ -1,9 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { DestinationTile } from "@/components/DestinationTile";
-import { JourneyCard } from "@/components/JourneyCard";
-import { SectionHeading } from "@/components/SectionHeading";
-import { WayTile } from "@/components/WayTile";
+import { HomeWhereNext } from "@/components/HomeWhereNext";
 import { listTrips } from "@/lib/catalogue";
 import { DESTINATIONS } from "@/lib/destinations";
 import { SITE } from "@/lib/site";
@@ -14,169 +11,234 @@ export const dynamic = "force-dynamic";
 
 const HERO =
   "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=2400&q=80";
+const HERO_CARD =
+  "https://images.unsplash.com/photo-1551632811-561732d1e306?auto=format&fit=crop&w=900&q=80";
+const GLIMPSE = [
+  {
+    title: "Snow & High Camps",
+    blurb: "Kedarkantha winters, bugyals at dawn, and ridges above Sankri.",
+    image: "https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=1200&q=80",
+    href: "/ways/active",
+  },
+  {
+    title: "Yatras & Temples",
+    blurb: "Kedarnath to Char Dham — devotion with field-tested logistics.",
+    image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80",
+    href: "/ways/spiritual",
+  },
+  {
+    title: "Valleys by Road",
+    blurb: "Spiti light, Ladakh bikes, Kerala circuits with trip-captain support.",
+    image: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1200&q=80",
+    href: "/ways/road-trips",
+  },
+  {
+    title: "Weekend Escapes",
+    blurb: "Maharashtra monsoon forts and short Himalayan getaways.",
+    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+    href: "/ways/weekend",
+  },
+];
 
 export default async function HomePage() {
-  let featured: StorefrontTripCard[] = [];
-  let noteworthy: StorefrontTripCard[] = [];
-  let catalogueError: string | null = null;
+  let trips: StorefrontTripCard[] = [];
   try {
-    const all = await listTrips();
-    featured = all.filter((t) => t.category === "TREK").slice(0, 3);
-    if (featured.length < 3) featured = all.slice(0, 3);
-    noteworthy = [...all].sort((a, b) => Number(b.fromPriceInr) - Number(a.fromPriceInr)).slice(0, 3);
-  } catch (err) {
-    catalogueError = err instanceof Error ? err.message : "Catalogue unavailable";
+    trips = await listTrips();
+  } catch {
+    trips = [];
   }
 
   return (
     <>
-      <section className="relative min-h-[100svh] overflow-hidden">
+      {/* Hero — full bleed + ghost CTA + inset editorial card */}
+      <section className="relative min-h-[92svh] overflow-hidden bg-charcoal">
         <Image src={HERO} alt="" fill priority sizes="100vw" className="hero-drift object-cover" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(12,18,28,0.28)_0%,rgba(12,18,28,0.5)_40%,rgba(12,18,28,0.94)_100%)]" />
-        <div className="relative mx-auto flex min-h-[100svh] max-w-6xl flex-col justify-end px-5 pb-20 pt-36 md:px-8 md:pb-28">
-          <p className="animate-rise display text-5xl leading-[0.94] tracking-tight text-snow md:text-7xl lg:text-[5.5rem]">
-            {SITE.brand}
-          </p>
-          <h1 className="animate-rise-delay mt-6 max-w-xl text-xl font-normal leading-snug text-mist md:text-2xl">
-            There are ridges you remember all your life.
-          </h1>
-          <p className="animate-rise-delay-2 mt-4 max-w-lg text-sm leading-relaxed text-mist/75 md:text-base">
-            Extraordinary Indian Himalayan journeys — treks, yatras, and road trips — crafted from a Dehradun desk
-            that already runs the sales and ops spine.
-          </p>
-          <div className="animate-rise-delay-2 mt-10 flex flex-wrap gap-3">
-            <Link href="/journeys" className="rounded-full bg-snow px-6 py-3 text-sm font-semibold text-ink hover:bg-ice">
-              Browse journeys
+        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/35 to-black/20" />
+        <div className="relative mx-auto grid min-h-[92svh] max-w-6xl items-end gap-8 px-5 pb-16 pt-40 md:grid-cols-[1.15fr_0.85fr] md:px-8 md:pb-20">
+          <div className="max-w-xl pb-4">
+            <p className="animate-rise text-[11px] uppercase tracking-[0.22em] text-white/75">
+              Indian Himalaya · Since the Dehradun desk
+            </p>
+            <h1 className="animate-rise-delay display mt-5 text-4xl leading-[1.15] text-white md:text-5xl lg:text-[3.25rem]">
+              Magnificent Ridges & Relais of the Himalaya: Experience India with {SITE.brand}
+            </h1>
+            <Link href="/journeys" className="btn-ghost animate-rise-delay mt-8">
+              Explore journeys
             </Link>
-            <Link
-              href="/speak-to-us"
-              className="rounded-full border border-white/30 px-6 py-3 text-sm font-semibold text-snow hover:border-ice hover:bg-white/5"
-            >
-              Speak to us
-            </Link>
+          </div>
+          <div className="relative hidden min-h-[18rem] overflow-hidden md:block md:min-h-[22rem]">
+            <Image src={HERO_CARD} alt="" fill className="object-cover" sizes="40vw" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+            <p className="absolute bottom-5 left-5 right-5 text-sm font-light text-white/90">
+              Small-group treks and private tailor-made departures — live from the CRM catalogue.
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="section-pad">
-        <SectionHeading
-          eyebrow="Where do you want to go?"
-          title="Destinations we love"
-          body="India’s high country, from Garhwal snow camps to Spiti silence and Kerala circuits — each hub links to live journeys in the CRM catalogue."
-        />
-        <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {DESTINATIONS.slice(0, 6).map((d) => (
-            <DestinationTile key={d.slug} dest={d} />
-          ))}
+      {/* Intro manifesto */}
+      <section className="bg-cream">
+        <div className="mx-auto max-w-3xl px-5 py-20 text-center md:px-8 md:py-28">
+          <p className="display text-2xl leading-snug text-charcoal md:text-[2rem] md:leading-[1.35]">
+            For discerning travellers we turn Indian Himalayan dreams into out-of-this-world experiences. Every
+            journey should be extraordinary — every life, well-travelled on these ridges.
+          </p>
         </div>
-        <Link href="/destinations" className="mt-10 inline-block text-sm text-ice hover:underline">
-          See all destinations →
-        </Link>
       </section>
 
-      <section className="border-y border-white/10 bg-ink-soft/40">
+      {/* Where to go next — tabs + cream cards */}
+      {trips.length > 0 ? <HomeWhereNext trips={trips} /> : null}
+
+      {/* Glimpse — horizontal scroll categories */}
+      <section className="bg-cream-deep/50">
+        <div className="section-pad !pb-10">
+          <h2 className="display text-center text-3xl text-charcoal md:text-4xl">
+            A Glimpse Into the World of {SITE.brand}
+          </h2>
+        </div>
+        <div className="mx-auto max-w-6xl px-5 pb-20 md:px-8">
+          <div className="scroll-row">
+            {GLIMPSE.map((g) => (
+              <Link key={g.title} href={g.href} className="group relative block aspect-[3/4] overflow-hidden">
+                <Image
+                  src={g.image}
+                  alt=""
+                  fill
+                  sizes="320px"
+                  className="object-cover transition duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                  <h3 className="display text-2xl">{g.title}</h3>
+                  <p className="mt-2 text-sm font-light text-white/80">{g.blurb}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Ways to travel — masonry-ish grid */}
+      <section className="bg-cream">
         <div className="section-pad">
-          <SectionHeading
-            eyebrow="Journeys to book now"
-            title="This season on the ridge"
-            body="Live prices and durations from the same catalogue sales quotes from — not a static brochure."
-          />
-          {catalogueError ? (
-            <p className="mt-10 text-sm text-ember">{catalogueError}</p>
-          ) : (
-            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {featured.map((trip) => (
-                <JourneyCard key={trip.id} trip={trip} />
-              ))}
-            </div>
-          )}
-          <Link href="/journeys" className="mt-10 inline-block text-sm text-ice hover:underline">
-            Open the journey finder →
-          </Link>
+          <h2 className="display text-center text-3xl text-charcoal md:text-4xl">Ways to Travel</h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-sm font-light text-muted">
+            Fixed departures, private tailor-made, active treks, yatras, and road journeys across India.
+          </p>
+          <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            {WAYS.map((w, i) => (
+              <Link
+                key={w.slug}
+                href={`/ways/${w.slug}`}
+                className={`group relative min-h-[16rem] overflow-hidden ${
+                  i === 0 || i === 5 ? "lg:col-span-3" : "lg:col-span-2"
+                }`}
+              >
+                <Image
+                  src={w.image}
+                  alt=""
+                  fill
+                  sizes="40vw"
+                  className="object-cover transition duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-5 text-white md:p-6">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/70">{w.eyebrow}</p>
+                  <h3 className="display mt-2 text-2xl md:text-[1.75rem]">{w.name}</h3>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="section-pad">
-        <SectionHeading
-          eyebrow="What kind of trip?"
-          title="Ways to travel"
-          body="Fixed departures, private tailor-made, active treks, yatras, road trips, and short escapes — choose the shape of the journey, then the trail."
-        />
-        <div className="mt-12 grid gap-4 lg:grid-cols-2">
-          {WAYS.slice(0, 4).map((w) => (
-            <WayTile key={w.slug} way={w} />
-          ))}
-        </div>
-        <Link href="/ways" className="mt-10 inline-block text-sm text-ice hover:underline">
-          All ways to travel →
-        </Link>
-      </section>
-
-      <section className="relative overflow-hidden border-y border-white/10">
+      {/* Quote + since badge split */}
+      <section className="relative overflow-hidden">
         <Image
           src="https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=2000&q=80"
           alt=""
           fill
-          className="object-cover opacity-35"
+          className="object-cover"
         />
-        <div className="relative section-pad">
-          <p className="eyebrow">Private travel</p>
-          <h2 className="display mt-4 max-w-3xl text-4xl text-snow md:text-5xl">
-            Wherever you want to go in the Indian Himalaya — we craft the adventure around your party.
-          </h2>
-          <p className="mt-5 max-w-xl text-sm leading-relaxed text-mist/80 md:text-base">
-            Dates, pacing, difficulty, and stays — designed with the same trip catalogue and ops handoff the CRM
-            already uses.
+        <div className="absolute inset-0 bg-black/55" />
+        <div className="relative mx-auto max-w-4xl px-5 py-28 text-center md:px-8 md:py-36">
+          <p className="display text-3xl leading-snug text-white md:text-4xl">
+            “We are not in the travel business. We are in the business of dreams — on Indian trails.”
           </p>
-          <Link
-            href="/tailormade"
-            className="mt-8 inline-flex rounded-full bg-snow px-6 py-3 text-sm font-semibold text-ink hover:bg-ice"
-          >
-            Start a tailor-made plan
-          </Link>
         </div>
       </section>
 
-      {!catalogueError && noteworthy.length > 0 ? (
-        <section className="section-pad">
-          <SectionHeading
-            eyebrow="New & noteworthy"
-            title="Journeys guests ask for first"
-            body="Higher-commitment expeditions and signature circuits from the live book."
-          />
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {noteworthy.map((trip) => (
-              <JourneyCard key={trip.id} trip={trip} />
+      <section className="bg-cream">
+        <div className="mx-auto grid max-w-6xl md:grid-cols-2">
+          <div className="flex flex-col justify-center px-5 py-16 md:px-12 md:py-24">
+            <p className="display text-5xl text-charcoal md:text-6xl">Dehradun</p>
+            <p className="mt-2 text-[12px] uppercase tracking-[0.2em] text-muted">Home of the desk</p>
+            <p className="mt-6 max-w-md text-sm font-light leading-relaxed text-muted">
+              {SITE.brand} plans Himalayan journeys the way a luxury house should: expert advice, honest catalogue
+              prices, and an operations spine that already owns the booking after you enquire.
+            </p>
+            <Link href="/about" className="btn-ghost-dark mt-8 w-fit">
+              Our story
+            </Link>
+          </div>
+          <div className="relative min-h-[22rem]">
+            <Image
+              src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1400&q=80"
+              alt=""
+              fill
+              className="object-cover"
+              sizes="50vw"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Why travel with us */}
+      <section className="relative overflow-hidden">
+        <Image
+          src="https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=2000&q=80"
+          alt=""
+          fill
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative section-pad">
+          <h2 className="display text-center text-3xl text-white md:text-4xl">
+            Why Travel with {SITE.brand}
+          </h2>
+          <div className="mt-14 grid gap-10 md:grid-cols-4">
+            {[
+              ["Local access", "Dehradun desk with on-ground leaders who know when a batch is full — and when private is wiser."],
+              ["Live catalogue", "Prices and inclusions mirror the CRM treks sales quote from. No brochure fiction."],
+              ["Desk to departure", "Enquiry → advisor → booking → ops in one Basecamp OS spine."],
+              ["India only focus", "Himalayan treks, yatras, and road journeys — depth over seven continents of noise."],
+            ].map(([t, b]) => (
+              <div key={t} className="text-center md:text-left">
+                <h3 className="text-[12px] font-medium uppercase tracking-[0.16em] text-white">{t}</h3>
+                <p className="mt-3 text-sm font-light leading-relaxed text-white/75">{b}</p>
+              </div>
             ))}
           </div>
-        </section>
-      ) : null}
-
-      <section className="border-t border-white/10 bg-ink-soft/50">
-        <div className="section-pad grid gap-12 md:grid-cols-3">
-          {[
-            {
-              t: "Nobody walks it alone",
-              b: "Every enquiry lands in the Trip On Himalaya sales desk — round-robin to advisors who own the trail book.",
-            },
-            {
-              t: "We’ve got your back",
-              b: "Ops, permits, batches, and payments live in one CRM spine. The storefront is the front door to that desk.",
-            },
-            {
-              t: "Travel that stays honest",
-              b: "Inclusions and prices mirror catalogue records. What you see is what the team can actually deliver.",
-            },
-          ].map((item) => (
-            <div key={item.t}>
-              <h3 className="display text-2xl text-snow">{item.t}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-mist/75">{item.b}</p>
-            </div>
-          ))}
         </div>
-        <div className="mx-auto max-w-6xl px-5 pb-20 md:px-8">
-          <Link href="/about" className="text-sm text-ice hover:underline">
-            Why travellers choose us →
+      </section>
+
+      {/* Destinations strip CTA */}
+      <section className="bg-cream-deep/70">
+        <div className="section-pad text-center">
+          <h2 className="display text-3xl text-charcoal md:text-4xl">Destinations We Love</h2>
+          <div className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-3">
+            {DESTINATIONS.map((d) => (
+              <Link
+                key={d.slug}
+                href={`/destinations/${d.slug}`}
+                className="text-[12px] uppercase tracking-[0.16em] text-muted underline-offset-8 hover:text-charcoal hover:underline"
+              >
+                {d.name}
+              </Link>
+            ))}
+          </div>
+          <Link href="/speak-to-us" className="btn-solid mt-12">
+            Speak to an advisor
           </Link>
         </div>
       </section>

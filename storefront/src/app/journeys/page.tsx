@@ -57,32 +57,32 @@ export default async function JourneysPage({ searchParams }: Props) {
   }
 
   return (
-    <div className="pt-28 md:pt-32">
-      <div className="section-pad !pt-8">
+    <div className="bg-cream pt-8">
+      <div className="section-pad !pt-10">
         <SectionHeading
           eyebrow="Journey finder"
-          title="Journeys of a lifetime — in India"
-          body="Filter the live Trip On Himalaya catalogue by style, region, and search. Every card opens a full itinerary and a desk enquiry."
+          title="Journeys of a Lifetime"
+          body="Filter the live Trip On Himalaya catalogue by style, region, and search."
         />
 
-        <form className="mt-10 flex flex-col gap-5 border border-white/10 bg-ink-soft/40 p-5 md:p-6">
+        <form className="mt-10 space-y-5 border border-line bg-paper p-5 md:p-6">
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
               <Link
                 key={c.label}
                 href={href({ category: c.value || undefined })}
-                className={`rounded-full px-4 py-1.5 text-sm ${
-                  category === c.value ? "bg-snow text-ink" : "border border-white/20 text-mist hover:text-snow"
+                className={`px-4 py-1.5 text-[12px] uppercase tracking-[0.12em] ${
+                  category === c.value ? "bg-charcoal text-cream" : "border border-line text-muted hover:text-charcoal"
                 }`}
               >
                 {c.label}
               </Link>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             <Link
               href={href({ region: undefined })}
-              className={`rounded-full px-3 py-1 text-xs ${!region ? "bg-ice/20 text-ice" : "text-mist/70 hover:text-snow"}`}
+              className={`text-[11px] uppercase tracking-[0.14em] ${!region ? "text-charcoal underline underline-offset-4" : "text-muted"}`}
             >
               All regions
             </Link>
@@ -90,45 +90,45 @@ export default async function JourneysPage({ searchParams }: Props) {
               <Link
                 key={d.slug}
                 href={href({ region: d.slug })}
-                className={`rounded-full px-3 py-1 text-xs ${
-                  region === d.slug ? "bg-ice/20 text-ice" : "text-mist/70 hover:text-snow"
+                className={`text-[11px] uppercase tracking-[0.14em] ${
+                  region === d.slug ? "text-charcoal underline underline-offset-4" : "text-muted hover:text-charcoal"
                 }`}
               >
                 {d.name}
               </Link>
             ))}
           </div>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex flex-col gap-3 md:flex-row">
             <input
               name="q"
               defaultValue={q}
               placeholder="Search Kedarkantha, Spiti, Char Dham…"
-              className="w-full flex-1 rounded-full border border-white/15 bg-ink px-4 py-2.5 text-sm text-snow outline-none focus:border-ice"
+              className="w-full flex-1 border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-charcoal"
             />
             {category ? <input type="hidden" name="category" value={category} /> : null}
             {region ? <input type="hidden" name="region" value={region} /> : null}
             <select
               name="sort"
               defaultValue={sort}
-              className="rounded-full border border-white/15 bg-ink px-4 py-2.5 text-sm text-snow outline-none focus:border-ice"
+              className="border border-line bg-cream px-4 py-2.5 text-sm outline-none focus:border-charcoal"
             >
               <option value="name">Sort: name</option>
               <option value="price-asc">Price ↑</option>
               <option value="price-desc">Price ↓</option>
               <option value="days">Duration</option>
             </select>
-            <button type="submit" className="rounded-full bg-ice px-5 py-2.5 text-sm font-semibold text-ink">
+            <button type="submit" className="btn-solid">
               Find journeys
             </button>
           </div>
         </form>
 
-        <p className="mt-8 text-sm text-mist/60">
+        <p className="mt-8 text-sm text-muted">
           {error ? error : `${trips.length} journey${trips.length === 1 ? "" : "s"}`}
         </p>
 
         {!error && trips.length > 0 ? (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {trips.map((trip) => (
               <JourneyCard key={trip.id} trip={trip} />
             ))}

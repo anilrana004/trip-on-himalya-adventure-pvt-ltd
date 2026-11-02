@@ -12,11 +12,11 @@ export function DestinationTile({ dest }: { dest: Destination }) {
         sizes="(max-width: 768px) 100vw, 33vw"
         className="object-cover transition duration-700 group-hover:scale-105"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 p-6">
-        <p className="eyebrow text-mist/70">{dest.tagline}</p>
-        <h3 className="display mt-2 text-3xl text-snow">{dest.name}</h3>
-        <p className="mt-2 line-clamp-2 text-sm text-mist/75">{dest.blurb}</p>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 p-6 text-white">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/70">{dest.tagline}</p>
+        <h3 className="display mt-2 text-3xl">{dest.name}</h3>
+        <p className="mt-2 line-clamp-2 text-sm font-light text-white/80">{dest.blurb}</p>
       </div>
     </Link>
   );

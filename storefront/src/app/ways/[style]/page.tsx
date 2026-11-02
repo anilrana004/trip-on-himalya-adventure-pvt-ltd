@@ -28,22 +28,22 @@ export default async function WayDetailPage({ params }: Props) {
   }
 
   return (
-    <article>
+    <article className="bg-cream">
       <section className="relative min-h-[50svh] overflow-hidden">
         <Image src={way.image} alt="" fill priority className="object-cover" sizes="100vw" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/50 to-ink/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/30 to-black/15" />
         <div className="relative mx-auto flex min-h-[50svh] max-w-6xl flex-col justify-end px-5 pb-12 pt-32 md:px-8">
-          <p className="eyebrow">{way.eyebrow}</p>
-          <h1 className="display mt-3 text-5xl text-snow md:text-6xl">{way.name}</h1>
-          <p className="mt-4 max-w-2xl text-sm text-mist/80 md:text-base">{way.blurb}</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-white/75">{way.eyebrow}</p>
+          <h1 className="display mt-3 text-5xl text-white md:text-6xl">{way.name}</h1>
+          <p className="mt-4 max-w-2xl text-sm font-light text-white/85 md:text-base">{way.blurb}</p>
         </div>
       </section>
       <div className="section-pad !pt-14">
-        <h2 className="display text-3xl text-snow">Matching journeys</h2>
+        <h2 className="display text-3xl text-charcoal">Matching journeys</h2>
         {trips.length === 0 ? (
-          <p className="mt-8 text-sm text-mist/70">No live matches — ask the desk for a custom plan.</p>
+          <p className="mt-8 text-sm text-muted">No live matches — ask the desk for a custom plan.</p>
         ) : (
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {trips.map((t) => (
               <JourneyCard key={t.id} trip={t} />
             ))}

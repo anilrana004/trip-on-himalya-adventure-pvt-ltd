@@ -2,9 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EnquiryForm } from "@/components/EnquiryForm";
+import { JourneyCard } from "@/components/JourneyCard";
 import { getTrip, listTrips } from "@/lib/catalogue";
 import { categoryLabel, coverForSlug, difficultyLabel, formatInr } from "@/lib/format";
-import { JourneyCard } from "@/components/JourneyCard";
 
 export const dynamic = "force-dynamic";
 
@@ -40,27 +40,24 @@ export default async function JourneyDetailPage({ params }: Props) {
   }
 
   return (
-    <article>
-      <section className="relative min-h-[75svh] overflow-hidden">
+    <article className="bg-cream">
+      <section className="relative min-h-[70svh] overflow-hidden">
         <Image src={cover} alt="" fill priority sizes="100vw" className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-ink/25" />
-        <div className="relative mx-auto flex min-h-[75svh] max-w-6xl flex-col justify-end px-5 pb-14 pt-32 md:px-8">
-          <p className="eyebrow">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/35 to-black/20" />
+        <div className="relative mx-auto flex min-h-[70svh] max-w-6xl flex-col justify-end px-5 pb-14 pt-32 md:px-8">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-white/75">
             {categoryLabel(trip.category)} · {difficultyLabel(trip.difficulty)} ·{" "}
             {trip.bookingType === "CUSTOM_FIT" ? "Private / tailor-made" : "Fixed departure"}
           </p>
-          <h1 className="display mt-3 max-w-3xl text-4xl leading-tight text-snow md:text-6xl">{trip.name}</h1>
-          <p className="mt-5 text-lg text-ice">
+          <h1 className="display mt-3 max-w-3xl text-4xl leading-tight text-white md:text-6xl">{trip.name}</h1>
+          <p className="mt-5 text-lg text-white/90">
             From {formatInr(Number(trip.fromPriceInr))} · {trip.durationDays} days
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="#enquire" className="rounded-full bg-snow px-6 py-3 text-sm font-semibold text-ink hover:bg-ice">
+            <Link href="#enquire" className="btn-ghost">
               Enquire about this journey
             </Link>
-            <Link
-              href="/journeys"
-              className="rounded-full border border-white/30 px-6 py-3 text-sm font-semibold text-snow hover:border-ice"
-            >
+            <Link href="/journeys" className="btn-ghost">
               Back to finder
             </Link>
           </div>
@@ -72,31 +69,31 @@ export default async function JourneyDetailPage({ params }: Props) {
           <Block title="Itinerary" body={trip.itinerary} />
           <Block title="Inclusions" body={trip.inclusions} />
           <Block title="Exclusions" body={trip.exclusions} />
-          <section className="border border-white/10 bg-ink-soft/40 p-6 md:p-8">
-            <h2 className="display text-2xl text-snow">How we travel this route</h2>
-            <ul className="mt-4 space-y-3 text-sm leading-relaxed text-mist/80">
+          <section className="border border-line bg-paper p-6 md:p-8">
+            <h2 className="display text-2xl text-charcoal">How we travel this route</h2>
+            <ul className="mt-4 space-y-3 text-sm font-light leading-relaxed text-muted">
               <li>Airport / city meet guidance arranged through the Dehradun desk when booked.</li>
               <li>English-speaking trek leaders / trip captains as per package.</li>
               <li>Permits, camping or stays, and meals as listed in inclusions.</li>
-              <li>24/7 escalation path into ops once your booking is confirmed in the CRM.</li>
+              <li>Escalation into ops once your booking is confirmed in the CRM.</li>
             </ul>
           </section>
         </div>
-        <aside id="enquire" className="md:sticky md:top-28 md:self-start">
+        <aside id="enquire" className="md:sticky md:top-8 md:self-start">
           <p className="eyebrow">Speak to the desk</p>
-          <h2 className="display mt-2 text-3xl text-snow">Plan this journey</h2>
-          <p className="mt-2 mb-6 text-sm text-mist/75">
-            Your note becomes a lead with this trek pre-filled — same queue Meta and website forms already use.
+          <h2 className="display mt-2 text-3xl text-charcoal">Plan this journey</h2>
+          <p className="mt-2 mb-6 text-sm font-light text-muted">
+            Your note becomes a lead with this trek pre-filled.
           </p>
           <EnquiryForm defaultDestination={trip.name} />
         </aside>
       </div>
 
       {related.length > 0 ? (
-        <section className="border-t border-white/10 bg-ink-soft/30">
+        <section className="border-t border-line bg-cream-deep/40">
           <div className="section-pad">
-            <h2 className="display text-3xl text-snow">You may also like</h2>
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <h2 className="display text-3xl text-charcoal">You may also like</h2>
+            <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {related.map((t) => (
                 <JourneyCard key={t.id} trip={t} />
               ))}
@@ -112,8 +109,8 @@ function Block({ title, body }: { title: string; body: string | null }) {
   if (!body?.trim()) return null;
   return (
     <section>
-      <h2 className="display text-2xl text-snow">{title}</h2>
-      <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-mist/80 md:text-base">{body}</p>
+      <h2 className="display text-2xl text-charcoal">{title}</h2>
+      <p className="mt-3 whitespace-pre-line text-sm font-light leading-relaxed text-muted md:text-base">{body}</p>
     </section>
   );
 }

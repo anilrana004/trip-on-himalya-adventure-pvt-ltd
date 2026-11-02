@@ -51,28 +51,26 @@ export function EnquiryForm({ defaultDestination = "" }: Props) {
 
   if (done) {
     return (
-      <div className="rounded-2xl border border-ice/30 bg-ink-soft/80 p-8 text-center">
-        <p className="font-[family-name:var(--font-display)] text-3xl text-snow">We have your plan request</p>
-        <p className="mt-3 text-sm leading-relaxed text-mist/80">
+      <div className="border border-line bg-cream p-8 text-center">
+        <p className="display text-3xl text-charcoal">We have your plan request</p>
+        <p className="mt-3 text-sm font-light leading-relaxed text-muted">
           A Trip On Himalaya advisor will call you shortly. Your enquiry is already in the sales desk queue.
         </p>
       </div>
     );
   }
 
+  const field =
+    "mt-1.5 w-full border border-line bg-paper px-3 py-2.5 text-sm text-charcoal outline-none focus:border-charcoal";
+
   return (
-    <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-white/10 bg-ink-soft/70 p-6 md:p-8">
+    <form onSubmit={onSubmit} className="space-y-5 border border-line bg-cream p-6 md:p-8">
       <div className="grid gap-5 md:grid-cols-2">
-        <label className="block text-sm text-mist/85">
+        <label className="block text-sm text-muted">
           Full name
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-white/15 bg-ink px-3 py-2.5 text-snow outline-none focus:border-ice"
-          />
+          <input required value={name} onChange={(e) => setName(e.target.value)} className={field} />
         </label>
-        <label className="block text-sm text-mist/85">
+        <label className="block text-sm text-muted">
           Mobile
           <input
             required
@@ -80,19 +78,14 @@ export function EnquiryForm({ defaultDestination = "" }: Props) {
             pattern="[0-9+\-\s]{8,15}"
             value={mobile}
             onChange={(e) => setMobile(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-white/15 bg-ink px-3 py-2.5 text-snow outline-none focus:border-ice"
+            className={field}
           />
         </label>
-        <label className="block text-sm text-mist/85">
-          Email <span className="text-mist/50">(optional)</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-white/15 bg-ink px-3 py-2.5 text-snow outline-none focus:border-ice"
-          />
+        <label className="block text-sm text-muted">
+          Email <span className="text-muted/60">(optional)</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
         </label>
-        <label className="block text-sm text-mist/85">
+        <label className="block text-sm text-muted">
           Travellers
           <input
             type="number"
@@ -100,44 +93,24 @@ export function EnquiryForm({ defaultDestination = "" }: Props) {
             max={40}
             value={persons}
             onChange={(e) => setPersons(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-white/15 bg-ink px-3 py-2.5 text-snow outline-none focus:border-ice"
+            className={field}
           />
         </label>
       </div>
-      <label className="block text-sm text-mist/85">
+      <label className="block text-sm text-muted">
         Trek or destination
-        <input
-          required
-          value={destination}
-          onChange={(e) => setDestination(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-white/15 bg-ink px-3 py-2.5 text-snow outline-none focus:border-ice"
-        />
+        <input required value={destination} onChange={(e) => setDestination(e.target.value)} className={field} />
       </label>
-      <label className="block text-sm text-mist/85">
+      <label className="block text-sm text-muted">
         Anything we should know
-        <textarea
-          rows={4}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-white/15 bg-ink px-3 py-2.5 text-snow outline-none focus:border-ice"
-        />
+        <textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} className={field} />
       </label>
-      <label className="flex items-start gap-3 text-sm text-mist/80">
-        <input
-          type="checkbox"
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          required
-          className="mt-1"
-        />
+      <label className="flex items-start gap-3 text-sm text-muted">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required className="mt-1" />
         <span>I agree to be contacted on call / WhatsApp about this trip enquiry.</span>
       </label>
-      {error ? <p className="text-sm text-ember">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full rounded-full bg-snow px-5 py-3 text-sm font-semibold text-ink transition hover:bg-ice disabled:opacity-60 md:w-auto"
-      >
+      {error ? <p className="text-sm text-accent">{error}</p> : null}
+      <button type="submit" disabled={submitting} className="btn-solid disabled:opacity-60">
         {submitting ? "Sending…" : "Send to the desk"}
       </button>
     </form>

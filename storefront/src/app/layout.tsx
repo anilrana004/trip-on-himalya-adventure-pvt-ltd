@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
-import { DM_Sans, Fraunces } from "next/font/google";
+import { Libre_Franklin, Libre_Baskerville } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SITE } from "@/lib/site";
 import "./globals.css";
 
-const display = Fraunces({
+const display = Libre_Baskerville({
   subsets: ["latin"],
+  weight: ["400", "700"],
   variable: "--font-display",
   display: "swap",
 });
 
-const body = DM_Sans({
+const body = Libre_Franklin({
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
   variable: "--font-body",
   display: "swap",
 });
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
     template: `%s · ${SITE.brand}`,
   },
   description:
-    "Extraordinary Indian treks, yatras, and Himalayan road journeys planned from Dehradun. Browse destinations, journey finder, tailor-made travel, and speak to our desk.",
+    "Extraordinary Indian treks, yatras, and Himalayan road journeys planned from Dehradun. Destinations, journey finder, tailor-made travel, and speak to our desk.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

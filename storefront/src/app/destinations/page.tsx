@@ -9,8 +9,8 @@ export const metadata = {
 
 export default function DestinationsPage() {
   return (
-    <div className="pt-28 md:pt-32">
-      <div className="section-pad !pt-8">
+    <div className="bg-cream pt-8">
+      <div className="section-pad !pt-10">
         <SectionHeading
           eyebrow="Destinations"
           title="Where the Indian Himalaya begins"
