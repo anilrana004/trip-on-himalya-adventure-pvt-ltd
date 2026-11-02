@@ -1,50 +1,33 @@
-# Storefront (separate Vercel app)
+# Storefront (sibling product)
 
-The customer site lives in `/storefront`. Deploy it as its **own** Vercel
-project with Root Directory `storefront`. Do not bundle it into the CRM
-`frontend` project.
+The customer site is **not** in this repository. It lives in the sibling
+folder / separate GitHub repo **`toh-storefront`**.
 
-Abercrombie & Kent–depth information architecture, scoped to **Indian
-Himalayan treks, yatras, and road journeys** only. Copy and brand are Trip On
-Himalaya — not A&K.
+Deploy that app as its own Vercel project (Root Directory = repo root). Do not
+nest it under this CRM `frontend` project.
 
 ```text
-Browser (store)
-  → GET  /journeys (RSC) → Railway GET /api/storefront/trips
-  → POST /api/enquiry    → HMAC → Railway POST /api/webhook/lead
+Browser (toh-storefront)
+  → RSC catalogue     → Railway GET  /api/storefront/trips
+  → POST /api/enquiry → HMAC         → Railway POST /api/webhook/lead
 ```
 
-## Surfaces
+Full contract: `toh-storefront/docs/CRM_API_CONTRACT.md`.
 
-| Path | Purpose |
+## What this CRM owns
+
+| Surface | Notes |
 |---|---|
-| `/` | Hero, destinations, featured journeys, ways, why us |
-| `/destinations` | Region hubs |
-| `/journeys` | Journey finder |
-| `/ways` | How guests travel |
-| `/tailormade` `/offers` `/about` `/speak-to-us` | Private, offers, story, contact |
-| `/treks/*` | Redirects to `/journeys/*` |
+| `GET /api/storefront/**` | Public catalogue (no JWT) |
+| `POST /api/webhook/lead` | HMAC enquiry intake → lead |
+| CORS | Merge `STOREFRONT_PUBLIC_URL` with `APP_PUBLIC_URL` |
 
-## Railway
+## Railway env
 
 | Variable | Purpose |
 |---|---|
-| `STOREFRONT_PUBLIC_URL` | `https://<store>.vercel.app` — merged into CORS with `APP_PUBLIC_URL` |
-| `WEBHOOK_SECRET` | Shared with storefront BFF for enquiry HMAC |
+| `STOREFRONT_PUBLIC_URL` | `https://<store>.vercel.app` |
+| `WEBHOOK_SECRET` | Same value as storefront Vercel |
 
-Public API (no JWT):
-
-- `GET /api/storefront/trips?category=&q=`
-- `GET /api/storefront/trips/{slug}`
-
-## Vercel storefront project
-
-| Variable | Required |
-|---|---|
-| `API_PROXY_TARGET` | Yes — Railway HTTPS origin |
-| `WEBHOOK_SECRET` | Yes — same as Railway |
-| `NEXT_PUBLIC_CRM_URL` | Optional |
-| `NEXT_PUBLIC_WHATSAPP_E164` | Optional |
-
-After first deploy, paste the storefront URL into Railway
-`STOREFRONT_PUBLIC_URL` and redeploy the API so CORS includes it.
+After the first storefront deploy, set `STOREFRONT_PUBLIC_URL` and redeploy
+the API so CORS includes that origin.
