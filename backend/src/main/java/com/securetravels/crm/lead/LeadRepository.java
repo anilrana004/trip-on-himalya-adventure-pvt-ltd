@@ -24,6 +24,16 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
             """)
     Optional<Lead> findFirstActiveDuplicate(@Param("digits") String digits);
 
+    /** Soft match when phone differs but email is the same active person. */
+    @Query("""
+            select l from Lead l
+            where lower(l.email) = lower(:email)
+              and l.status <> com.securetravels.crm.lead.Lead.Status.LOST
+            order by l.createdAt desc
+            limit 1
+            """)
+    Optional<Lead> findFirstActiveDuplicateByEmail(@Param("email") String email);
+
     Optional<Lead> findByMetaLeadId(String metaLeadId);
 
     @Query(value = """

@@ -1,33 +1,41 @@
-# Storefront (sibling product)
+# Public storefront channel (CRM-owned)
 
-The customer site is **not** in this repository. It lives in the sibling
-folder / separate GitHub repo **`toh-storefront`**.
-
-Deploy that app as its own Vercel project (Root Directory = repo root). Do not
-nest it under this CRM `frontend` project.
+The customer storefront is a **separate product and GitHub repo**. This CRM
+does **not** host its Next.js app. CRM owns the Salesforce-style channel
+integration only.
 
 ```text
-Browser (toh-storefront)
-  → RSC catalogue     → Railway GET  /api/storefront/trips
-  → POST /api/enquiry → HMAC         → Railway POST /api/webhook/lead
+External storefront (toh-storefront)
+  → GET  /api/storefront/trips[/{slug}]   public catalogue (active trips only)
+  → POST /api/webhook/lead                HMAC enquiry → lead → RR owner → 5-min call task
 ```
 
-Full contract: `toh-storefront/docs/CRM_API_CONTRACT.md`.
+## What lives in this CRM
 
-## What this CRM owns
-
-| Surface | Notes |
+| Surface | Behaviour |
 |---|---|
-| `GET /api/storefront/**` | Public catalogue (no JWT) |
-| `POST /api/webhook/lead` | HMAC enquiry intake → lead |
-| CORS | Merge `STOREFRONT_PUBLIC_URL` with `APP_PUBLIC_URL` |
+| `GET /api/storefront/**` | Public, no JWT. Active trips only. No CRM notes / content briefs. |
+| `POST /api/webhook/lead` | HMAC `X-Webhook-Signature`. Source `STOREFRONT` or `WEBSITE`. Optional `trip_slug` for sticky assignment. Phone then email soft-dedupe. |
+| Desk **Capture / Forms** | Storefront + website + WhatsApp channels; recent signed posts without raw PII payload. |
+| Lead book | Filter / tab by source `STOREFRONT`. Same journey: lead → deal → booking. |
 
-## Railway env
+## Railway env (API)
 
 | Variable | Purpose |
 |---|---|
-| `STOREFRONT_PUBLIC_URL` | `https://<store>.vercel.app` |
-| `WEBHOOK_SECRET` | Same value as storefront Vercel |
+| `STOREFRONT_PUBLIC_URL` | `https://<store>.vercel.app` — merged into CORS with `APP_PUBLIC_URL` |
+| `WEBHOOK_SECRET` | Shared with the storefront BFF only (never `NEXT_PUBLIC_*`) |
 
-After the first storefront deploy, set `STOREFRONT_PUBLIC_URL` and redeploy
-the API so CORS includes that origin.
+After first storefront deploy, set `STOREFRONT_PUBLIC_URL` and redeploy the API.
+
+## Contract fields the storefront may send
+
+| Field | Required | Notes |
+|---|---|---|
+| `customer_name` / `mobile_number` / `consent_given` | Yes | Indian mobile |
+| `destination` | Recommended | Free text trek / region |
+| `trip_slug` | Optional | Resolves to active `trip_id` + sticky RR |
+| `lead_source` | Optional | Prefer `STOREFRONT` |
+| `email`, `num_persons`, `message`, `consent_scope` | Optional | |
+
+Do not add storefront UI, pages, or packages into this repository.

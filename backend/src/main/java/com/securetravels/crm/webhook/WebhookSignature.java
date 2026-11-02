@@ -22,6 +22,7 @@ public final class WebhookSignature {
     }
 
     public static boolean matches(String provided, String secret, byte[] payload) {
-        return HmacSigner.matches(provided, secret, payload);
+        // Fail closed on blank secret — never accept a body signed with "".
+        return HmacSigner.verified(secret, provided, payload);
     }
 }

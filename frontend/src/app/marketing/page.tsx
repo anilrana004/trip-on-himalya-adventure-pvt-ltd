@@ -14,6 +14,7 @@ const ORDER = [
   "FACEBOOK_ADS",
   "INSTAGRAM",
   "WEBSITE",
+  "STOREFRONT",
   "WHATSAPP",
   "REFERRAL",
   "JUSTDIAL",

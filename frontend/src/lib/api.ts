@@ -846,7 +846,7 @@ export const api = {
     ),
 
   getWebsiteAttempts: () =>
-    request<{ id: string; status: string; errorMessage?: string | null; leadId?: string | null; createdAt: string }[]>(
+    request<{ id: string; source?: string; status: string; errorMessage?: string | null; leadId?: string | null; createdAt: string }[]>(
       "/api/capture/website-attempts",
     ),
 

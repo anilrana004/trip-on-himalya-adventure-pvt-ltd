@@ -12,7 +12,7 @@ before any work starts.
 
 | # | System | Purpose | Status | Phase | Notes / references |
 |---|---|---|---|---|---|
-| 1 | **SecureTravels website** | Inbound lead intake | **Built** | 1 | `POST /api/webhook/lead`, HMAC-SHA256 `X-Webhook-Signature`, rate-limited, audited in `webhook_logs` (`API_STANDARDS.md` §6) |
+| 1 | **Website + storefront channel** | Inbound lead intake + public trek catalogue | **Built** | 1 | `POST /api/webhook/lead` (HMAC, sources `WEBSITE`/`STOREFRONT`, optional `trip_slug`), `GET /api/storefront/trips/**`, CORS via `STOREFRONT_PUBLIC_URL` (`docs/deployment/STOREFRONT.md`) |
 | 2 | **Email (SMTP)** | Follow-up / notification emails | Partial | 1→2 | `IN_APP` rows always persisted; `EMAIL` rows emitted by stub behind a flag — real SMTP wiring in Phase 2 (`notifications` table, `EmailNotifier`) |
 | 3 | **S3-compatible object storage** | ID proofs, medical certs, trip photos | Schema only | 2 | `documents` table stores `storage_key`; presigned upload path + compliance workflows land in Phase 2 |
 | 4 | **Interakt (WhatsApp Business API)** | Outbound template sends, delivery status, inbound replies | **Built** (sandbox default) | 4 | `communications` package, 9 templates, `Interakt-Signature` HMAC webhook; `app.whatsapp.mode=INTERAKT` + `INTERAKT_API_KEY` activates the live adapter (`API_INTEGRATIONS.md`) |

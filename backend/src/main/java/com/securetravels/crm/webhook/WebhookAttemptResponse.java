@@ -4,10 +4,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One website-form attempt. The stored payload is never returned.
+ * One public-channel form attempt. The stored payload is never returned.
  */
 public record WebhookAttemptResponse(
         UUID id,
+        String source,
         String status,
         String errorMessage,
         UUID leadId,

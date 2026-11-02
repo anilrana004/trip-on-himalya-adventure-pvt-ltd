@@ -12,6 +12,7 @@ public interface WebhookLogRepository extends JpaRepository<WebhookLog, UUID> {
 
     interface AttemptRow {
         UUID getId();
+        String getSource();
         String getStatus();
         String getErrorMessage();
         UUID getLeadId();
@@ -19,7 +20,7 @@ public interface WebhookLogRepository extends JpaRepository<WebhookLog, UUID> {
     }
 
     @Query("""
-            select w.id as id, w.status as status, w.errorMessage as errorMessage,
+            select w.id as id, w.source as source, w.status as status, w.errorMessage as errorMessage,
                    w.leadId as leadId, w.createdAt as createdAt
             from WebhookLog w
             order by w.createdAt desc

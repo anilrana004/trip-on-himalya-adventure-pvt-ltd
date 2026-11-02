@@ -8,6 +8,7 @@ const SOURCES = new Set([
   "FACEBOOK_ADS",
   "INSTAGRAM",
   "WEBSITE",
+  "STOREFRONT",
   "WHATSAPP",
   "REFERRAL",
   "JUSTDIAL",

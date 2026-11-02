@@ -9,6 +9,8 @@ import com.securetravels.crm.lead.LeadRepository;
 import com.securetravels.crm.lead.LeadService;
 import com.securetravels.crm.lead.dto.LeadCreateRequest;
 import com.securetravels.crm.lead.dto.LeadResponse;
+import com.securetravels.crm.trip.Trip;
+import com.securetravels.crm.trip.TripRepository;
 import com.securetravels.crm.user.User;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,30 +20,28 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Public website webhook intake (Module 9). Verifies the HMAC-SHA256
- * signature, validates the payload manually (no Spring Security context),
- * rejects duplicates softly (HTTP 200), round-robins the owner, then runs
- * the standard lead pipeline (automation shortcuts included). Every call is
- * recorded in webhook_logs.
- *
- * Validation mirrors LedCreateRequest's bean constraints: the webhook builds
- * the DTO programmatically, so constraints must be enforced here — otherwise
- * oversized/invalid fields would hit the DB with a 500 instead of a 400.
+ * Public channel intake (website form + sibling storefront BFF). Verifies
+ * HMAC-SHA256, validates the payload, soft-dedupes by phone then email,
+ * resolves optional trip slug for sticky round-robin, then runs the standard
+ * lead pipeline. Every call is recorded in webhook_logs.
  */
 @Service
 public class WebhookService {
 
     private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
-    private static final String SOURCE = "WEBSITE";
+    private static final String LOG_WEBSITE = "WEBSITE";
+    private static final String LOG_STOREFRONT = "STOREFRONT";
     private static final int MAX_STORED_PAYLOAD = 10_000;
     private static final int MAX_NAME = 200;
     private static final int MAX_PHONE = 30;
     private static final int MAX_EMAIL = 255;
     private static final int MAX_DESTINATION = 120;
+    private static final int MAX_TRIP_SLUG = 160;
     private static final int MAX_REMARKS = 5000;
     private static final int MAX_CONSENT_SCOPE = 200;
     private static final int MIN_PERSONS = 1;
@@ -54,15 +54,18 @@ public class WebhookService {
     private final RoundRobinService roundRobin;
     private final LeadService leadService;
     private final LeadRepository leads;
+    private final TripRepository trips;
     private final WebhookLogRepository webhookLogs;
 
     public WebhookService(ObjectMapper objectMapper, AppProperties props, RoundRobinService roundRobin,
-                          LeadService leadService, LeadRepository leads, WebhookLogRepository webhookLogs) {
+                          LeadService leadService, LeadRepository leads, TripRepository trips,
+                          WebhookLogRepository webhookLogs) {
         this.objectMapper = objectMapper;
         this.props = props;
         this.roundRobin = roundRobin;
         this.leadService = leadService;
         this.leads = leads;
+        this.trips = trips;
         this.webhookLogs = webhookLogs;
     }
 
@@ -80,24 +83,33 @@ public class WebhookService {
         }
         validate(req);
 
-        Lead duplicate = leads.findFirstActiveDuplicate(PhoneUtils.normalize(req.mobileNumber())).orElse(null);
+        Lead.Source channel = parseSource(req.source());
+        String logSource = channel == Lead.Source.STOREFRONT ? LOG_STOREFRONT : LOG_WEBSITE;
+
+        Lead duplicate = findDuplicate(req);
         if (duplicate != null) {
-            log(SOURCE, payload, duplicate.getId(), WebhookLog.Status.duplicate, null);
+            log(logSource, payload, duplicate.getId(), WebhookLog.Status.duplicate, null);
             return new WebhookLeadResponse(true, true, duplicate.getId(), duplicate.getOwnerId(), null,
                     "Duplicate lead; existing lead returned");
         }
 
-        LeadCreateRequest createReq = toCreateRequest(req);
+        UUID tripId = resolveTripId(req.tripSlug());
+        String destination = blankToNull(req.destination());
+        if (destination == null && tripId != null) {
+            destination = trips.findById(tripId).map(Trip::getName).orElse(null);
+        }
+
+        LeadCreateRequest createReq = toCreateRequest(req, channel, tripId, destination);
         User owner = roundRobin.assignForEnquiry(createReq.tripId(), createReq.destination(), null);
         LeadResponse created = leadService.createAutomated(createReq, owner.getId());
 
-        log(SOURCE, payload, created.id(), WebhookLog.Status.success, null);
+        log(logSource, payload, created.id(), WebhookLog.Status.success, null);
         return new WebhookLeadResponse(true, false, created.id(), owner.getId(), owner.getFullName(),
                 "Lead created and assigned to " + owner.getFullName() + ". 5-minute call task scheduled.");
     }
 
     /**
-     * Latest website-form posts for managers. Payload text stays in the table
+     * Latest public-form posts for managers. Payload text stays in the table
      * and is not copied onto the response.
      */
     @Transactional(readOnly = true)
@@ -105,6 +117,7 @@ public class WebhookService {
         return webhookLogs.latestAttempts(PageRequest.of(0, 40)).stream()
                 .map(row -> new WebhookAttemptResponse(
                         row.getId(),
+                        row.getSource(),
                         row.getStatus(),
                         safeError(row.getErrorMessage()),
                         row.getLeadId(),
@@ -123,13 +136,36 @@ public class WebhookService {
 
     @Transactional
     public void logFailure(String payload, String errorMessage) {
-        log(SOURCE, payload, null, WebhookLog.Status.failed,
+        log(LOG_WEBSITE, payload, null, WebhookLog.Status.failed,
                 errorMessage == null ? null : errorMessage.substring(0, Math.min(1000, errorMessage.length())));
     }
 
     private void log(String source, String payload, UUID leadId, WebhookLog.Status status, String errorMessage) {
         String bounded = payload == null ? "" : payload.substring(0, Math.min(MAX_STORED_PAYLOAD, payload.length()));
         webhookLogs.save(new WebhookLog(source, bounded, leadId, status, errorMessage));
+    }
+
+    private Lead findDuplicate(WebhookLeadRequest req) {
+        Lead byPhone = leads.findFirstActiveDuplicate(PhoneUtils.normalize(req.mobileNumber())).orElse(null);
+        if (byPhone != null) {
+            return byPhone;
+        }
+        if (!isBlank(req.email())) {
+            return leads.findFirstActiveDuplicateByEmail(req.email().trim()).orElse(null);
+        }
+        return null;
+    }
+
+    private UUID resolveTripId(String tripSlug) {
+        if (isBlank(tripSlug)) {
+            return null;
+        }
+        String slug = tripSlug.trim().toLowerCase(Locale.ROOT);
+        return trips.findBySlug(slug)
+                .or(() -> trips.findBySlug(tripSlug.trim()))
+                .filter(Trip::isActive)
+                .map(Trip::getId)
+                .orElse(null);
     }
 
     private void validate(WebhookLeadRequest req) {
@@ -164,6 +200,9 @@ public class WebhookService {
         if (req.destination() != null && req.destination().length() > MAX_DESTINATION) {
             throw new BadRequestException("destination must be at most " + MAX_DESTINATION + " characters");
         }
+        if (req.tripSlug() != null && req.tripSlug().length() > MAX_TRIP_SLUG) {
+            throw new BadRequestException("tripSlug must be at most " + MAX_TRIP_SLUG + " characters");
+        }
         if (req.numPersons() != null && (req.numPersons() < MIN_PERSONS || req.numPersons() > MAX_PERSONS)) {
             throw new BadRequestException("numPersons must be between " + MIN_PERSONS + " and " + MAX_PERSONS);
         }
@@ -193,15 +232,16 @@ public class WebhookService {
         return budget.precision() - budget.scale() <= MAX_BUDGET_INTEGER_DIGITS;
     }
 
-    private LeadCreateRequest toCreateRequest(WebhookLeadRequest req) {
+    private LeadCreateRequest toCreateRequest(WebhookLeadRequest req, Lead.Source channel,
+                                              UUID tripId, String destination) {
         return new LeadCreateRequest(
                 req.customerName().trim(),
                 req.mobileNumber().trim(),
                 blankToNull(req.whatsappNumber()),
                 blankToNull(req.email()),
-                parseSource(req.source()),
-                blankToNull(req.destination()),
-                null,
+                channel,
+                destination,
+                tripId,
                 null,
                 req.numPersons(),
                 req.budget(),
@@ -220,7 +260,7 @@ public class WebhookService {
             return Lead.Source.WEBSITE;
         }
         try {
-            return Lead.Source.valueOf(raw.trim().toUpperCase());
+            return Lead.Source.valueOf(raw.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
             return Lead.Source.WEBSITE;
         }

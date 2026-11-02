@@ -28,7 +28,7 @@ public class Lead extends Auditable {
 
     public enum Status { NEW, INTERESTED, QUOTATION_SENT, BOOKING_CONFIRMED, LOST }
     public enum Source {
-        GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, WEBSITE, WHATSAPP,
+        GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, WEBSITE, STOREFRONT, WHATSAPP,
         REFERRAL, JUSTDIAL, WALK_IN, B2B, EXISTING_CUSTOMER, OTHER
     }
     public enum LostReason {

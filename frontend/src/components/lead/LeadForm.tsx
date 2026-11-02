@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { api, type Lead, type LeadCreatePayload, type LeadUpdatePayload, type Trip, ApiClientError } from "@/lib/api";
 
 const SOURCES = [
-  "GOOGLE_ADS", "FACEBOOK_ADS", "INSTAGRAM", "WEBSITE", "WHATSAPP",
+  "GOOGLE_ADS", "FACEBOOK_ADS", "INSTAGRAM", "WEBSITE", "STOREFRONT", "WHATSAPP",
   "REFERRAL", "JUSTDIAL", "WALK_IN", "B2B", "EXISTING_CUSTOMER", "OTHER",
 ];
 

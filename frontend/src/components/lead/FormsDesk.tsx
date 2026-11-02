@@ -8,9 +8,21 @@ import { api, formatApiError, type Lead } from "@/lib/api";
 import { STAGE_LABEL } from "@/lib/leadUi";
 
 type SourceRow = { source: string; total: number; open: number; quoted: number; booked: number; lost: number };
-type Attempt = { id: string; status: string; errorMessage?: string | null; leadId?: string | null; createdAt: string };
+type Attempt = {
+  id: string;
+  source?: string;
+  status: string;
+  errorMessage?: string | null;
+  leadId?: string | null;
+  createdAt: string;
+};
 
 const CHANNELS = [
+  {
+    source: "STOREFRONT",
+    title: "Storefront enquiry",
+    empty: "No storefront enquiry has created a lead yet. The customer site posts HMAC-signed enquiries into this desk.",
+  },
   {
     source: "WEBSITE",
     title: "Website form",
@@ -42,7 +54,7 @@ function attemptLabel(status: string) {
 
 export function FormsDesk() {
   const [sources, setSources] = useState<SourceRow[]>([]);
-  const [selected, setSelected] = useState<(typeof CHANNELS)[number]["source"]>("WEBSITE");
+  const [selected, setSelected] = useState<(typeof CHANNELS)[number]["source"]>("STOREFRONT");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -95,13 +107,12 @@ export function FormsDesk() {
   const pageCount = Math.max(1, Math.ceil(total / 25));
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const failed = attempts.filter((row) => row.status === "failed").length;
 
   return (
     <div className="space-y-4">
       {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <p className="text-sm text-slate-600">
-        A captured enquiry is a lead. Website forms and WhatsApp messages already write that lead. Desk entry does the same through Add lead or a CSV.
+        A captured enquiry is a lead. Storefront, website forms, and WhatsApp already write that lead into the same book. Desk entry does the same through Add lead or a CSV.
       </p>
 
       <div className="grid gap-3 lg:grid-cols-3">
@@ -141,17 +152,24 @@ export function FormsDesk() {
         </div>
       </div>
 
-      {selected === "WEBSITE" && (
+      {(selected === "WEBSITE" || selected === "STOREFRONT") && (() => {
+        const channelAttempts = attempts.filter((a) => (a.source || "WEBSITE") === selected);
+        const channelFailed = channelAttempts.filter((a) => a.status === "failed").length;
+        return (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm">
-            <span className="font-medium text-slate-900">Recent website posts</span>
+            <span className="font-medium text-slate-900">
+              {selected === "STOREFRONT" ? "Recent storefront posts" : "Recent website posts"}
+            </span>
             <span className="text-xs text-slate-500">
-              {attempts.length === 0 ? "None recorded" : `${attempts.length} latest${failed ? ` · ${failed} rejected` : ""}`}
+              {channelAttempts.length === 0
+                ? "None recorded"
+                : `${channelAttempts.length} latest${channelFailed ? ` · ${channelFailed} rejected` : ""}`}
             </span>
           </div>
-          {attempts.length === 0 ? (
+          {channelAttempts.length === 0 ? (
             <p className="px-3 py-6 text-sm text-slate-500">
-              No website form post is recorded yet. A successful post creates a lead. A rejected post names what to fix, and the form body is not shown here.
+              No signed form post is recorded for this channel yet. A successful post creates a lead. Rejected posts name what to fix; the form body is not shown here.
             </p>
           ) : (
             <table className="w-full text-left text-sm">
@@ -163,7 +181,7 @@ export function FormsDesk() {
                 </tr>
               </thead>
               <tbody>
-                {attempts.map((attempt) => (
+                {channelAttempts.map((attempt) => (
                   <tr key={attempt.id} className="border-t border-slate-100">
                     <td className="px-3 py-2 text-slate-600">{new Date(attempt.createdAt).toLocaleString()}</td>
                     <td className="px-3 py-2 text-slate-800">{attemptLabel(attempt.status)}</td>
@@ -178,7 +196,8 @@ export function FormsDesk() {
             </table>
           )}
         </section>
-      )}
+        );
+      })()}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm">

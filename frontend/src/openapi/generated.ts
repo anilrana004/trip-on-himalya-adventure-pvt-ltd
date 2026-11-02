@@ -1378,7 +1378,7 @@ export interface components {
             /** Format: email */
             email?: string;
             /** @enum {string} */
-            source: "GOOGLE_ADS" | "FACEBOOK_ADS" | "INSTAGRAM" | "WEBSITE" | "WHATSAPP" | "REFERRAL" | "JUSTDIAL" | "WALK_IN" | "B2B" | "EXISTING_CUSTOMER" | "OTHER";
+            source: "GOOGLE_ADS" | "FACEBOOK_ADS" | "INSTAGRAM" | "WEBSITE" | "STOREFRONT" | "WHATSAPP" | "REFERRAL" | "JUSTDIAL" | "WALK_IN" | "B2B" | "EXISTING_CUSTOMER" | "OTHER";
             destination?: string;
             /** Format: uuid */
             tripId?: string;
@@ -1403,7 +1403,7 @@ export interface components {
             whatsappNumber?: string;
             email?: string;
             /** @enum {string} */
-            source?: "GOOGLE_ADS" | "FACEBOOK_ADS" | "INSTAGRAM" | "WEBSITE" | "WHATSAPP" | "REFERRAL" | "JUSTDIAL" | "WALK_IN" | "B2B" | "EXISTING_CUSTOMER" | "OTHER";
+            source?: "GOOGLE_ADS" | "FACEBOOK_ADS" | "INSTAGRAM" | "WEBSITE" | "STOREFRONT" | "WHATSAPP" | "REFERRAL" | "JUSTDIAL" | "WALK_IN" | "B2B" | "EXISTING_CUSTOMER" | "OTHER";
             destination?: string;
             /** Format: uuid */
             tripId?: string;
@@ -2772,7 +2772,7 @@ export interface operations {
             query: {
                 ownerId?: string;
                 status?: "NEW" | "INTERESTED" | "QUOTATION_SENT" | "BOOKING_CONFIRMED" | "LOST";
-                source?: "GOOGLE_ADS" | "FACEBOOK_ADS" | "INSTAGRAM" | "WEBSITE" | "WHATSAPP" | "REFERRAL" | "JUSTDIAL" | "WALK_IN" | "B2B" | "EXISTING_CUSTOMER" | "OTHER";
+                source?: "GOOGLE_ADS" | "FACEBOOK_ADS" | "INSTAGRAM" | "WEBSITE" | "STOREFRONT" | "WHATSAPP" | "REFERRAL" | "JUSTDIAL" | "WALK_IN" | "B2B" | "EXISTING_CUSTOMER" | "OTHER";
                 heat?: "HOT" | "WARM" | "COLD";
                 tripId?: string;
                 from?: string;
