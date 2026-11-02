@@ -79,6 +79,7 @@ public class FollowUpSweep {
     private static String human(Task.Type type) {
         return switch (type) {
             case INITIAL_CALL -> "first call (5 min)";
+            case CALLBACK -> "callback";
             case FOLLOW_UP_1D -> "follow-up 1";
             case FOLLOW_UP_3D -> "follow-up 2";
             case FOLLOW_UP_8D -> "follow-up 3";

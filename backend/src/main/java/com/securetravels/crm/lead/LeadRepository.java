@@ -36,6 +36,20 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     Optional<Lead> findByMetaLeadId(String metaLeadId);
 
+    /** Open leads that have gone quiet — used by inactive-lead nudge sweep. */
+    @Query("""
+            select l from Lead l
+            where l.status in :statuses
+              and l.ownerId is not null
+              and (l.lastContactedAt is null or l.lastContactedAt < :quietSince)
+              and l.createdAt < :createdBefore
+            order by l.createdAt asc
+            """)
+    java.util.List<Lead> findInactiveForNudge(
+            @Param("statuses") java.util.Collection<Lead.Status> statuses,
+            @Param("quietSince") java.time.Instant quietSince,
+            @Param("createdBefore") java.time.Instant createdBefore);
+
     @Query(value = """
             select l.source as source,
                    count(*) as total,

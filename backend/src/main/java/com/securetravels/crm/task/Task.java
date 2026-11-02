@@ -28,7 +28,7 @@ public class Task extends CreatedUpdated {
 
     public enum Type {
         INITIAL_CALL, FOLLOW_UP_1D, FOLLOW_UP_3D, FOLLOW_UP_8D, FOLLOW_UP_15D,
-        QUOTATION, PAYMENT_REMINDER, OPS, REVIEW, CUSTOM
+        QUOTATION, PAYMENT_REMINDER, OPS, REVIEW, CUSTOM, CALLBACK
     }
     public enum Status { PENDING, COMPLETED, OVERDUE, CANCELLED }
 

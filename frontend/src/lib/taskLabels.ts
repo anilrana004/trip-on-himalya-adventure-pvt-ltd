@@ -11,6 +11,7 @@ export const TASK_TYPE_LABEL: Record<string, string> = {
   OPS: "Ops handoff",
   REVIEW: "Review",
   CUSTOM: "Custom",
+  CALLBACK: "Callback (2 hours)",
 };
 
 export const TASK_STATUS_STYLE: Record<string, string> = {

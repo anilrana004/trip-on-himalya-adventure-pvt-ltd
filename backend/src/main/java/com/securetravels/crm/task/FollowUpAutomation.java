@@ -3,6 +3,7 @@ package com.securetravels.crm.task;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
 import com.securetravels.crm.lead.Lead;
+import com.securetravels.crm.lead.LeadCallAttempt;
 import com.securetravels.crm.notification.Notification;
 import com.securetravels.crm.notification.NotificationRepository;
 import com.securetravels.crm.user.Role;
@@ -26,6 +27,9 @@ import java.util.UUID;
  *   • New lead              → INITIAL_CALL due +5 min (SLA 15m for ads/web/storefront, else 1h)
  *   • Lead → INTERESTED     → FU1 tomorrow, FU2 +2d, FU3 +5d, FU4 +7d (from mark-interested time)
  *   • Lead → QUOTATION_SENT → quotation task +2 days
+ *   • Call NO_ANSWER/BUSY/CALLBACK → CALLBACK task (+2h)
+ *   • Call CONNECTED → complete open INITIAL_CALL
+ *   • Call WRONG_NUMBER → alert managers
  * Each task notifies the assignee in-app + email. SLA breach escalates to managers.
  */
 @Service
@@ -126,6 +130,57 @@ public class FollowUpAutomation {
         log.info("[automation] lead={} booked; outstanding follow-ups cancelled", lead.getId());
     }
 
+    /**
+     * Drive the next sales action from a logged call attempt.
+     * Returns how many open INITIAL_CALL tasks were auto-completed (0 or more).
+     */
+    @Transactional
+    public int onCallOutcome(Lead lead, LeadCallAttempt.Outcome outcome) {
+        if (lead == null || lead.getId() == null || lead.getOwnerId() == null || outcome == null) {
+            return 0;
+        }
+        int completedFirstCalls = 0;
+        switch (outcome) {
+            case CONNECTED -> {
+                List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
+                for (Task t : tasks.findByLeadIdAndTypeAndStatusIn(lead.getId(), Task.Type.INITIAL_CALL, open)) {
+                    t.complete(Instant.now());
+                    completedFirstCalls++;
+                }
+                notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP,
+                        "Call connected — update the stage",
+                        "You reached " + lead.getCustomerName()
+                                + ". Mark Interested if they want the trek, or Quotation sent when you send the quote.",
+                        leadPath(lead.getId())));
+            }
+            case NO_ANSWER, BUSY, CALLBACK -> {
+                cancelOpen(lead.getId(), Task.Type.CALLBACK);
+                Instant due = Instant.now().plus(2, ChronoUnit.HOURS);
+                scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.CALLBACK, due, 4,
+                        "Callback in 2 hours",
+                        "Could not finish the call with " + lead.getCustomerName()
+                                + " (" + outcome.name() + "). Call again.");
+                lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+            }
+            case WRONG_NUMBER -> {
+                List<User> managers = users.findByIsActiveTrueAndRoleIn(
+                        EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO));
+                String title = "Wrong number on lead";
+                String body = lead.getCustomerName() + " — logged number looks wrong. Fix the mobile or mark Lost.";
+                for (User manager : managers) {
+                    notifications.save(new Notification(manager.getId(), Notification.Channel.IN_APP,
+                            title, body, leadPath(lead.getId())));
+                }
+                notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP,
+                        title, body, leadPath(lead.getId())));
+            }
+            case OTHER -> {
+                // no automatic task — sales decides next step
+            }
+        }
+        return completedFirstCalls;
+    }
+
     /** Remind the assignee that a task is due soon or already overdue. */
     @Transactional
     public void remindAssignee(Task task, String title, String body) {
@@ -212,6 +267,7 @@ public class FollowUpAutomation {
     private String humanType(Task.Type type) {
         return switch (type) {
             case INITIAL_CALL -> "first call";
+            case CALLBACK -> "callback";
             case QUOTATION -> "quotation follow-up";
             case PAYMENT_REMINDER -> "payment reminder";
             case OPS -> "ops handoff";

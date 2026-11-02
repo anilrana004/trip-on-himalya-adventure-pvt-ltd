@@ -7,24 +7,28 @@ import { TASK_TYPE_LABEL } from "@/lib/taskLabels";
 
 const RULES = [
   {
+    title: "Facebook / ads in",
+    body: "Zapier (Facebook Lead Ads) or Meta webhook posts a signed lead. CRM assigns the next sales owner and starts the 5‑minute first call.",
+  },
+  {
     title: "First call",
-    body: "A new lead creates a first-call task for its owner, due five minutes later.",
+    body: "Every new lead gets an INITIAL_CALL task due in 5 minutes. Ads / website / storefront SLA is 15 minutes, then managers are escalated.",
   },
   {
-    title: "Interested",
-    body: "Moving a lead to Interested schedules follow-ups on day 1, day 3, day 8, and day 15 from when the lead was created. Open ones of that kind are replaced, not duplicated.",
+    title: "Call outcomes",
+    body: "NO_ANSWER / BUSY / CALLBACK → auto CALLBACK in 2 hours. CONNECTED → closes the first-call task. WRONG_NUMBER → alerts managers.",
   },
   {
-    title: "Quotation",
-    body: "A quotation schedules one quotation follow-up, two days after the lead was created.",
+    title: "Interested cadence",
+    body: "Mark Interested → Follow-up 1 tomorrow, then +2 / +5 / +7 days. Open cadence tasks are replaced, not duplicated.",
   },
   {
-    title: "Booking",
-    body: "A confirmed booking cancels the open follow-ups on that lead.",
+    title: "Quote & book",
+    body: "Quotation sent → chase in 2 days. Booking confirmed → cancel open follow-ups, open ops handoff, queue WhatsApp confirmation.",
   },
   {
-    title: "Assignment",
-    body: "A website form, a Meta lead, or a new WhatsApp number is given to the next sales owner. A number that already has a lead stays on that lead.",
+    title: "Reminders & digest",
+    body: "Due-soon and overdue reminders to sales every few minutes. Morning inactive-lead nudge. 09:00 manager SLA digest.",
   },
 ];
 
@@ -85,10 +89,11 @@ export function AutomationsDesk() {
     <div className="space-y-4">
       {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <p className="text-sm text-slate-600">
-        These rules run when a lead changes stage or arrives from a form. They are not switches. The rows below are the open tasks they have already created.
+        Live sales automation for Trip On Himalaya. Facebook enters via Zapier; everything after that — assignment,
+        calls, cadence, SLA, digests — runs inside this CRM. Rows below are open tasks already created.
       </p>
 
-      <div className="grid gap-3 lg:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {RULES.map((rule) => (
           <div key={rule.title} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
             <div className="text-sm font-semibold text-slate-900">{rule.title}</div>
@@ -105,6 +110,7 @@ export function AutomationsDesk() {
         >
           Open queue · {tasks.length}
           {overdue ? ` · ${overdue} overdue` : ""}
+          {escalated ? ` · ${escalated} escalated` : ""}
         </button>
         {types.map(([type, count]) => (
           <button
@@ -116,20 +122,20 @@ export function AutomationsDesk() {
             {TASK_TYPE_LABEL[type] || type} · {count}
           </button>
         ))}
+        <button type="button" onClick={reload} className="rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700">
+          Refresh
+        </button>
         <Link href="/tasks" className="ml-auto text-sm font-medium text-sky-700 hover:underline">
           Work the queue
         </Link>
       </div>
-      {escalated > 0 && (
-        <p className="text-xs text-slate-500">{escalated} open task{escalated === 1 ? "" : "s"} already escalated after an SLA breach.</p>
-      )}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-3 py-2 font-medium">Lead</th>
               <th className="px-3 py-2 font-medium">Task</th>
+              <th className="px-3 py-2 font-medium">Lead</th>
               <th className="px-3 py-2 font-medium">Owner</th>
               <th className="px-3 py-2 font-medium">Due</th>
               <th className="px-3 py-2 font-medium">Next</th>
@@ -137,11 +143,15 @@ export function AutomationsDesk() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-400">Loading the queue…</td></tr>
+              <tr>
+                <td colSpan={5} className="px-3 py-8 text-center text-slate-400">
+                  Loading automation queue…
+                </td>
+              </tr>
             ) : visible.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-8 text-center text-sm text-slate-500">
-                  No open follow-up is waiting. The next new lead creates a first-call task for its owner.
+                  No open automated tasks. When Facebook or a desk lead arrives, the first-call task appears here.
                 </td>
               </tr>
             ) : (
@@ -149,15 +159,22 @@ export function AutomationsDesk() {
                 const step = nextStep(task);
                 return (
                   <tr key={task.id} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-medium text-slate-900">{task.customerName || "No lead name"}</td>
-                    <td className="px-3 py-2 text-slate-600">
-                      {TASK_TYPE_LABEL[task.type || ""] || task.type}
-                      {task.status === "OVERDUE" && <div className="text-[11px] text-red-600">Overdue</div>}
-                    </td>
-                    <td className="px-3 py-2 text-slate-600">{task.assigneeName || "Unassigned"}</td>
-                    <td className="px-3 py-2 text-slate-600">{task.dueAt ? new Date(task.dueAt).toLocaleString() : "—"}</td>
                     <td className="px-3 py-2">
-                      <Link href={step.href} className="text-xs font-medium text-sky-700 hover:underline">{step.label}</Link>
+                      <div className="font-medium text-slate-900">{TASK_TYPE_LABEL[task.type || ""] || task.type}</div>
+                      <div className="text-xs text-slate-400">
+                        {task.status}
+                        {task.escalatedAt ? " · SLA breach" : ""}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">{task.customerName || "—"}</td>
+                    <td className="px-3 py-2 text-slate-600">{task.assigneeName || "—"}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500">
+                      {task.dueAt ? new Date(task.dueAt).toLocaleString() : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Link href={step.href} className="text-xs font-medium text-sky-700 hover:underline">
+                        {step.label}
+                      </Link>
                     </td>
                   </tr>
                 );

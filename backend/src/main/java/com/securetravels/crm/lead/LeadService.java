@@ -410,6 +410,7 @@ public class LeadService {
         Instant now = Instant.now();
         lead.incrementCallCount();
         lead.setLastContactedAt(now);
+        automation.onCallOutcome(lead, request.outcome());
         lead.setHeat(scoringService.score(lead));
         leads.save(lead);
 
