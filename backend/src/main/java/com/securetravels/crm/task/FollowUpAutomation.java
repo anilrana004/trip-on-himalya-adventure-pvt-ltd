@@ -14,25 +14,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
 /**
-*  Module 2 — follow-up automation rules:
- *   • lead created            → INITIAL_CALL task, due +5 min, SLA +1 h
- *   • lead → INTERESTED       → four follow-ups from the lead date:
- *                              tomorrow, then 2 days later, then 5 days later,
- *                              then 7 days later (+1, +3, +8, +15)
- *   • lead → QUOTATION_SENT   → QUOTATION task, due +2 days
- * Each task raises an in-app notification for the assignee plus an email via
- * the stub notifier. Re-entering a status re-schedules (old open tasks of
- * that kind are cancelled first) so batches never duplicate.
+ * Sales follow-up system:
+ *   • New lead              → INITIAL_CALL due +5 min (SLA 15m for ads/web/storefront, else 1h)
+ *   • Lead → INTERESTED     → FU1 tomorrow, FU2 +2d, FU3 +5d, FU4 +7d (from mark-interested time)
+ *   • Lead → QUOTATION_SENT → quotation task +2 days
+ * Each task notifies the assignee in-app + email. SLA breach escalates to managers.
  */
 @Service
 public class FollowUpAutomation {
 
     private static final Logger log = LoggerFactory.getLogger(FollowUpAutomation.class);
+    private static final ZoneId ZONE = ZoneId.systemDefault();
 
     private final TaskRepository tasks;
     private final UserRepository users;
@@ -59,8 +59,7 @@ public class FollowUpAutomation {
     @Transactional
     public void onLeadCreated(UUID leadId, UUID assigneeId, Lead.Source source) {
         Instant dueAt = Instant.now().plus(5, ChronoUnit.MINUTES);
-        // Paid ads: escalate to manager after 15 minutes if still uncalled.
-        Instant sla = isPaidAds(source)
+        Instant sla = isFastTrack(source)
                 ? Instant.now().plus(15, ChronoUnit.MINUTES)
                 : dueAt.plus(1, ChronoUnit.HOURS);
         scheduleOne(leadId, assigneeId, Task.Type.INITIAL_CALL, dueAt, sla,
@@ -78,10 +77,14 @@ public class FollowUpAutomation {
         }
     }
 
+    /**
+     * Cadence starts when sales marks INTERESTED (not from lead createdAt), so a
+     * late status change does not create already-overdue follow-ups.
+     */
     @Transactional
     public void onInterested(Lead lead) {
         cancelOpenFollowUps(lead.getId());
-        Instant base = base(lead);
+        Instant base = Instant.now();
         int[] days = {1, 3, 8, 15};
         String[] titles = {
                 "Follow-up 1 — tomorrow",
@@ -89,25 +92,33 @@ public class FollowUpAutomation {
                 "Follow-up 3 — 5 days later",
                 "Follow-up 4 — 7 days later"
         };
+        Instant firstDue = null;
         for (int i = 0; i < days.length; i++) {
+            Instant due = base.plus(days[i], ChronoUnit.DAYS);
+            if (firstDue == null) firstDue = due;
             scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.valueOf("FOLLOW_UP_" + days[i] + "D"),
-                    base.plus(days[i], ChronoUnit.DAYS), 24, titles[i],
+                    due, 24, titles[i],
                     titles[i] + " for " + lead.getCustomerName() + ".");
+        }
+        if (firstDue != null) {
+            lead.setFollowUpDate(LocalDate.ofInstant(firstDue, ZONE));
         }
     }
 
     @Transactional
     public void onQuotationSent(Lead lead) {
         cancelOpen(lead.getId(), Task.Type.QUOTATION);
+        Instant due = Instant.now().plus(2, ChronoUnit.DAYS);
         scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.QUOTATION,
-                base(lead).plus(2, ChronoUnit.DAYS), 24, "Quotation follow-up",
+                due, 24, "Quotation follow-up",
                 "Send / confirm the quotation for " + lead.getCustomerName() + ".");
+        lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
     }
 
-    /** A booking was confirmed — every open follow-up task on the lead is cancelled. */
     @Transactional
     public void onBooked(Lead lead) {
         cancelAllOpen(lead.getId());
+        lead.setFollowUpDate(null);
         String title = "Booking confirmed — follow-up closed";
         String body = "No further follow-up needed for " + lead.getCustomerName() + ".";
         notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
@@ -115,25 +126,43 @@ public class FollowUpAutomation {
         log.info("[automation] lead={} booked; outstanding follow-ups cancelled", lead.getId());
     }
 
-    /** Escalation support used by the overdue sweep (SLA breach -> MANAGER). */
+    /** Remind the assignee that a task is due soon or already overdue. */
     @Transactional
-    public void escalateToManager(Task task, String reason) {
-        User manager = users.findFirstByRoleOrderByCreatedAtAsc(Role.MANAGER).orElse(null);
-        UUID target = manager == null ? task.getAssigneeId() : manager.getId();
-        task.escalate(Instant.now());
-        String title = "SLA breach: " + humanType(task.getType());
-        notifications.save(new Notification(target, Notification.Channel.IN_APP, title,
-                humanType(task.getType()) + " task breached its SLA. " + reason
-                        + " (due " + task.getDueAt() + ")",
+    public void remindAssignee(Task task, String title, String body) {
+        notifications.save(new Notification(task.getAssigneeId(), Notification.Channel.IN_APP, title, body,
                 leadPath(task.getLeadId())));
-        if (manager != null) {
-            email.send(manager.getEmail(), title, reason + " " + appUrl + leadPath(task.getLeadId()));
-        }
-        log.info("[automation] escalated task={} to={} reason={}", task.getId(), target, reason);
+        users.findById(task.getAssigneeId()).ifPresent(user ->
+                email.send(user.getEmail(), title, body + " " + appUrl + leadPath(task.getLeadId())));
+        task.markReminded(Instant.now());
+        log.info("[automation] reminded assignee={} task={} type={}", task.getAssigneeId(), task.getId(), task.getType());
     }
 
-    private Instant base(Lead lead) {
-        return lead.getCreatedAt() == null ? Instant.now() : lead.getCreatedAt();
+    /** Escalation support used by the overdue sweep (SLA breach → managers). */
+    @Transactional
+    public void escalateToManager(Task task, String reason) {
+        List<User> managers = users.findByIsActiveTrueAndRoleIn(
+                EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO));
+        if (managers.isEmpty()) {
+            users.findFirstByRoleOrderByCreatedAtAsc(Role.MANAGER).ifPresent(managers::add);
+        }
+        task.escalate(Instant.now());
+        String title = "SLA breach: " + humanType(task.getType());
+        String body = humanType(task.getType()) + " task breached its SLA. " + reason
+                + " (due " + task.getDueAt() + ")";
+        if (managers.isEmpty()) {
+            notifications.save(new Notification(task.getAssigneeId(), Notification.Channel.IN_APP, title, body,
+                    leadPath(task.getLeadId())));
+        } else {
+            for (User manager : managers) {
+                notifications.save(new Notification(manager.getId(), Notification.Channel.IN_APP, title, body,
+                        leadPath(task.getLeadId())));
+                email.send(manager.getEmail(), title, reason + " " + appUrl + leadPath(task.getLeadId()));
+            }
+        }
+        // Also nudge the sales owner so they see the breach on their bell.
+        notifications.save(new Notification(task.getAssigneeId(), Notification.Channel.IN_APP,
+                "Your follow-up missed SLA", body, leadPath(task.getLeadId())));
+        log.info("[automation] escalated task={} managers={} reason={}", task.getId(), managers.size(), reason);
     }
 
     private void cancelOpenFollowUps(UUID leadId) {
@@ -172,11 +201,12 @@ public class FollowUpAutomation {
         log.info("[automation] lead={} type={} assignee={} dueAt={}", leadId, type, assigneeId, dueAt);
     }
 
-    private static boolean isPaidAds(Lead.Source source) {
+    private static boolean isFastTrack(Lead.Source source) {
         return source == Lead.Source.FACEBOOK_ADS
                 || source == Lead.Source.INSTAGRAM
                 || source == Lead.Source.GOOGLE_ADS
-                || source == Lead.Source.WEBSITE;
+                || source == Lead.Source.WEBSITE
+                || source == Lead.Source.STOREFRONT;
     }
 
     private String humanType(Task.Type type) {

@@ -2,6 +2,8 @@ package com.securetravels.crm.lead;
 
 import com.securetravels.crm.common.security.CurrentUser;
 import com.securetravels.crm.lead.dto.LeadActivityResponse;
+import com.securetravels.crm.lead.dto.LeadCallAttemptRequest;
+import com.securetravels.crm.lead.dto.LeadCallAttemptResponse;
 import com.securetravels.crm.lead.dto.LeadCreateRequest;
 import com.securetravels.crm.lead.dto.LeadResponse;
 import com.securetravels.crm.lead.dto.LeadSourceSummary;
@@ -108,6 +110,26 @@ public class LeadController {
     @PreAuthorize("isAuthenticated()")
     public List<LeadActivityResponse> activity(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
         return leadService.activity(id, caller);
+    }
+
+    @Operation(summary = "Log a call attempt (count + last contacted; managers see the trail)",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping(path = "/{id}/calls", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('SALES', 'MANAGER', 'ADMIN', 'CEO')")
+    public LeadCallAttemptResponse logCall(@PathVariable UUID id,
+                                           @Valid @RequestBody LeadCallAttemptRequest request,
+                                           @CurrentUser UserPrincipal caller) {
+        return leadService.logCall(id, request, caller);
+    }
+
+    @Operation(summary = "List call attempts on a lead",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping(path = "/{id}/calls", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public List<LeadCallAttemptResponse> listCalls(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
+        return leadService.listCalls(id, caller);
     }
 
     @Operation(summary = "Change lead status (audited; LOST requires lostReason)",

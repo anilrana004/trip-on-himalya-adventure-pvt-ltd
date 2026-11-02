@@ -93,9 +93,10 @@ public class DashboardService {
                   (SELECT count(*) FROM leads)                                            AS total_leads,
                   (SELECT count(*) FROM leads WHERE status = 'NEW'
                        AND created_at >= CAST(? AS timestamptz))                          AS new_leads,
-                  (SELECT count(*) FROM leads
-                       WHERE status NOT IN ('LOST','BOOKING_CONFIRMED')
-                         AND follow_up_date IS NOT NULL AND follow_up_date <= ?)          AS follow_up_due,
+                  (SELECT count(*) FROM tasks
+                        WHERE status IN ('PENDING','OVERDUE')
+                          AND type IN ('FOLLOW_UP_1D','FOLLOW_UP_3D','FOLLOW_UP_8D','FOLLOW_UP_15D','QUOTATION')
+                          AND due_at::date <= ?)                                         AS follow_up_due,
                   (SELECT count(*) FROM leads WHERE status = 'INTERESTED')                AS interested,
                   (SELECT count(*) FROM leads WHERE status = 'QUOTATION_SENT')            AS quotation_sent,
                   (SELECT count(*) FROM leads WHERE status = 'BOOKING_CONFIRMED')          AS booking_confirmed,
@@ -113,7 +114,14 @@ public class DashboardService {
                   (SELECT count(*) FROM leads
                         WHERE status = 'NEW'
                           AND last_contacted_at IS NULL
-                          AND source IN ('FACEBOOK_ADS','INSTAGRAM','GOOGLE_ADS','WEBSITE')) AS hot_uncalled
+                          AND source IN ('FACEBOOK_ADS','INSTAGRAM','GOOGLE_ADS','WEBSITE','STOREFRONT')) AS hot_uncalled,
+                  (SELECT count(*) FROM tasks
+                        WHERE status = 'OVERDUE'
+                          AND type IN ('FOLLOW_UP_1D','FOLLOW_UP_3D','FOLLOW_UP_8D','FOLLOW_UP_15D','QUOTATION','INITIAL_CALL'))
+                                                                                         AS follow_up_overdue,
+                  (SELECT count(*) FROM tasks
+                        WHERE status IN ('PENDING','OVERDUE')
+                          AND sla_deadline IS NOT NULL AND sla_deadline < now())         AS sla_breached
                 """, from, asOf, from);
 
         return new DashboardSummaryResponse(
@@ -131,7 +139,9 @@ public class DashboardService {
                 bd(row.get("revenue")),
                 l(row.get("first_call_pending")),
                 l(row.get("first_call_overdue")),
-                l(row.get("hot_uncalled")));
+                l(row.get("hot_uncalled")),
+                l(row.get("follow_up_overdue")),
+                l(row.get("sla_breached")));
     }
 
     // ------------------------------------------------------------------
@@ -157,6 +167,18 @@ public class DashboardService {
                             WHERE t.assignee_id = u.id AND t.status = 'COMPLETED'
                               AND t.completed_at >= CAST(? AS timestamptz)
                               AND t.completed_at <  CAST(? AS timestamptz))            AS follow_ups_completed,
+                       (SELECT count(*) FROM tasks t
+                            WHERE t.assignee_id = u.id AND t.status = 'OVERDUE')       AS follow_ups_overdue,
+                       (SELECT count(*) FROM tasks t
+                            WHERE t.assignee_id = u.id AND t.status = 'COMPLETED'
+                              AND t.completed_at >= CAST(? AS timestamptz)
+                              AND t.completed_at <  CAST(? AS timestamptz)
+                              AND t.completed_at <= t.due_at)                          AS completed_on_time,
+                       (SELECT count(*) FROM tasks t
+                            WHERE t.assignee_id = u.id AND t.status = 'COMPLETED'
+                              AND t.completed_at >= CAST(? AS timestamptz)
+                              AND t.completed_at <  CAST(? AS timestamptz)
+                              AND t.completed_at > t.due_at)                           AS completed_late,
                        (SELECT count(*) FROM bookings b
                             WHERE b.created_by = u.id AND b.status IN ('CONFIRMED','COMPLETED')
                               AND b.created_at >= CAST(? AS timestamptz)
@@ -172,24 +194,32 @@ public class DashboardService {
                   FROM users u
                  WHERE u.role = 'SALES' AND u.is_active = TRUE
                 """;
+        // Param order: leads(from,to), completed(from,to), onTime(from,to), late(from,to),
+        // bookings(from,to), payments count(from,to), revenue(from,to) = 14 timestamps
+        Object[] args = new Object[]{from, to, from, to, from, to, from, to, from, to, from, to, from, to};
         List<PerformanceResponse.Employee> employees = new ArrayList<>();
         if (scope == null) {
-            Map<String, Object>[] maps = jdbc.queryForList(base + " ORDER BY u.full_name",
-                    from, to, from, to, from, to, from, to, from, to).toArray(new Map[0]);
+            Map<String, Object>[] maps = jdbc.queryForList(base + " ORDER BY u.full_name", args)
+                    .toArray(new Map[0]);
             Arrays.stream(maps).forEach(m -> employees.add(toEmployee(m)));
         } else {
-            employees.add(toEmployee(jdbc.queryForMap(base + " AND u.id = ?", from, to, from, to,
-                    from, to, from, to, from, to, scope)));
+            Object[] scoped = new Object[args.length + 1];
+            System.arraycopy(args, 0, scoped, 0, args.length);
+            scoped[args.length] = scope;
+            employees.add(toEmployee(jdbc.queryForMap(base + " AND u.id = ?", scoped)));
         }
 
         long leads = employees.stream().mapToLong(PerformanceResponse.Employee::leadsAssigned).sum();
         long followUps = employees.stream().mapToLong(PerformanceResponse.Employee::followUpsCompleted).sum();
+        long overdue = employees.stream().mapToLong(PerformanceResponse.Employee::followUpsOverdue).sum();
+        long onTime = employees.stream().mapToLong(PerformanceResponse.Employee::completedOnTime).sum();
+        long late = employees.stream().mapToLong(PerformanceResponse.Employee::completedLate).sum();
         long closed = employees.stream().mapToLong(PerformanceResponse.Employee::bookingsClosed).sum();
         BigDecimal revenue = employees.stream()
                 .map(PerformanceResponse.Employee::revenue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new PerformanceResponse(start.toString(), employees,
-                new PerformanceResponse.Totals(leads, followUps, closed, revenue));
+                new PerformanceResponse.Totals(leads, followUps, overdue, onTime, late, closed, revenue));
     }
 
     private static PerformanceResponse.Employee toEmployee(Map<String, Object> m) {
@@ -199,6 +229,9 @@ public class DashboardService {
                 (String) m.get("email"),
                 l(m.get("leads_assigned")),
                 l(m.get("follow_ups_completed")),
+                l(m.get("follow_ups_overdue")),
+                l(m.get("completed_on_time")),
+                l(m.get("completed_late")),
                 l(m.get("bookings_closed")),
                 l(m.get("payments_count")),
                 bd(m.get("revenue")));

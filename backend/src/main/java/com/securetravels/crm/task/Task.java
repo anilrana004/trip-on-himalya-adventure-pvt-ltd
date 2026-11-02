@@ -65,6 +65,10 @@ public class Task extends CreatedUpdated {
     @Column(name = "escalated_at")
     private Instant escalatedAt;
 
+    /** Last due/overdue reminder sent to the assignee (sweep-driven). */
+    @Column(name = "last_reminded_at")
+    private Instant lastRemindedAt;
+
     @Column(columnDefinition = "text")
     private String notes;
 
@@ -90,6 +94,7 @@ public class Task extends CreatedUpdated {
     public Instant getSlaDeadline() { return slaDeadline; }
     public Instant getCompletedAt() { return completedAt; }
     public Instant getEscalatedAt() { return escalatedAt; }
+    public Instant getLastRemindedAt() { return lastRemindedAt; }
     public String getNotes() { return notes; }
 
     public void complete(Instant at) {
@@ -103,4 +108,5 @@ public class Task extends CreatedUpdated {
         }
     }
     public void escalate(Instant at) { this.escalatedAt = at; }
+    public void markReminded(Instant at) { this.lastRemindedAt = at; }
 }

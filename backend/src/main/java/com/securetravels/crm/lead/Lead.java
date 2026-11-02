@@ -119,6 +119,10 @@ public class Lead extends Auditable {
     @Column(name = "last_contacted_at")
     private Instant lastContactedAt;
 
+    /** How many times sales logged a call attempt on this lead. */
+    @Column(name = "call_count", nullable = false)
+    private int callCount = 0;
+
     /** Meta Lead Ads id (ADR 0008). Unique when present for webhook idempotency. */
     @Column(name = "meta_lead_id", length = 64)
     private String metaLeadId;
@@ -166,6 +170,7 @@ public class Lead extends Auditable {
     public Lead.LostReason getLostReason() { return lostReason; }
     public UUID getDuplicateOfLeadId() { return duplicateOfLeadId; }
     public Instant getLastContactedAt() { return lastContactedAt; }
+    public int getCallCount() { return callCount; }
     public String getMetaLeadId() { return metaLeadId; }
     public UUID getCreatedBy() { return createdBy; }
 
@@ -191,6 +196,8 @@ public class Lead extends Auditable {
     public void setLostReason(LostReason lostReason) { this.lostReason = lostReason; }
     public void setDuplicateOfLeadId(UUID duplicateOfLeadId) { this.duplicateOfLeadId = duplicateOfLeadId; }
     public void setLastContactedAt(Instant lastContactedAt) { this.lastContactedAt = lastContactedAt; }
+    public void setCallCount(int callCount) { this.callCount = Math.max(0, callCount); }
+    public void incrementCallCount() { this.callCount = this.callCount + 1; }
     public void setMetaLeadId(String metaLeadId) { this.metaLeadId = metaLeadId; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
 }

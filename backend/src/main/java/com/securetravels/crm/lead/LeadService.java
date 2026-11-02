@@ -13,6 +13,8 @@ import com.securetravels.crm.common.util.PhoneUtils;
 import com.securetravels.crm.customer.Customer360;
 import com.securetravels.crm.customer.Customer360Repository;
 import com.securetravels.crm.lead.dto.LeadActivityResponse;
+import com.securetravels.crm.lead.dto.LeadCallAttemptRequest;
+import com.securetravels.crm.lead.dto.LeadCallAttemptResponse;
 import com.securetravels.crm.lead.dto.LeadCreateRequest;
 import com.securetravels.crm.lead.dto.LeadResponse;
 import com.securetravels.crm.lead.dto.LeadSourceSummary;
@@ -66,12 +68,13 @@ public class LeadService {
     private final FollowUpAutomation automation;
     private final com.securetravels.crm.webhook.RoundRobinService roundRobin;
     private final AccountService accounts;
+    private final LeadCallAttemptRepository callAttempts;
 
     public LeadService(LeadRepository leads, UserRepository users, Customer360Repository customers,
                        AuditLogRepository auditLogRepository, AuditService auditService,
                        LeadScoringService scoringService, FollowUpAutomation automation,
                        com.securetravels.crm.webhook.RoundRobinService roundRobin,
-                       AccountService accounts) {
+                       AccountService accounts, LeadCallAttemptRepository callAttempts) {
         this.leads = leads;
         this.users = users;
         this.customers = customers;
@@ -81,6 +84,7 @@ public class LeadService {
         this.automation = automation;
         this.roundRobin = roundRobin;
         this.accounts = accounts;
+        this.callAttempts = callAttempts;
     }
 
     @Transactional
@@ -391,6 +395,44 @@ public class LeadService {
                 .toList();
     }
 
+    /**
+     * Sales logs every dial attempt. Managers see the count and trail on the lead.
+     * Sets last_contacted_at and recomputes heat.
+     */
+    @Transactional
+    public LeadCallAttemptResponse logCall(UUID id, LeadCallAttemptRequest request, UserPrincipal caller) {
+        requireRole(caller.role(), Role.SALES, Role.MANAGER, Role.ADMIN, Role.CEO);
+        Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        assertCanAccess(lead, caller);
+
+        LeadCallAttempt attempt = callAttempts.save(
+                new LeadCallAttempt(lead.getId(), caller.id(), request.outcome(), request.notes()));
+        Instant now = Instant.now();
+        lead.incrementCallCount();
+        lead.setLastContactedAt(now);
+        lead.setHeat(scoringService.score(lead));
+        leads.save(lead);
+
+        auditService.record("LEAD", lead.getId(), AuditAction.UPDATE, "call_attempt",
+                null, request.outcome().name() + (request.notes() == null || request.notes().isBlank()
+                        ? "" : ": " + request.notes().trim()));
+
+        return new LeadCallAttemptResponse(
+                attempt.getId(), attempt.getLeadId(), attempt.getActorId(),
+                caller.fullName(), attempt.getOutcome(), attempt.getNotes(), attempt.getCreatedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public List<LeadCallAttemptResponse> listCalls(UUID id, UserPrincipal caller) {
+        Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        assertCanAccess(lead, caller);
+        return callAttempts.findTop50ByLeadIdOrderByCreatedAtDesc(id).stream()
+                .map(a -> new LeadCallAttemptResponse(
+                        a.getId(), a.getLeadId(), a.getActorId(), actorName(a.getActorId()),
+                        a.getOutcome(), a.getNotes(), a.getCreatedAt()))
+                .toList();
+    }
+
     private void auditChanged(Lead lead, String field, String oldValue, String newValue,
                               java.util.function.Consumer<String> apply) {
         if (newValue == null || newValue.equals(oldValue)) return;
@@ -445,10 +487,13 @@ public class LeadService {
         }
         if (request.status() == Lead.Status.INTERESTED) {
             automation.onInterested(lead);
+            leads.save(lead); // followUpDate set by cadence
         } else if (request.status() == Lead.Status.QUOTATION_SENT) {
             automation.onQuotationSent(lead);
+            leads.save(lead);
         } else if (request.status() == Lead.Status.BOOKING_CONFIRMED) {
             automation.onBooked(lead);
+            leads.save(lead);
         }
         return toResponse(lead);
     }
@@ -497,6 +542,7 @@ public class LeadService {
                 lead.getStatus(), lead.getHeat(), lead.getFollowUpDate(), lead.getRemarks(),
                 lead.isConsentGiven(), lead.getConsentScope(), lead.getConsentCapturedAt(),
                 lead.getLostReason(), lead.getDuplicateOfLeadId(), lead.getLastContactedAt(),
+                lead.getCallCount(),
                 lead.getCreatedAt(), lead.getUpdatedAt());
     }
 

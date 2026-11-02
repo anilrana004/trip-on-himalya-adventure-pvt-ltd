@@ -1434,6 +1434,8 @@ export interface components {
             duplicateOfLeadId?: string;
             /** Format: date-time */
             lastContactedAt?: string;
+            /** Format: int32 */
+            callCount?: number;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -1953,6 +1955,10 @@ export interface components {
             firstCallOverdue?: number;
             /** Format: int64 */
             hotUncalled?: number;
+            /** Format: int64 */
+            followUpOverdue?: number;
+            /** Format: int64 */
+            slaBreached?: number;
         };
         Employee: {
             /** Format: uuid */
@@ -1963,6 +1969,12 @@ export interface components {
             leadsAssigned?: number;
             /** Format: int64 */
             followUpsCompleted?: number;
+            /** Format: int64 */
+            followUpsOverdue?: number;
+            /** Format: int64 */
+            completedOnTime?: number;
+            /** Format: int64 */
+            completedLate?: number;
             /** Format: int64 */
             bookingsClosed?: number;
             /** Format: int64 */
@@ -1979,6 +1991,12 @@ export interface components {
             leadsAssigned?: number;
             /** Format: int64 */
             followUpsCompleted?: number;
+            /** Format: int64 */
+            followUpsOverdue?: number;
+            /** Format: int64 */
+            completedOnTime?: number;
+            /** Format: int64 */
+            completedLate?: number;
             /** Format: int64 */
             bookingsClosed?: number;
             revenue?: number;

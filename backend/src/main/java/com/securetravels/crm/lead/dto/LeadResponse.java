@@ -33,6 +33,7 @@ public record LeadResponse(
         Lead.LostReason lostReason,
         UUID duplicateOfLeadId,
         Instant lastContactedAt,
+        int callCount,
         Instant createdAt,
         Instant updatedAt
 ) {

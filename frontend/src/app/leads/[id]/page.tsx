@@ -219,7 +219,7 @@ export default function LeadDetailPage() {
             </div>
 
             <section className="lg:col-span-2 space-y-6">
-              <FollowUpPanel leadId={lead.id ?? id} />
+              <FollowUpPanel leadId={lead.id ?? id} callCount={lead.callCount} />
 
               <section className="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 className="mb-4 text-sm font-semibold text-slate-900">Activity</h2>

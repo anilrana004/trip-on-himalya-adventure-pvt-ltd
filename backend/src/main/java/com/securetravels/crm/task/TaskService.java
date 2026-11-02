@@ -64,9 +64,12 @@ public class TaskService {
         if (task.getStatus() != Task.Status.COMPLETED) {
             Instant now = Instant.now();
             task.complete(now);
-            if (task.getType() == Task.Type.INITIAL_CALL && task.getLeadId() != null) {
+            if (task.getLeadId() != null) {
                 leads.findById(task.getLeadId()).ifPresent(lead -> {
-                    lead.setLastContactedAt(now);
+                    if (task.getType() == Task.Type.INITIAL_CALL) {
+                        lead.setLastContactedAt(now);
+                        lead.incrementCallCount();
+                    }
                     lead.setHeat(scoring.score(lead));
                     leads.save(lead);
                 });

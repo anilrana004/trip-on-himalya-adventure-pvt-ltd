@@ -87,8 +87,7 @@ class FollowUpAutomationTest {
         assertThat(saved).extracting(Task::getType)
                 .containsExactly(Task.Type.FOLLOW_UP_1D, Task.Type.FOLLOW_UP_3D,
                         Task.Type.FOLLOW_UP_8D, Task.Type.FOLLOW_UP_15D);
-        // Cumulative offsets from lead creation (base = now when createdAt is absent):
-        // +1, +3 (2 days after FU1), +8 (5 days after FU2), +15 (7 days after FU3).
+        // Cadence from mark-interested time: +1, +3 (+2 after FU1), +8 (+5), +15 (+7).
         assertThat(ChronoUnit.DAYS.between(saved.get(0).getDueAt(), saved.get(1).getDueAt())).isEqualTo(2);
         assertThat(ChronoUnit.DAYS.between(saved.get(1).getDueAt(), saved.get(2).getDueAt())).isEqualTo(5);
         assertThat(ChronoUnit.DAYS.between(saved.get(2).getDueAt(), saved.get(3).getDueAt())).isEqualTo(7);

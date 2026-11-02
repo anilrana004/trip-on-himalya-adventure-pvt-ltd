@@ -19,10 +19,12 @@ import { WorkdayHours } from "@/components/dashboard/WorkdayHours";
 const CARD_FIELDS: { key: string; label: string }[] = [
   { key: "totalLeads", label: "Total leads" },
   { key: "newLeads", label: "New leads" },
-  { key: "hotUncalled", label: "Hot uncalled (ads)" },
+  { key: "hotUncalled", label: "Hot uncalled (ads/web)" },
   { key: "firstCallPending", label: "First call pending" },
   { key: "firstCallOverdue", label: "First call overdue" },
-  { key: "followUpDue", label: "Follow-up due" },
+  { key: "followUpDue", label: "Follow-up due today" },
+  { key: "followUpOverdue", label: "Follow-ups overdue" },
+  { key: "slaBreached", label: "SLA breached" },
   { key: "interested", label: "Interested" },
   { key: "quotationSent", label: "Quotation sent" },
   { key: "bookingConfirmed", label: "Bookings confirmed" },
@@ -217,12 +219,12 @@ function DashboardView() {
                 <HeroKpi
                   label="Hot uncalled"
                   value={n(summary?.hotUncalled)}
-                  hint="Ads / website waiting first call"
+                  hint="Ads / website / storefront waiting first call"
                 />
                 <HeroKpi
-                  label="First call overdue"
-                  value={n(summary?.firstCallOverdue)}
-                  hint={`${n(summary?.firstCallPending)} still open`}
+                  label="Follow-up SLA"
+                  value={n(summary?.slaBreached)}
+                  hint={`${n(summary?.followUpOverdue)} overdue · ${n(summary?.firstCallOverdue)} first-call late`}
                 />
               </div>
             </section>
@@ -256,16 +258,18 @@ function DashboardView() {
                     <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                       <th className="px-4 py-2.5 font-medium">Executive</th>
                       <th className="px-3 py-2.5 text-right font-medium">Leads</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Follow-ups done</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Bookings closed</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Payments</th>
+                      <th className="px-3 py-2.5 text-right font-medium">FU done</th>
+                      <th className="px-3 py-2.5 text-right font-medium">On time</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Late</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Overdue now</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Bookings</th>
                       <th className="px-4 py-2.5 text-right font-medium">Revenue</th>
                     </tr>
                   </thead>
                   <tbody>
                     {employees.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-4 text-slate-400" colSpan={6}>
+                        <td className="px-4 py-4 text-slate-400" colSpan={8}>
                           No sales performance for this month.
                         </td>
                       </tr>
@@ -278,8 +282,10 @@ function DashboardView() {
                           </td>
                           <td className="px-3 py-2.5 text-right tabular-nums">{n(e.leadsAssigned)}</td>
                           <td className="px-3 py-2.5 text-right tabular-nums">{n(e.followUpsCompleted)}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">{n(e.completedOnTime)}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{n(e.completedLate)}</td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-rose-700">{n(e.followUpsOverdue)}</td>
                           <td className="px-3 py-2.5 text-right tabular-nums">{n(e.bookingsClosed)}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">{n(e.paymentsCount)}</td>
                           <td className="px-4 py-2.5 text-right tabular-nums font-medium text-slate-900">
                             {inr(e.revenue)}
                           </td>
@@ -293,8 +299,10 @@ function DashboardView() {
                         <td className="px-4 py-2.5">Team totals ({employees.length})</td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{n(perf?.totals?.leadsAssigned)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{n(perf?.totals?.followUpsCompleted)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{n(perf?.totals?.completedOnTime)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{n(perf?.totals?.completedLate)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{n(perf?.totals?.followUpsOverdue)}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{n(perf?.totals?.bookingsClosed)}</td>
-                        <td className="px-3 py-2.5" />
                         <td className="px-4 py-2.5 text-right tabular-nums">{inr(perf?.totals?.revenue)}</td>
                       </tr>
                     </tfoot>

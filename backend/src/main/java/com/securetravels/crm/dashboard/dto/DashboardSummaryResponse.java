@@ -1,10 +1,8 @@
 package com.securetravels.crm.dashboard.dto;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
 
-/** Daily/monthly sales-dashboard cards (Module 4). */
+/** Daily/monthly sales-dashboard cards (Module 4) + follow-up SLA queue. */
 public record DashboardSummaryResponse(
         String period,
         java.time.LocalDate from,
@@ -22,7 +20,11 @@ public record DashboardSummaryResponse(
         long firstCallPending,
         /** Open INITIAL_CALL past dueAt — queue not clearing in 5 minutes. */
         long firstCallOverdue,
-        /** NEW paid-ad / website leads still uncontacted (hot queue). */
-        long hotUncalled
+        /** NEW paid-ad / website / storefront leads still uncontacted (hot queue). */
+        long hotUncalled,
+        /** Open cadence follow-ups past due (manager SLA view). */
+        long followUpOverdue,
+        /** Open tasks that already breached sla_deadline (escalated or pending escalate). */
+        long slaBreached
 ) {
 }

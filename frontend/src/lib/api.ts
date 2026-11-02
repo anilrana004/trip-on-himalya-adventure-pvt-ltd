@@ -852,6 +852,17 @@ export const api = {
 
   getLead: (id: string) => request<Lead>(`/api/leads/${id}`),
 
+  logLeadCall: (id: string, payload: { outcome: string; notes?: string }) =>
+    request<{ id: string; outcome: string; notes?: string | null; actorName?: string | null; createdAt: string }>(
+      `/api/leads/${id}/calls`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+
+  listLeadCalls: (id: string) =>
+    request<{ id: string; outcome: string; notes?: string | null; actorName?: string | null; createdAt: string }[]>(
+      `/api/leads/${id}/calls`,
+    ),
+
   createLead: (payload: LeadCreatePayload) =>
     request<Lead>("/api/leads", { method: "POST", body: JSON.stringify(payload) }),
 

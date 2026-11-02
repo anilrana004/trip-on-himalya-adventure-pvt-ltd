@@ -121,7 +121,7 @@ class MetaLeadgenServiceTest {
                 crmId, "Asha Trekker", "9876543210", "9876543210", "asha@example.com",
                 Lead.Source.FACEBOOK_ADS, null, null, null, 1, null, null, null, null, null,
                 Lead.Status.NEW, Lead.Heat.COLD, null, null, true, null, Instant.now(),
-                null, null, null, Instant.now(), Instant.now());
+                null, null, null, 0, Instant.now(), Instant.now());
         when(leadService.createFromMeta(any(), any(), eq(leadgenId)))
                 .thenReturn(new LeadService.LeadIngestResult(response, false));
 

@@ -65,6 +65,7 @@ public class LeadScoringService {
         return source == Lead.Source.FACEBOOK_ADS
                 || source == Lead.Source.INSTAGRAM
                 || source == Lead.Source.GOOGLE_ADS
-                || source == Lead.Source.WEBSITE;
+                || source == Lead.Source.WEBSITE
+                || source == Lead.Source.STOREFRONT;
     }
 }

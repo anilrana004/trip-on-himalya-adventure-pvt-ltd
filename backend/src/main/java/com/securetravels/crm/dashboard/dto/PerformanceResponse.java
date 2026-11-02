@@ -3,7 +3,7 @@ package com.securetravels.crm.dashboard.dto;
 import java.math.BigDecimal;
 import java.util.List;
 
-/** Per-employee performance line (legacy M5) plus the month totals. */
+/** Per-employee performance + follow-up on-time discipline for managers. */
 public record PerformanceResponse(
         String month,
         List<Employee> employees,
@@ -15,6 +15,9 @@ public record PerformanceResponse(
             String email,
             long leadsAssigned,
             long followUpsCompleted,
+            long followUpsOverdue,
+            long completedOnTime,
+            long completedLate,
             long bookingsClosed,
             long paymentsCount,
             BigDecimal revenue) {
@@ -23,6 +26,9 @@ public record PerformanceResponse(
     public record Totals(
             long leadsAssigned,
             long followUpsCompleted,
+            long followUpsOverdue,
+            long completedOnTime,
+            long completedLate,
             long bookingsClosed,
             BigDecimal revenue) {
     }

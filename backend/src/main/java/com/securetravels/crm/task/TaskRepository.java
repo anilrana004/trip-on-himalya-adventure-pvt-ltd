@@ -21,6 +21,9 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
     /** Pending tasks whose due instant has passed (overdue sweep). */
     List<Task> findByStatusAndDueAtBefore(Task.Status status, Instant before);
 
+    /** Pending tasks due between now and soon (due-soon reminders). */
+    List<Task> findByStatusAndDueAtBetween(Task.Status status, Instant fromInclusive, Instant toExclusive);
+
     /** Tasks still pending at or past SLA (escalation sweep). */
     List<Task> findByStatusInAndSlaDeadlineBefore(List<Task.Status> statuses, Instant before);
 
