@@ -39,3 +39,12 @@ After first storefront deploy, set `STOREFRONT_PUBLIC_URL` and redeploy the API.
 | `email`, `num_persons`, `message`, `consent_scope` | Optional | |
 
 Do not add storefront UI, pages, or packages into this repository.
+
+## Security boundary
+
+- Push CRM changes only to the CRM GitHub remote. Push website changes only to
+  `toh-storefront`. Never mix the two in one commit or push.
+- The public storefront must not link to the CRM desk, expose owner/SLA/finance
+  fields, or put `WEBHOOK_SECRET` / API origins in `NEXT_PUBLIC_*`.
+- Catalogue responses stay on `/api/storefront/**` (active trips only). Enquiry
+  intake stays on HMAC `/api/webhook/lead`.
