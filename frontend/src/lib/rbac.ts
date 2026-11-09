@@ -77,7 +77,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/leads", label: "Leads", roles: SALES_DESK, icon: "leads" },
       { href: "/deals", label: "Deals / Opportunities", roles: SALES_DESK, icon: "payments" },
       { href: "/activities", label: "Activities", roles: SALES_DESK, icon: "tasks" },
+      { href: "/sales-tracking", label: "Sales Tracking", roles: SALES_DESK, icon: "analytics" },
       { href: "/forecasting", label: "Forecasting", roles: SALES_DESK, icon: "analytics" },
+      { href: "/team-salary", label: "My Salary", roles: CRM_STAFF, icon: "payroll" },
       { href: "/bookings", label: "Bookings", roles: CRM_STAFF, icon: "bookings" },
       { href: "/customers", label: "Customers", roles: CRM_STAFF, icon: "customers" },
     ],
@@ -248,7 +250,7 @@ export const FINANCE_NAV_ITEMS: NavItem[] = [
   { href: "/finance/expenses", label: "Expenses & Bills", roles: FINANCE_PORTAL, icon: "expenses" },
   { href: "/finance/payouts", label: "Vendor & Payouts", roles: FINANCE_PORTAL, icon: "vendors" },
   { href: "/finance/tax", label: "GST & Tax Compliance", roles: FINANCE_PORTAL, icon: "documents" },
-  { href: "/finance/payroll", label: "Payroll & HR", roles: FINANCE_PORTAL, icon: "payroll" },
+  { href: "/finance/payroll", label: "Teams Salary", roles: FINANCE_PORTAL, icon: "payroll" },
   { href: "/finance/inventory", label: "Inventory & Assets", roles: FINANCE_PORTAL, icon: "inventory" },
   { href: "/finance/budgets", label: "Budgeting & Forecasting", roles: FINANCE_PORTAL, icon: "analytics" },
   { href: "/finance/profitability", label: "Profitability & Analytics", roles: FINANCE_PORTAL, icon: "analytics" },
@@ -269,7 +271,7 @@ export const FINANCE_ERP_TABS: { href: string; label: string }[] = [
   { href: "/finance/payouts", label: "Vendor & Payouts" },
   { href: "/finance/accounting", label: "Accounting" },
   { href: "/finance/tax", label: "GST & Taxes" },
-  { href: "/finance/payroll", label: "Payroll" },
+  { href: "/finance/payroll", label: "Teams Salary" },
   { href: "/finance/inventory", label: "Inventory & Assets" },
   { href: "/finance/budgets", label: "Budgeting" },
   { href: "/finance/reports", label: "Reports" },
@@ -390,5 +392,5 @@ export const canEditCustomerFlags = (role: string | null | undefined) => hasRole
 export const canViewAudit = (role: string | null | undefined) => hasRole(role, ADMINS);
 export const canWriteFinance = (role: string | null | undefined) => hasRole(role, FINANCE_WRITE);
 export const canAccessFinance = (role: string | null | undefined) => hasRole(role, FINANCE_PORTAL);
-export const canEditPayroll = (role: string | null | undefined) => hasRole(role, ADMINS);
+export const canEditPayroll = (role: string | null | undefined) => hasRole(role, FINANCE_WRITE);
 export const canEditSettings = (role: string | null | undefined) => hasRole(role, ADMINS);

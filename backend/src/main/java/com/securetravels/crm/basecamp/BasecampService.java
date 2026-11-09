@@ -376,6 +376,16 @@ public class BasecampService {
         m.put("netPay", p.getNetPay());
         m.put("status", p.getStatus());
         m.put("notes", p.getNotes());
+        m.put("role", p.getRoleSnapshot());
+        m.put("workingDays", p.getWorkingDays());
+        m.put("presentDays", p.getPresentDays());
+        m.put("halfDays", p.getHalfDays());
+        m.put("leaveDays", p.getLeaveDays());
+        m.put("absentDays", p.getAbsentDays());
+        m.put("workedMinutes", p.getWorkedMinutes());
+        m.put("overtimeMinutes", p.getOvertimeMinutes());
+        m.put("paidAt", p.getPaidAt());
+        m.put("paymentRef", p.getPaymentRef());
         return m;
     }
 

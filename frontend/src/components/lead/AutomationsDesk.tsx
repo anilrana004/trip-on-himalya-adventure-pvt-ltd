@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, formatApiError, type Task } from "@/lib/api";
+import { api, formatApiError, type Task, type ZapierAutomationStatus } from "@/lib/api";
 import { TASK_TYPE_LABEL } from "@/lib/taskLabels";
 
 const RULES = [
@@ -30,6 +30,18 @@ const RULES = [
     title: "Reminders & digest",
     body: "Due-soon and overdue reminders to sales every few minutes. Morning inactive-lead nudge. 09:00 manager SLA digest.",
   },
+  {
+    title: "Zapier alerts",
+    body: "lead.created / interested / quotation / booked / sla.breach post to ZAPIER_EVENTS_HOOK_URL for Slack or Gmail.",
+  },
+  {
+    title: "Bulk email (Zap)",
+    body: "Managers select leads → CRM queues a campaign → Zapier Catch Hook (or inline SendGate) delivers one email per recipient. Consent + suppressions enforced.",
+  },
+  {
+    title: "Bulk WhatsApp (Zap)",
+    body: "Managers select leads → CRM queues a WA campaign → Zapier Catch Hook (or inline Interakt/sandbox) delivers one template per recipient. Consent + WA suppressions enforced.",
+  },
 ];
 
 function nextStep(task: Task): { label: string; href: string } {
@@ -41,6 +53,7 @@ function nextStep(task: Task): { label: string; href: string } {
 
 export function AutomationsDesk() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [zapier, setZapier] = useState<ZapierAutomationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>("ALL");
@@ -48,8 +61,12 @@ export function AutomationsDesk() {
   const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([api.getTasks({ status: "PENDING" }), api.getTasks({ status: "OVERDUE" })])
-      .then(([pending, overdue]) => {
+    Promise.all([
+      api.getTasks({ status: "PENDING" }),
+      api.getTasks({ status: "OVERDUE" }),
+      api.getZapierAutomationStatus().catch(() => null),
+    ])
+      .then(([pending, overdue, zap]) => {
         const byId = new Map<string, Task>();
         for (const task of [...pending, ...overdue]) {
           if (task.id) byId.set(task.id, task);
@@ -61,6 +78,7 @@ export function AutomationsDesk() {
             return da - db;
           }),
         );
+        setZapier(zap);
       })
       .catch((err) => setError(formatApiError(err, "Could not load the follow-up queue")))
       .finally(() => setLoading(false));
@@ -92,6 +110,40 @@ export function AutomationsDesk() {
         Live sales automation for Trip On Himalaya. Facebook enters via Zapier; everything after that — assignment,
         calls, cadence, SLA, digests — runs inside this CRM. Rows below are open tasks already created.
       </p>
+
+      {zapier && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Zapier pipes</h2>
+            <span className="text-xs text-slate-500">
+              {zapier.hooks.filter((h) => h.configured).length}/{zapier.hooks.length} configured
+            </span>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {zapier.hooks.map((hook) => (
+              <li
+                key={hook.id}
+                className={`rounded-lg border px-3 py-2 ${
+                  hook.configured ? "border-emerald-200 bg-emerald-50/50" : "border-amber-200 bg-amber-50/40"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-slate-800">{hook.label}</div>
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      hook.configured ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                  >
+                    {hook.configured ? "Ready" : "Set env"}
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">{hook.zap}</div>
+                <code className="mt-1 block truncate text-[10px] text-slate-400">{hook.env}</code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {RULES.map((rule) => (

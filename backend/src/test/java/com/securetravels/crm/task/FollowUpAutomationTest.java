@@ -1,8 +1,10 @@
 package com.securetravels.crm.task;
 
+import com.securetravels.crm.automation.zapier.ZapierEventsClient;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
 import com.securetravels.crm.lead.Lead;
+import com.securetravels.crm.lead.LeadRepository;
 import com.securetravels.crm.notification.Notification;
 import com.securetravels.crm.notification.NotificationRepository;
 import com.securetravels.crm.user.Role;
@@ -36,8 +38,10 @@ class FollowUpAutomationTest {
 
     @Mock private TaskRepository tasks;
     @Mock private UserRepository users;
+    @Mock private LeadRepository leads;
     @Mock private NotificationRepository notifications;
     @Mock private EmailNotifier email;
+    @Mock private ZapierEventsClient zapier;
 
     private FollowUpAutomation automation;
     private UUID assignee;
@@ -47,7 +51,7 @@ class FollowUpAutomationTest {
     void setUp() {
         AppProperties props = new AppProperties();
         props.setPublicUrl("http://localhost:3001");
-        automation = new FollowUpAutomation(tasks, users, notifications, email, props);
+        automation = new FollowUpAutomation(tasks, users, leads, notifications, email, zapier, props);
         assignee = UUID.randomUUID();
         user = new User("sales@securetravels.in", "pw", "Ravi", Role.SALES, "9876500000");
     }

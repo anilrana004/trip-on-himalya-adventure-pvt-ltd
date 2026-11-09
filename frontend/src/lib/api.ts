@@ -151,6 +151,125 @@ export type CustomerTripRow = components["schemas"]["TripRow"];
 export type CustomerUpdatePayload = components["schemas"]["CustomerUpdateRequest"];
 export type DashboardSummary = components["schemas"]["DashboardSummaryResponse"];
 export type DashboardPerformance = components["schemas"]["PerformanceResponse"];
+
+/** Sales team on-time follow-up / lead hygiene desk (managers + self-scoped sales). */
+export type LeadHygieneOwner = {
+  ownerId: string;
+  fullName: string;
+  email: string;
+  openLeads: number;
+  openTasks: number;
+  overdueTasks: number;
+  slaBreachedOpen: number;
+  firstCallPending: number;
+  firstCallOverdue: number;
+  hotUncalled: number;
+  quietLeads24h: number;
+  callsLoggedToday: number;
+  completedOnTimeToday: number;
+  completedLateToday: number;
+  avgMinutesToFirstContact?: number | null;
+  onTimePct: number;
+};
+export type LeadHygieneAttention = {
+  leadId: string;
+  customerName?: string | null;
+  phone?: string | null;
+  status?: string | null;
+  source?: string | null;
+  ownerId?: string | null;
+  ownerName?: string | null;
+  heat?: string | null;
+  lastContactedAt?: string | null;
+  callCount?: number;
+  nextTaskType?: string | null;
+  nextTaskStatus?: string | null;
+  dueAt?: string | null;
+  slaDeadline?: string | null;
+  escalatedAt?: string | null;
+  reason?: string | null;
+};
+export type LeadHygieneUpdate = {
+  at?: string | null;
+  kind?: string | null;
+  leadId?: string | null;
+  customerName?: string | null;
+  actorId?: string | null;
+  actorName?: string | null;
+  summary?: string | null;
+};
+export type LeadHygiene = {
+  scope: string;
+  asOf?: string | null;
+  totals: {
+    openTasks: number;
+    overdueTasks: number;
+    slaBreachedOpen: number;
+    firstCallPending: number;
+    firstCallOverdue: number;
+    hotUncalled: number;
+    quietLeads24h: number;
+    callsLoggedToday: number;
+    completedOnTimeToday: number;
+    completedLateToday: number;
+  };
+  owners: LeadHygieneOwner[];
+  attention: LeadHygieneAttention[];
+  feed: LeadHygieneUpdate[];
+};
+
+/** Company teams salary (finance pays; employee dashboard reads /me). */
+export type TeamsSalaryLine = {
+  id?: string | null;
+  userId: string;
+  fullName: string;
+  email?: string | null;
+  role?: string | null;
+  periodMonth: string;
+  basicPay: number;
+  allowances: number;
+  deductions: number;
+  netPay: number;
+  status: string;
+  workingDays: number;
+  presentDays: number;
+  halfDays: number;
+  leaveDays: number;
+  absentDays: number;
+  workedMinutes: number;
+  overtimeMinutes: number;
+  workedHoursLabel: string;
+  overtimeHoursLabel: string;
+  monthlySalaryDefault?: number | null;
+  paidAt?: string | null;
+  paymentRef?: string | null;
+  expenseId?: string | null;
+  notes?: string | null;
+};
+export type TeamsSalaryDay = {
+  workDate: string;
+  status: string;
+  workedMinutes: number;
+  overtimeMinutes: number;
+  workedHoursLabel: string;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+};
+export type TeamsSalaryMonth = {
+  month: string;
+  totals: {
+    headcount: number;
+    paidCount: number;
+    draftCount: number;
+    totalNet: number;
+    paidNet: number;
+    totalWorkedMinutes: number;
+    totalWorkedHoursLabel: string;
+  };
+  lines: TeamsSalaryLine[];
+  byRole?: Record<string, number>;
+  message?: string | null;
+};
 export type TargetRow = components["schemas"]["TargetDto"];
 export type TargetsList = components["schemas"]["TargetListResponse"];
 export type TargetsProgress = components["schemas"]["TargetProgressResponse"];
@@ -674,6 +793,45 @@ export type LeadListParams = {
   search?: string;
   page?: number;
   size?: number;
+};
+
+export type EmailCampaignSummary = {
+  id: string;
+  name: string;
+  templateCode: string;
+  deliveryMode: "ZAPIER" | "INLINE";
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "CANCELLED";
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  skippedCount: number;
+  createdAt: string;
+};
+
+export type WhatsAppCampaignSummary = {
+  id: string;
+  name: string;
+  templateCode: string;
+  deliveryMode: "ZAPIER" | "INLINE";
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "CANCELLED";
+  totalRecipients: number;
+  sentCount: number;
+  failedCount: number;
+  skippedCount: number;
+  createdAt: string;
+};
+
+export type ZapierHookStatus = {
+  id: string;
+  label: string;
+  configured: boolean;
+  env: string;
+  zap: string;
+};
+
+export type ZapierAutomationStatus = {
+  hooks: ZapierHookStatus[];
+  docs: string[];
 };
 
 export type ApiErrorBody = {
@@ -1208,6 +1366,9 @@ export const api = {
   getDashboardPerformance: (month?: string) =>
     request<DashboardPerformance>(`/api/dashboard/performance${qs({ month })}`),
 
+  getLeadHygiene: (ownerId?: string) =>
+    request<LeadHygiene>(`/api/dashboard/lead-hygiene${qs({ ownerId })}`),
+
   getTargets: (month?: string) => request<TargetsList>(`/api/targets${qs({ month })}`),
 
   getTargetProgress: (month?: string) =>
@@ -1293,6 +1454,43 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  createEmailCampaign: (payload: {
+    name: string;
+    leadIds: string[];
+    templateCode?: string;
+    subject?: string;
+    body?: string;
+    deliveryMode?: "ZAPIER" | "INLINE";
+  }) =>
+    request<EmailCampaignSummary>("/api/v1/email/campaigns", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  listEmailCampaigns: () => request<EmailCampaignSummary[]>("/api/v1/email/campaigns"),
+
+  getEmailCampaign: (id: string) => request<EmailCampaignSummary>(`/api/v1/email/campaigns/${id}`),
+
+  createWhatsAppCampaign: (payload: {
+    name: string;
+    leadIds: string[];
+    templateCode?: string;
+    body?: string;
+    deliveryMode?: "ZAPIER" | "INLINE";
+  }) =>
+    request<WhatsAppCampaignSummary>("/api/whatsapp/campaigns", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  listWhatsAppCampaigns: () => request<WhatsAppCampaignSummary[]>("/api/whatsapp/campaigns"),
+
+  getWhatsAppCampaign: (id: string) =>
+    request<WhatsAppCampaignSummary>(`/api/whatsapp/campaigns/${id}`),
+
+  getZapierAutomationStatus: () =>
+    request<ZapierAutomationStatus>("/api/v1/automation/zapier/status"),
 
   getFinanceOverview: (params: { from?: string; to?: string } = {}) =>
     request<FinanceOverview>(`/api/finance/overview${qs(params)}`),
@@ -1488,6 +1686,45 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  getTeamsSalary: (params: { month?: string; role?: string } = {}) =>
+    request<TeamsSalaryMonth>(`/api/finance/teams-salary${qs(params)}`),
+
+  generateTeamsSalary: (month?: string) =>
+    request<TeamsSalaryMonth>(`/api/finance/teams-salary/generate${qs({ month })}`, { method: "POST" }),
+
+  upsertTeamsSalaryLine: (payload: {
+    userId: string;
+    periodMonth: string;
+    basicPay?: number;
+    allowances?: number;
+    deductions?: number;
+    status?: string;
+    notes?: string;
+    monthlySalaryDefault?: number;
+  }) =>
+    request<TeamsSalaryLine>("/api/finance/teams-salary/lines", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  payTeamsSalaryLine: (userId: string, month?: string, paymentRef?: string) =>
+    request<TeamsSalaryLine>(`/api/finance/teams-salary/lines/${userId}/pay${qs({ month })}`, {
+      method: "POST",
+      body: JSON.stringify({ paymentRef }),
+    }),
+
+  payApprovedTeamsSalary: (month?: string, paymentRef?: string) =>
+    request<TeamsSalaryMonth>(`/api/finance/teams-salary/pay-approved${qs({ month })}`, {
+      method: "POST",
+      body: JSON.stringify({ paymentRef }),
+    }),
+
+  getMyTeamsSalary: (month?: string) =>
+    request<TeamsSalaryLine>(`/api/finance/teams-salary/me${qs({ month })}`),
+
+  getTeamsSalaryDays: (params: { month?: string; userId?: string } = {}) =>
+    request<TeamsSalaryDay[]>(`/api/finance/teams-salary/days${qs(params)}`),
 
   getBasecampInventory: () => request<Record<string, unknown>[]>("/api/basecamp/inventory"),
 

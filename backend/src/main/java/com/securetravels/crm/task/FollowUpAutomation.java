@@ -1,9 +1,11 @@
 package com.securetravels.crm.task;
 
+import com.securetravels.crm.automation.zapier.ZapierEventsClient;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
 import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.lead.LeadCallAttempt;
+import com.securetravels.crm.lead.LeadRepository;
 import com.securetravels.crm.notification.Notification;
 import com.securetravels.crm.notification.NotificationRepository;
 import com.securetravels.crm.user.Role;
@@ -19,7 +21,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -40,17 +44,21 @@ public class FollowUpAutomation {
 
     private final TaskRepository tasks;
     private final UserRepository users;
+    private final LeadRepository leads;
     private final NotificationRepository notifications;
     private final EmailNotifier email;
+    private final ZapierEventsClient zapier;
     private final String appUrl;
 
-    public FollowUpAutomation(TaskRepository tasks, UserRepository users,
+    public FollowUpAutomation(TaskRepository tasks, UserRepository users, LeadRepository leads,
                               NotificationRepository notifications, EmailNotifier email,
-                              AppProperties props) {
+                              ZapierEventsClient zapier, AppProperties props) {
         this.tasks = tasks;
         this.users = users;
+        this.leads = leads;
         this.notifications = notifications;
         this.email = email;
+        this.zapier = zapier;
         String configured = props.getPublicUrl() == null ? "" : props.getPublicUrl().trim();
         this.appUrl = configured.endsWith("/") ? configured.substring(0, configured.length() - 1) : configured;
     }
@@ -69,6 +77,7 @@ public class FollowUpAutomation {
         scheduleOne(leadId, assigneeId, Task.Type.INITIAL_CALL, dueAt, sla,
                 "Call within 5 minutes",
                 "New lead assigned to you — call the customer now.");
+        publishLeadEvent("lead.created", leadId, assigneeId);
     }
 
     /** Move open follow-up tasks when a manager reassigns the lead owner. */
@@ -107,6 +116,7 @@ public class FollowUpAutomation {
         if (firstDue != null) {
             lead.setFollowUpDate(LocalDate.ofInstant(firstDue, ZONE));
         }
+        publishLeadSnapshot("lead.interested", lead);
     }
 
     @Transactional
@@ -117,6 +127,7 @@ public class FollowUpAutomation {
                 due, 24, "Quotation follow-up",
                 "Send / confirm the quotation for " + lead.getCustomerName() + ".");
         lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+        publishLeadSnapshot("lead.quotation", lead);
     }
 
     @Transactional
@@ -128,6 +139,7 @@ public class FollowUpAutomation {
         notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
                 leadPath(lead.getId())));
         log.info("[automation] lead={} booked; outstanding follow-ups cancelled", lead.getId());
+        publishLeadSnapshot("lead.booked", lead);
     }
 
     /**
@@ -218,6 +230,53 @@ public class FollowUpAutomation {
         notifications.save(new Notification(task.getAssigneeId(), Notification.Channel.IN_APP,
                 "Your follow-up missed SLA", body, leadPath(task.getLeadId())));
         log.info("[automation] escalated task={} managers={} reason={}", task.getId(), managers.size(), reason);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("taskId", task.getId() == null ? null : task.getId().toString());
+        data.put("taskType", task.getType() == null ? null : task.getType().name());
+        data.put("reason", reason);
+        data.put("dueAt", task.getDueAt() == null ? null : task.getDueAt().toString());
+        data.putAll(leadPayload(task.getLeadId(), task.getAssigneeId()));
+        zapier.publishAsync("sla.breach", data);
+    }
+
+    private void publishLeadEvent(String event, UUID leadId, UUID assigneeId) {
+        zapier.publishAsync(event, leadPayload(leadId, assigneeId));
+    }
+
+    private void publishLeadSnapshot(String event, Lead lead) {
+        if (lead == null) return;
+        String owner = lead.getOwnerId() == null ? null
+                : users.findById(lead.getOwnerId()).map(User::getFullName).orElse(null);
+        String phone = lead.getWhatsappNumber() != null && !lead.getWhatsappNumber().isBlank()
+                ? lead.getWhatsappNumber() : lead.getMobileNumber();
+        zapier.publishAsync(event, ZapierEventsClient.leadData(
+                lead.getId(),
+                lead.getCustomerName(),
+                phone,
+                lead.getSource() == null ? null : lead.getSource().name(),
+                owner,
+                lead.getStatus() == null ? null : lead.getStatus().name()));
+    }
+
+    private Map<String, Object> leadPayload(UUID leadId, UUID assigneeId) {
+        Lead lead = leadId == null ? null : leads.findById(leadId).orElse(null);
+        String owner = assigneeId == null ? null
+                : users.findById(assigneeId).map(User::getFullName).orElse(null);
+        if (lead == null) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            if (leadId != null) m.put("leadId", leadId.toString());
+            m.put("ownerName", owner);
+            return m;
+        }
+        String phone = lead.getWhatsappNumber() != null && !lead.getWhatsappNumber().isBlank()
+                ? lead.getWhatsappNumber() : lead.getMobileNumber();
+        return ZapierEventsClient.leadData(
+                lead.getId(),
+                lead.getCustomerName(),
+                phone,
+                lead.getSource() == null ? null : lead.getSource().name(),
+                owner,
+                lead.getStatus() == null ? null : lead.getStatus().name());
     }
 
     private void cancelOpenFollowUps(UUID leadId) {

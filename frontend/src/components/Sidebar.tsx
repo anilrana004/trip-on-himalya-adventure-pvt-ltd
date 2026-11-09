@@ -229,7 +229,9 @@ export function Sidebar() {
               )}
             </div>
           )}
-          <NotificationBell />
+          <div className="hidden md:block">
+            <NotificationBell placement="bottom" />
+          </div>
         </div>
         {user?.role === "SALES" && <SessionTimer compact={!showLabels} />}
         {showLabels && (
@@ -266,7 +268,7 @@ export function Sidebar() {
           </div>
         </div>
         {user?.role === "SALES" && <SessionTimer compact />}
-        <NotificationBell />
+        <NotificationBell placement="top" />
       </header>
 
       {mobileOpen && (
@@ -279,8 +281,8 @@ export function Sidebar() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-slate-800 bg-slate-950 text-slate-200 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
-          collapsed ? "md:w-[72px]" : "md:w-60"
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-slate-800 bg-slate-950 text-slate-200 transition-transform duration-200 md:static md:z-auto md:h-screen md:shrink-0 md:translate-x-0 ${
+          collapsed ? "md:w-[72px]" : "md:w-64"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {nav}

@@ -238,7 +238,9 @@ export function OpsDashboard() {
           <a href="mailto:" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500">
             ✉
           </a>
-          <NotificationBell />
+          <div className="hidden md:block">
+            <NotificationBell placement="top" />
+          </div>
           {user && (
             <div className="hidden items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 lg:flex">
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100 text-[10px] font-bold text-orange-700">

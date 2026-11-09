@@ -253,19 +253,20 @@ function FinanceOverviewView() {
       title="Finance & ERP Dashboard"
       subtitle="Company-wide books for trekking operations — revenue, costs, cash, GST, budgets & approvals"
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <input
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            aria-label="From date"
+            className="min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm sm:px-3"
           />
-          <span className="text-slate-400">–</span>
           <input
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            aria-label="To date"
+            className="min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm sm:px-3"
           />
           <button
             type="button"
@@ -287,7 +288,7 @@ function FinanceOverviewView() {
           </button>
           <Link
             href="/finance/invoices?new=1"
-            className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500"
+            className="col-span-2 rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-sky-500 sm:col-span-1"
           >
             + Quick Add
           </Link>
@@ -303,7 +304,7 @@ function FinanceOverviewView() {
 
       {overview && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
             <span>
               Period: {monthLabel(from)} – {monthLabel(to)}
               {compare && prev ? ` · Comparing vs ${prev.month}` : ""}
@@ -314,7 +315,7 @@ function FinanceOverviewView() {
             </span>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <KpiCard
               tone="accent"
               label="Total Revenue"
@@ -366,14 +367,18 @@ function FinanceOverviewView() {
                 </span>
               }
             >
-              <TrendChart
-                points={series.map((m) => ({
-                  label: m.month,
-                  revenue: Number(m.collected),
-                  expense: Number(m.expenses),
-                  profit: Number(m.collected) - Number(m.expenses),
-                }))}
-              />
+              <div className="overflow-x-auto">
+                <div className="min-w-[280px]">
+                  <TrendChart
+                    points={series.map((m) => ({
+                      label: m.month,
+                      revenue: Number(m.collected),
+                      expense: Number(m.expenses),
+                      profit: Number(m.collected) - Number(m.expenses),
+                    }))}
+                  />
+                </div>
+              </div>
             </Panel>
             <Panel
               title="Income Breakdown"
@@ -399,21 +404,23 @@ function FinanceOverviewView() {
               <DonutChart slices={expenseSlices} />
             </Panel>
             <Panel title="Cash Flow Overview" className="xl:col-span-2">
-              <CashflowBars points={cashPoints} />
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="rounded-lg bg-emerald-50 px-2 py-2">
+              <div className="overflow-x-auto">
+                <CashflowBars points={cashPoints} />
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 text-center text-xs sm:grid-cols-3">
+                <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2.5 sm:block sm:px-2 sm:py-2">
                   <div className="text-slate-500">Inflow</div>
                   <div className="font-semibold tabular-nums text-emerald-700">
                     {inr(cashflow?.totalInflow ?? revenue)}
                   </div>
                 </div>
-                <div className="rounded-lg bg-rose-50 px-2 py-2">
+                <div className="flex items-center justify-between rounded-lg bg-rose-50 px-3 py-2.5 sm:block sm:px-2 sm:py-2">
                   <div className="text-slate-500">Outflow</div>
                   <div className="font-semibold tabular-nums text-rose-700">
                     {inr(cashflow?.totalOutflow ?? totalExpenses)}
                   </div>
                 </div>
-                <div className="rounded-lg bg-sky-50 px-2 py-2">
+                <div className="flex items-center justify-between rounded-lg bg-sky-50 px-3 py-2.5 sm:block sm:px-2 sm:py-2">
                   <div className="text-slate-500">Net cash</div>
                   <div className="font-semibold tabular-nums text-sky-700">
                     {inr(cashflow?.netCash ?? netProfit)}
@@ -524,7 +531,31 @@ function FinanceOverviewView() {
 
           <div className="grid gap-4 xl:grid-cols-12">
             <Panel title="Recent Transactions" className="xl:col-span-5">
-              <div className="overflow-x-auto">
+              <div className="space-y-3 sm:hidden">
+                {recentTx.map((tx) => (
+                  <div key={tx.key} className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-800">{tx.description}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                          <span>{tx.date}</span>
+                          <StatusBadge status={tx.type} />
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-semibold tabular-nums">{inr(tx.amount)}</div>
+                        <div className="mt-1">
+                          <StatusBadge status={tx.status} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {recentTx.length === 0 && (
+                  <p className="py-4 text-center text-sm text-slate-400">No recent transactions</p>
+                )}
+              </div>
+              <div className="hidden overflow-x-auto sm:block">
                 <table className="w-full text-left text-xs">
                   <thead className="text-[10px] uppercase tracking-wide text-slate-400">
                     <tr>
@@ -592,7 +623,35 @@ function FinanceOverviewView() {
             </Panel>
 
             <Panel title="Approval Requests" className="xl:col-span-3">
-              <div className="overflow-x-auto">
+              <div className="space-y-2.5 sm:hidden">
+                {approvals.map((a) => (
+                  <div
+                    key={a.key}
+                    className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                          {a.type}
+                        </div>
+                        <div className="mt-0.5 truncate text-sm font-medium text-slate-800">
+                          {a.description}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-semibold tabular-nums">{inr(a.amount)}</div>
+                        <div className="mt-1">
+                          <StatusBadge status={a.status} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {approvals.length === 0 && (
+                  <p className="py-4 text-center text-sm text-slate-400">No pending approvals</p>
+                )}
+              </div>
+              <div className="hidden overflow-x-auto sm:block">
                 <table className="w-full text-left text-xs">
                   <thead className="text-[10px] uppercase tracking-wide text-slate-400">
                     <tr>

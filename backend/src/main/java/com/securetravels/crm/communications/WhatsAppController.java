@@ -3,6 +3,9 @@ package com.securetravels.crm.communications;
 import com.securetravels.crm.communications.dto.WhatsAppMessageResponse;
 import com.securetravels.crm.communications.dto.WhatsAppSendRequest;
 import com.securetravels.crm.communications.dto.WhatsAppTemplateResponse;
+import com.securetravels.crm.communications.whatsapp.BulkWhatsAppCampaignRequest;
+import com.securetravels.crm.communications.whatsapp.BulkWhatsAppCampaignResponse;
+import com.securetravels.crm.communications.whatsapp.BulkWhatsAppCampaignService;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.security.CurrentUser;
@@ -14,6 +17,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,13 +48,16 @@ public class WhatsAppController {
     private final WhatsAppMessageRepository messages;
     private final WhatsAppTemplateRepository templates;
     private final TimelineService timeline;
+    private final BulkWhatsAppCampaignService campaigns;
 
     public WhatsAppController(SendGateService sendGate, WhatsAppMessageRepository messages,
-                              WhatsAppTemplateRepository templates, TimelineService timeline) {
+                              WhatsAppTemplateRepository templates, TimelineService timeline,
+                              BulkWhatsAppCampaignService campaigns) {
         this.sendGate = sendGate;
         this.messages = messages;
         this.templates = templates;
         this.timeline = timeline;
+        this.campaigns = campaigns;
     }
 
     @Operation(summary = "List WhatsApp templates",
@@ -107,5 +114,28 @@ public class WhatsAppController {
                 .map(WhatsAppMessageResponse::from)
                 .orElseThrow(() -> new IllegalStateException(
                         "Accepted send left no message row for " + decision.messageId()));
+    }
+
+    @Operation(summary = "Launch a bulk WhatsApp campaign to selected leads (Zapier or inline)")
+    @PostMapping("/campaigns")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public BulkWhatsAppCampaignResponse createCampaign(@Valid @RequestBody BulkWhatsAppCampaignRequest request,
+                                                       @CurrentUser UserPrincipal caller) {
+        return campaigns.create(request, caller);
+    }
+
+    @Operation(summary = "List recent bulk WhatsApp campaigns")
+    @GetMapping("/campaigns")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public List<BulkWhatsAppCampaignResponse> listCampaigns(@CurrentUser UserPrincipal caller) {
+        return campaigns.list(caller);
+    }
+
+    @Operation(summary = "Get one bulk WhatsApp campaign")
+    @GetMapping("/campaigns/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public BulkWhatsAppCampaignResponse getCampaign(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
+        return campaigns.get(id, caller);
     }
 }

@@ -368,28 +368,76 @@ function InvoicesView() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
+      {rows.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+          No GST invoices yet
+        </p>
+      )}
+
+      <div className="space-y-3 md:hidden">
+        {rows.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Link href={`/finance/invoices/${r.id}`} className="font-mono text-sm font-semibold text-emerald-800">
+                  {r.invoiceNo}
+                </Link>
+                <div className="mt-0.5 font-medium text-slate-900">{r.customerName}</div>
+                <div className="text-xs text-emerald-700">WA {r.customerWhatsapp ?? "—"}</div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="font-semibold tabular-nums text-slate-900">{inr(r.totalAmount)}</div>
+                <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS[r.status] ?? "bg-slate-100"}`}>
+                  {r.status}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <span>{r.issueDate}</span>
+              <span>GST {inr(r.taxAmount)}</span>
+              <span className={`rounded-full px-2 py-0.5 font-semibold ${WA[r.whatsappDeliveryStatus ?? ""] ?? "bg-slate-100"}`}>
+                WA {r.whatsappDeliveryStatus ?? "—"}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
+              <Link href={`/finance/invoices/${r.id}`} className="text-slate-700">
+                View bill
+              </Link>
+              {canWrite && r.status !== "PAID" && r.status !== "CANCELLED" && (
+                <button onClick={() => api.updateFinanceInvoiceStatus(r.id, "PAID").then(reload)} className="text-emerald-700">
+                  Mark paid
+                </button>
+              )}
+              {canWrite && (
+                <button
+                  onClick={() =>
+                    api.queueFinanceInvoiceWhatsapp(r.id).then(reload).catch((e: Error) => setError(e.message))
+                  }
+                  className="text-sky-700"
+                >
+                  Queue WA
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+        <table className="min-w-[980px] w-full text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-4 py-3">Invoice</th>
-              <th className="px-4 py-3">Customer / WhatsApp</th>
-              <th className="px-4 py-3">Issue</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">GST</th>
-              <th className="px-4 py-3">WhatsApp</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 whitespace-nowrap">Invoice</th>
+              <th className="px-4 py-3 whitespace-nowrap">Customer / WhatsApp</th>
+              <th className="px-4 py-3 whitespace-nowrap">Issue</th>
+              <th className="px-4 py-3 whitespace-nowrap">Total</th>
+              <th className="px-4 py-3 whitespace-nowrap">GST</th>
+              <th className="px-4 py-3 whitespace-nowrap">WhatsApp</th>
+              <th className="px-4 py-3 whitespace-nowrap">Status</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-slate-400">
-                  No GST invoices yet
-                </td>
-              </tr>
-            )}
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/60">
                 <td className="px-4 py-3">
@@ -402,9 +450,9 @@ function InvoicesView() {
                   <div className="font-medium">{r.customerName}</div>
                   <div className="text-xs text-emerald-700">WA {r.customerWhatsapp ?? "—"}</div>
                 </td>
-                <td className="px-4 py-3 text-slate-500">{r.issueDate}</td>
-                <td className="px-4 py-3 font-semibold tabular-nums">{inr(r.totalAmount)}</td>
-                <td className="px-4 py-3 text-xs text-slate-500 tabular-nums">{inr(r.taxAmount)}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-slate-500">{r.issueDate}</td>
+                <td className="px-4 py-3 font-semibold tabular-nums whitespace-nowrap">{inr(r.totalAmount)}</td>
+                <td className="px-4 py-3 text-xs tabular-nums text-slate-500 whitespace-nowrap">{inr(r.taxAmount)}</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${WA[r.whatsappDeliveryStatus ?? ""] ?? "bg-slate-100"}`}>
                     {r.whatsappDeliveryStatus ?? "—"}
@@ -415,7 +463,7 @@ function InvoicesView() {
                     {r.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 space-x-2 whitespace-nowrap">
+                <td className="space-x-2 px-4 py-3 whitespace-nowrap">
                   <Link href={`/finance/invoices/${r.id}`} className="text-xs font-medium text-slate-700 hover:underline">
                     View bill
                   </Link>

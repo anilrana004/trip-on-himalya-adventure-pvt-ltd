@@ -10,4 +10,5 @@ import java.util.UUID;
 public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance, UUID> {
     List<StaffAttendance> findByWorkDateBetweenOrderByWorkDateDesc(LocalDate from, LocalDate to);
     Optional<StaffAttendance> findByUserIdAndWorkDate(UUID userId, LocalDate workDate);
+    List<StaffAttendance> findByUserIdAndWorkDateBetweenOrderByWorkDateAsc(UUID userId, LocalDate from, LocalDate to);
 }

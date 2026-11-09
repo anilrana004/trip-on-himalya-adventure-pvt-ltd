@@ -5,6 +5,7 @@ import com.securetravels.crm.common.audit.AuditService;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.NotFoundException;
 import com.securetravels.crm.dashboard.dto.DashboardSummaryResponse;
+import com.securetravels.crm.dashboard.dto.LeadHygieneResponse;
 import com.securetravels.crm.dashboard.dto.PerformanceResponse;
 import com.securetravels.crm.dashboard.dto.TargetDto;
 import com.securetravels.crm.dashboard.dto.TargetListResponse;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -235,6 +238,321 @@ public class DashboardService {
                 l(m.get("bookings_closed")),
                 l(m.get("payments_count")),
                 bd(m.get("revenue")));
+    }
+
+    // ------------------------------------------------------------------
+    // Sales team lead hygiene / on-time follow-up accountability
+    // ------------------------------------------------------------------
+
+    private static final String HOT_SOURCES =
+            "'FACEBOOK_ADS','INSTAGRAM','GOOGLE_ADS','WEBSITE','STOREFRONT'";
+
+    /**
+     * Per-salesperson on-time discipline for managers/admins (or self for SALES).
+     * Optional ownerId drills one rep; attention + feed show the rows behind the KPIs.
+     */
+    @Transactional(readOnly = true)
+    public LeadHygieneResponse leadHygiene(UUID ownerId, UserPrincipal caller) {
+        boolean manager = caller.role() == Role.MANAGER
+                || caller.role() == Role.ADMIN
+                || caller.role() == Role.CEO;
+        UUID scope = manager ? ownerId : caller.id();
+        String scopeLabel = manager
+                ? (scope == null ? "ALL" : "OWNER")
+                : "SELF";
+
+        Timestamp dayStart = Timestamp.from(LocalDate.now(zone()).atStartOfDay(zone()).toInstant());
+
+        String ownerSql = """
+                SELECT u.id AS owner_id,
+                       u.full_name,
+                       u.email,
+                       (SELECT count(*) FROM leads l
+                             WHERE l.owner_id = u.id
+                               AND l.status IN ('NEW','INTERESTED','QUOTATION_SENT')) AS open_leads,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id
+                               AND t.status IN ('PENDING','OVERDUE')) AS open_tasks,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id AND t.status = 'OVERDUE') AS overdue_tasks,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id
+                               AND t.status IN ('PENDING','OVERDUE')
+                               AND t.sla_deadline IS NOT NULL AND t.sla_deadline < now()) AS sla_breached,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id AND t.type = 'INITIAL_CALL'
+                               AND t.status IN ('PENDING','OVERDUE')) AS first_call_pending,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id AND t.type = 'INITIAL_CALL'
+                               AND t.status IN ('PENDING','OVERDUE') AND t.due_at < now()) AS first_call_overdue,
+                       (SELECT count(*) FROM leads l
+                             WHERE l.owner_id = u.id AND l.status = 'NEW'
+                               AND l.last_contacted_at IS NULL
+                               AND l.source IN (%s)) AS hot_uncalled,
+                       (SELECT count(*) FROM leads l
+                             WHERE l.owner_id = u.id
+                               AND l.status IN ('NEW','INTERESTED')
+                               AND (l.last_contacted_at IS NULL
+                                    OR l.last_contacted_at < now() - interval '24 hours')) AS quiet_leads,
+                       (SELECT count(*) FROM lead_call_attempts c
+                             WHERE c.actor_id = u.id
+                               AND c.created_at >= CAST(? AS timestamptz)) AS calls_today,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id AND t.status = 'COMPLETED'
+                               AND t.completed_at >= CAST(? AS timestamptz)
+                               AND t.completed_at <= t.due_at) AS on_time_today,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id AND t.status = 'COMPLETED'
+                               AND t.completed_at >= CAST(? AS timestamptz)
+                               AND t.completed_at > t.due_at) AS late_today,
+                       (SELECT avg(EXTRACT(EPOCH FROM (l.last_contacted_at - l.created_at)) / 60.0)
+                          FROM leads l
+                         WHERE l.owner_id = u.id
+                           AND l.last_contacted_at IS NOT NULL
+                           AND l.created_at >= now() - interval '30 days') AS avg_min_first_contact
+                  FROM users u
+                 WHERE u.role = 'SALES' AND u.is_active = TRUE
+                """.formatted(HOT_SOURCES);
+
+        List<Map<String, Object>> ownerMaps;
+        if (scope == null) {
+            ownerMaps = jdbc.queryForList(ownerSql + " ORDER BY overdue_tasks DESC, sla_breached DESC, u.full_name",
+                    dayStart, dayStart, dayStart);
+        } else {
+            ownerMaps = jdbc.queryForList(ownerSql + " AND u.id = ? ORDER BY u.full_name",
+                    dayStart, dayStart, dayStart, scope);
+        }
+
+        List<LeadHygieneResponse.OwnerRow> owners = new ArrayList<>();
+        for (Map<String, Object> m : ownerMaps) {
+            long onTime = l(m.get("on_time_today"));
+            long late = l(m.get("late_today"));
+            int pct = (onTime + late) == 0 ? 100 : (int) Math.round(onTime * 100.0 / (onTime + late));
+            Double avg = m.get("avg_min_first_contact") == null ? null
+                    : ((Number) m.get("avg_min_first_contact")).doubleValue();
+            owners.add(new LeadHygieneResponse.OwnerRow(
+                    (UUID) m.get("owner_id"),
+                    (String) m.get("full_name"),
+                    (String) m.get("email"),
+                    l(m.get("open_leads")),
+                    l(m.get("open_tasks")),
+                    l(m.get("overdue_tasks")),
+                    l(m.get("sla_breached")),
+                    l(m.get("first_call_pending")),
+                    l(m.get("first_call_overdue")),
+                    l(m.get("hot_uncalled")),
+                    l(m.get("quiet_leads")),
+                    l(m.get("calls_today")),
+                    onTime,
+                    late,
+                    avg,
+                    pct));
+        }
+
+        LeadHygieneResponse.Totals totals = new LeadHygieneResponse.Totals(
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::openTasks).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::overdueTasks).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::slaBreachedOpen).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::firstCallPending).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::firstCallOverdue).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::hotUncalled).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::quietLeads24h).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::callsLoggedToday).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::completedOnTimeToday).sum(),
+                owners.stream().mapToLong(LeadHygieneResponse.OwnerRow::completedLateToday).sum());
+
+        List<LeadHygieneResponse.AttentionLead> attention = attentionQueue(scope);
+        List<LeadHygieneResponse.UpdateEvent> feed = recentFeed(scope);
+
+        return new LeadHygieneResponse(scopeLabel, Instant.now(), totals, owners, attention, feed);
+    }
+
+    private List<LeadHygieneResponse.AttentionLead> attentionQueue(UUID ownerScope) {
+        String sql = """
+                SELECT l.id AS lead_id,
+                       l.customer_name,
+                       l.mobile_number AS phone,
+                       l.status,
+                       l.source,
+                       l.owner_id,
+                       u.full_name AS owner_name,
+                       l.heat,
+                       l.last_contacted_at,
+                       COALESCE(l.call_count, 0) AS call_count,
+                       t.type AS next_task_type,
+                       t.status AS next_task_status,
+                       t.due_at,
+                       t.sla_deadline,
+                       t.escalated_at,
+                       CASE
+                         WHEN t.status = 'OVERDUE' THEN 'OVERDUE_TASK'
+                         WHEN t.sla_deadline IS NOT NULL AND t.sla_deadline < now() THEN 'SLA_BREACHED'
+                         WHEN t.type = 'INITIAL_CALL' AND t.due_at < now() THEN 'FIRST_CALL_LATE'
+                         WHEN l.status = 'NEW' AND l.last_contacted_at IS NULL
+                              AND l.source IN (%s) THEN 'HOT_UNCALLED'
+                         WHEN l.status IN ('NEW','INTERESTED')
+                              AND (l.last_contacted_at IS NULL
+                                   OR l.last_contacted_at < now() - interval '24 hours') THEN 'QUIET_24H'
+                         ELSE 'FOLLOW_UP_DUE'
+                       END AS reason
+                  FROM leads l
+                  LEFT JOIN users u ON u.id = l.owner_id
+                  LEFT JOIN LATERAL (
+                        SELECT t2.type, t2.status, t2.due_at, t2.sla_deadline, t2.escalated_at
+                          FROM tasks t2
+                         WHERE t2.lead_id = l.id
+                           AND t2.status IN ('PENDING','OVERDUE')
+                         ORDER BY CASE WHEN t2.status = 'OVERDUE' THEN 0 ELSE 1 END,
+                                  t2.due_at ASC NULLS LAST
+                         LIMIT 1
+                  ) t ON TRUE
+                 WHERE l.status IN ('NEW','INTERESTED','QUOTATION_SENT')
+                   AND (
+                        t.status = 'OVERDUE'
+                     OR (t.sla_deadline IS NOT NULL AND t.sla_deadline < now())
+                     OR (t.type = 'INITIAL_CALL' AND t.due_at < now())
+                     OR (l.status = 'NEW' AND l.last_contacted_at IS NULL
+                         AND l.source IN (%s))
+                     OR (l.status IN ('NEW','INTERESTED')
+                         AND (l.last_contacted_at IS NULL
+                              OR l.last_contacted_at < now() - interval '24 hours'))
+                   )
+                """.formatted(HOT_SOURCES, HOT_SOURCES);
+        Object[] args;
+        if (ownerScope != null) {
+            sql += " AND l.owner_id = ?";
+            args = new Object[]{ownerScope};
+        } else {
+            args = new Object[0];
+        }
+        sql += """
+                 ORDER BY CASE
+                            WHEN t.status = 'OVERDUE' THEN 0
+                            WHEN t.sla_deadline IS NOT NULL AND t.sla_deadline < now() THEN 1
+                            WHEN t.type = 'INITIAL_CALL' AND t.due_at < now() THEN 2
+                            WHEN l.status = 'NEW' AND l.last_contacted_at IS NULL THEN 3
+                            ELSE 4
+                          END,
+                          t.due_at ASC NULLS LAST,
+                          l.created_at ASC
+                 LIMIT 80
+                """;
+        return jdbc.queryForList(sql, args).stream().map(this::toAttention).toList();
+    }
+
+    private LeadHygieneResponse.AttentionLead toAttention(Map<String, Object> m) {
+        return new LeadHygieneResponse.AttentionLead(
+                (UUID) m.get("lead_id"),
+                (String) m.get("customer_name"),
+                (String) m.get("phone"),
+                (String) m.get("status"),
+                (String) m.get("source"),
+                (UUID) m.get("owner_id"),
+                (String) m.get("owner_name"),
+                m.get("heat") == null ? null : String.valueOf(m.get("heat")),
+                toInstant(m.get("last_contacted_at")),
+                l(m.get("call_count")),
+                (String) m.get("next_task_type"),
+                (String) m.get("next_task_status"),
+                toInstant(m.get("due_at")),
+                toInstant(m.get("sla_deadline")),
+                toInstant(m.get("escalated_at")),
+                (String) m.get("reason"));
+    }
+
+    private List<LeadHygieneResponse.UpdateEvent> recentFeed(UUID ownerScope) {
+        String ownerFilter = ownerScope == null ? "" : " AND l.owner_id = ? ";
+        String sql = """
+                (SELECT c.created_at AS at,
+                        'CALL' AS kind,
+                        l.id AS lead_id,
+                        l.customer_name,
+                        c.actor_id,
+                        u.full_name AS actor_name,
+                        CONCAT('Call · ', c.outcome,
+                               CASE WHEN c.notes IS NOT NULL AND length(c.notes) > 0
+                                    THEN CONCAT(' — ', left(c.notes, 80)) ELSE '' END) AS summary
+                   FROM lead_call_attempts c
+                   JOIN leads l ON l.id = c.lead_id
+                   LEFT JOIN users u ON u.id = c.actor_id
+                  WHERE c.created_at >= now() - interval '48 hours'
+                    %s
+                )
+                UNION ALL
+                (SELECT t.completed_at AS at,
+                        'TASK_DONE' AS kind,
+                        l.id AS lead_id,
+                        l.customer_name,
+                        t.assignee_id AS actor_id,
+                        u.full_name AS actor_name,
+                        CONCAT('Completed ', t.type,
+                               CASE WHEN t.completed_at <= t.due_at THEN ' on time'
+                                    ELSE ' late' END) AS summary
+                   FROM tasks t
+                   JOIN leads l ON l.id = t.lead_id
+                   LEFT JOIN users u ON u.id = t.assignee_id
+                  WHERE t.status = 'COMPLETED'
+                    AND t.completed_at >= now() - interval '48 hours'
+                    %s
+                )
+                UNION ALL
+                (SELECT t.escalated_at AS at,
+                        'ESCALATION' AS kind,
+                        l.id AS lead_id,
+                        l.customer_name,
+                        t.assignee_id AS actor_id,
+                        u.full_name AS actor_name,
+                        CONCAT('SLA escalated · ', t.type) AS summary
+                   FROM tasks t
+                   JOIN leads l ON l.id = t.lead_id
+                   LEFT JOIN users u ON u.id = t.assignee_id
+                  WHERE t.escalated_at IS NOT NULL
+                    AND t.escalated_at >= now() - interval '48 hours'
+                    %s
+                )
+                UNION ALL
+                (SELECT a.created_at AS at,
+                        'STATUS' AS kind,
+                        l.id AS lead_id,
+                        l.customer_name,
+                        a.actor_id,
+                        u.full_name AS actor_name,
+                        CONCAT('Status ', COALESCE(a.old_value, '—'), ' → ', COALESCE(a.new_value, '—')) AS summary
+                   FROM audit_log a
+                   JOIN leads l ON l.id = a.entity_id
+                   LEFT JOIN users u ON u.id = a.actor_id
+                  WHERE a.entity = 'LEAD'
+                    AND a.field = 'status'
+                    AND a.created_at >= now() - interval '48 hours'
+                    %s
+                )
+                ORDER BY at DESC
+                LIMIT 60
+                """.formatted(ownerFilter, ownerFilter, ownerFilter, ownerFilter);
+
+        Object[] args;
+        if (ownerScope != null) {
+            args = new Object[]{ownerScope, ownerScope, ownerScope, ownerScope};
+        } else {
+            args = new Object[0];
+        }
+        return jdbc.queryForList(sql, args).stream().map(m -> new LeadHygieneResponse.UpdateEvent(
+                toInstant(m.get("at")),
+                (String) m.get("kind"),
+                (UUID) m.get("lead_id"),
+                (String) m.get("customer_name"),
+                (UUID) m.get("actor_id"),
+                (String) m.get("actor_name"),
+                (String) m.get("summary"))).toList();
+    }
+
+    private static Instant toInstant(Object v) {
+        if (v == null) return null;
+        if (v instanceof Instant i) return i;
+        if (v instanceof Timestamp ts) return ts.toInstant();
+        if (v instanceof java.time.OffsetDateTime odt) return odt.toInstant();
+        if (v instanceof java.time.LocalDateTime ldt) return ldt.atZone(zone()).toInstant();
+        return null;
     }
 
     // ------------------------------------------------------------------

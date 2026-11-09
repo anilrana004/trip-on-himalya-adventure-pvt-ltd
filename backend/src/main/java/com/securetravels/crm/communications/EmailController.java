@@ -3,6 +3,9 @@ package com.securetravels.crm.communications;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.security.CurrentUser;
+import com.securetravels.crm.communications.email.BulkEmailCampaignRequest;
+import com.securetravels.crm.communications.email.BulkEmailCampaignResponse;
+import com.securetravels.crm.communications.email.BulkEmailCampaignService;
 import com.securetravels.crm.communications.email.EmailMessage;
 import com.securetravels.crm.communications.email.EmailMessageRepository;
 import com.securetravels.crm.communications.template.ChannelTemplate;
@@ -16,6 +19,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,13 +49,16 @@ public class EmailController {
     private final EmailMessageRepository messages;
     private final ChannelTemplateRepository templates;
     private final TimelineService timeline;
+    private final BulkEmailCampaignService campaigns;
 
     public EmailController(SendGateService sendGate, EmailMessageRepository messages,
-                           ChannelTemplateRepository templates, TimelineService timeline) {
+                           ChannelTemplateRepository templates, TimelineService timeline,
+                           BulkEmailCampaignService campaigns) {
         this.sendGate = sendGate;
         this.messages = messages;
         this.templates = templates;
         this.timeline = timeline;
+        this.campaigns = campaigns;
     }
 
     @Operation(summary = "List email templates",
@@ -118,5 +125,28 @@ public class EmailController {
                         "queuedAt", String.valueOf(m.getQueuedAt()),
                         "lastError", m.getLastError() == null ? "" : m.getLastError()))
                 .toList();
+    }
+
+    @Operation(summary = "Launch a bulk email campaign to selected leads (Zapier or inline)")
+    @PostMapping("/campaigns")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public BulkEmailCampaignResponse createCampaign(@Valid @RequestBody BulkEmailCampaignRequest request,
+                                                    @CurrentUser UserPrincipal caller) {
+        return campaigns.create(request, caller);
+    }
+
+    @Operation(summary = "List recent bulk email campaigns")
+    @GetMapping("/campaigns")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public List<BulkEmailCampaignResponse> listCampaigns(@CurrentUser UserPrincipal caller) {
+        return campaigns.list(caller);
+    }
+
+    @Operation(summary = "Get one bulk email campaign")
+    @GetMapping("/campaigns/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public BulkEmailCampaignResponse getCampaign(@PathVariable UUID id, @CurrentUser UserPrincipal caller) {
+        return campaigns.get(id, caller);
     }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   api,
   ApiClientError,
@@ -15,6 +16,7 @@ import { Protected } from "@/components/Protected";
 import { AppShell } from "@/components/AppShell";
 import { TravelOpsHome } from "@/components/dashboard/TravelOpsHome";
 import { WorkdayHours } from "@/components/dashboard/WorkdayHours";
+import { MySalaryCard } from "@/components/dashboard/MySalaryCard";
 
 const CARD_FIELDS: { key: string; label: string }[] = [
   { key: "totalLeads", label: "Total leads" },
@@ -203,6 +205,13 @@ function DashboardView() {
             {(user?.role === "SALES" || user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO") && (
               <WorkdayHours team={user.role !== "SALES"} company={user.role === "ADMIN" || user.role === "CEO"} />
             )}
+            {(user?.role === "SALES" ||
+              user?.role === "OPS" ||
+              user?.role === "MANAGER" ||
+              user?.role === "ADMIN" ||
+              user?.role === "CEO" ||
+              user?.role === "TRANSPORT" ||
+              user?.role === "FINANCE") && <MySalaryCard />}
 
             <section className="p-4 pb-2 md:p-6">
               <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -227,6 +236,16 @@ function DashboardView() {
                   hint={`${n(summary?.followUpOverdue)} overdue · ${n(summary?.firstCallOverdue)} first-call late`}
                 />
               </div>
+              {(user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO" || user?.role === "SALES") && (
+                <div className="mt-3">
+                  <Link
+                    href="/sales-tracking"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900"
+                  >
+                    Open Sales Tracking → see who is late on follow-ups
+                  </Link>
+                </div>
+              )}
             </section>
 
             <section className="px-6 pb-2">

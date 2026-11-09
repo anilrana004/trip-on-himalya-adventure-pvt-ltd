@@ -76,6 +76,9 @@ app:
       capacity: 20
       refill-per-window: 20
       window-minutes: 1
+  # Outbound Catch Hooks (Slack / Gmail / etc.). Separate from email/WA campaign hooks.
+  zapier:
+    events-hook-url: ${ZAPIER_EVENTS_HOOK_URL:}
   compliance:
     ready-threshold-percent: ${COMPLIANCE_READY_THRESHOLD_PERCENT:100}
     medical-threshold: ${COMPLIANCE_MEDICAL_THRESHOLD:DIFFICULT}
@@ -119,8 +122,12 @@ app:
     connect-timeout: ${INTERAKT_CONNECT_TIMEOUT:5s}
     read-timeout: ${INTERAKT_READ_TIMEOUT:10s}
     rate-limit-per-minute: ${INTERAKT_RATE_LIMIT_PER_MINUTE:300}
+    # Catch Hook URL for bulk WhatsApp campaigns (deliveryMode=ZAPIER).
+    zapier-hook-url: ${ZAPIER_WHATSAPP_HOOK_URL:}
   email:
     webhook-secret: ${EMAIL_WEBHOOK_SECRET:}
+    # Catch Hook URL for bulk email campaigns (deliveryMode=ZAPIER).
+    zapier-hook-url: ${ZAPIER_EMAIL_HOOK_URL:}
   sms:
     webhook-secret: ${SMS_WEBHOOK_SECRET:}
   automation:

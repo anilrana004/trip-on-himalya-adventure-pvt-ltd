@@ -20,7 +20,33 @@ Facebook Lead Form
 
 1. **Trigger:** Facebook Lead Ads → New Lead  
 2. **Filter:** phone present  
-3. **Code by Zapier:** build JSON, HMAC-SHA256, POST (see repo chat / ops snippet)  
+3. **Code by Zapier** (Node): build JSON, HMAC-SHA256, POST  
+
+```javascript
+const crypto = require("crypto");
+const secret = inputData.webhook_secret; // store as Zapier input field = WEBHOOK_SECRET
+const bodyObj = {
+  customer_name: inputData.full_name || inputData.name,
+  mobile_number: String(inputData.phone_number || inputData.phone || "").replace(/\D/g, "").slice(-10),
+  email: inputData.email || null,
+  consent_given: true,
+  lead_source: "FACEBOOK_ADS",
+  destination: inputData.trek || inputData.destination || null,
+};
+const body = JSON.stringify(bodyObj);
+const signature = crypto.createHmac("sha256", secret).update(body).digest("hex");
+const res = await fetch(inputData.crm_webhook_url, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-Webhook-Signature": signature,
+  },
+  body,
+});
+output = [{ status: res.status, text: await res.text() }];
+```
+
+Zap inputs: `webhook_secret`, `crm_webhook_url` (= `https://YOUR-API/api/webhook/lead`), plus mapped Facebook fields.  
 4. **Expect:** HTTP 201 created or 200 duplicate  
 
 Required body: `customer_name`, `mobile_number`, `consent_given: true`, `lead_source: "FACEBOOK_ADS"`.
@@ -39,6 +65,10 @@ Required body: `customer_name`, `mobile_number`, `consent_given: true`, `lead_so
 | Task overdue / SLA | Remind sales; escalate managers |
 | Quiet NEW/INTERESTED | Daily inactive nudge |
 | Morning | Manager SLA digest |
+
+Outbound lifecycle alerts: [EVENTS_ZAPIER.md](./EVENTS_ZAPIER.md).  
+Outbound bulk email: [EMAIL_ZAPIER.md](./EMAIL_ZAPIER.md).  
+Outbound bulk WhatsApp: [WHATSAPP_ZAPIER.md](./WHATSAPP_ZAPIER.md).
 
 ## Verify
 

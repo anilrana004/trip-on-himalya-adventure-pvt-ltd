@@ -11,6 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -47,6 +48,10 @@ public class User extends Auditable {
     @Column(name = "reports_to")
     private UUID reportsTo;
 
+    /** Default basic pay used when finance generates a month salary run. */
+    @Column(name = "monthly_salary", precision = 12, scale = 2)
+    private BigDecimal monthlySalary;
+
     protected User() {}
 
     public User(String email, String passwordHash, String fullName, Role role, String phone) {
@@ -66,6 +71,7 @@ public class User extends Auditable {
     public boolean isActive() { return isActive; }
     public UUID getVendorId() { return vendorId; }
     public UUID getReportsTo() { return reportsTo; }
+    public BigDecimal getMonthlySalary() { return monthlySalary; }
 
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public void setFullName(String fullName) { this.fullName = fullName; }
@@ -74,4 +80,5 @@ public class User extends Auditable {
     public void setActive(boolean active) { isActive = active; }
     public void setVendorId(UUID vendorId) { this.vendorId = vendorId; }
     public void setReportsTo(UUID reportsTo) { this.reportsTo = reportsTo; }
+    public void setMonthlySalary(BigDecimal monthlySalary) { this.monthlySalary = monthlySalary; }
 }

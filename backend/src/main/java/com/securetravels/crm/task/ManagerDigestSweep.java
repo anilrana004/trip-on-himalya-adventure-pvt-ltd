@@ -57,17 +57,34 @@ public class ManagerDigestSweep {
         if (overdue == 0 && sla == 0 && hot == 0 && firstLate == 0) {
             return;
         }
+        List<Map<String, Object>> worst = jdbc.queryForList("""
+                SELECT u.full_name,
+                       (SELECT count(*) FROM tasks t
+                             WHERE t.assignee_id = u.id AND t.status = 'OVERDUE') AS overdue
+                  FROM users u
+                 WHERE u.role = 'SALES' AND u.is_active = TRUE
+                 ORDER BY overdue DESC, u.full_name
+                 LIMIT 3
+                """);
+        StringBuilder top = new StringBuilder();
+        for (Map<String, Object> w : worst) {
+            long n = ((Number) w.get("overdue")).longValue();
+            if (n <= 0) continue;
+            if (top.length() > 0) top.append(", ");
+            top.append(w.get("full_name")).append(" (").append(n).append(")");
+        }
         String title = "Morning sales SLA digest";
         String body = "Overdue tasks: " + overdue
                 + " · SLA breached: " + sla
                 + " · Hot uncalled ads/web: " + hot
                 + " · First call late: " + firstLate
-                + ". Open Automations / Tasks to clear the queue.";
+                + (top.length() > 0 ? " · Needs coaching: " + top : "")
+                + ". Open Sales Tracking to clear the queue.";
         List<User> managers = users.findByIsActiveTrueAndRoleIn(
                 EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO));
         for (User manager : managers) {
             notifications.save(new Notification(manager.getId(), Notification.Channel.IN_APP,
-                    title, body, "/automations"));
+                    title, body, "/sales-tracking"));
         }
         log.info("[manager-digest] notified={} overdue={} sla={} hot={} firstLate={}",
                 managers.size(), overdue, sla, hot, firstLate);

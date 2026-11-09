@@ -109,31 +109,69 @@ function PayoutsView() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
+      {rows.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+          No vendor payouts scheduled
+        </p>
+      )}
+
+      <div className="space-y-3 md:hidden">
+        {rows.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-semibold text-slate-900">{r.vendorName}</div>
+                <div className="mt-0.5 text-xs uppercase text-slate-400">
+                  {r.category.replaceAll("_", " ")}
+                  {r.tripName ? ` · ${r.tripName}` : ""}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="font-semibold tabular-nums text-slate-900">{inr(r.amount)}</div>
+                <div className="mt-1 text-[11px] font-semibold text-slate-500">{r.status}</div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span>{r.payoutDate}</span>
+              {canWrite && r.status === "SCHEDULED" && (
+                <div className="flex gap-3 font-semibold">
+                  <button onClick={() => api.updateFinancePayoutStatus(r.id, "PAID").then(reload)} className="text-emerald-700">
+                    Mark paid
+                  </button>
+                  <button onClick={() => api.updateFinancePayoutStatus(r.id, "HOLD").then(reload)} className="text-amber-700">
+                    Hold
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+        <table className="min-w-[760px] w-full text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-4 py-3">Vendor</th>
-              <th className="px-4 py-3">Category</th>
-              <th className="px-4 py-3">Trek</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 whitespace-nowrap">Vendor</th>
+              <th className="px-4 py-3 whitespace-nowrap">Category</th>
+              <th className="px-4 py-3 whitespace-nowrap">Trek</th>
+              <th className="px-4 py-3 whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 whitespace-nowrap">Amount</th>
+              <th className="px-4 py-3 whitespace-nowrap">Status</th>
               {canWrite && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-slate-400">No vendor payouts scheduled</td></tr>}
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-50">
                 <td className="px-4 py-3 font-medium">{r.vendorName}</td>
                 <td className="px-4 py-3 text-xs uppercase text-slate-500">{r.category.replaceAll("_", " ")}</td>
                 <td className="px-4 py-3 text-slate-500">{r.tripName ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-500">{r.payoutDate}</td>
-                <td className="px-4 py-3 font-semibold tabular-nums">{inr(r.amount)}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-slate-500">{r.payoutDate}</td>
+                <td className="px-4 py-3 font-semibold tabular-nums whitespace-nowrap">{inr(r.amount)}</td>
                 <td className="px-4 py-3 text-xs font-semibold">{r.status}</td>
                 {canWrite && (
-                  <td className="px-4 py-3 space-x-2">
+                  <td className="space-x-2 px-4 py-3 whitespace-nowrap">
                     {r.status === "SCHEDULED" && (
                       <button onClick={() => api.updateFinancePayoutStatus(r.id, "PAID").then(reload)} className="text-xs font-medium text-emerald-700 hover:underline">Mark paid</button>
                     )}

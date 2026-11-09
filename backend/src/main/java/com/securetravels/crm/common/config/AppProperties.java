@@ -22,6 +22,7 @@ public class AppProperties {
   private final Email email = new Email();
   private final Sms sms = new Sms();
     private final Automation automation = new Automation();
+    private final Zapier zapier = new Zapier();
     private final FeatureFlags featureFlags = new FeatureFlags();
     private final Commission commission = new Commission();
     private final Meta meta = new Meta();
@@ -44,6 +45,7 @@ public class AppProperties {
   public Email getEmail() { return email; }
   public Sms getSms() { return sms; }
     public Automation getAutomation() { return automation; }
+    public Zapier getZapier() { return zapier; }
     public FeatureFlags getFeatureFlags() { return featureFlags; }
     public Commission getCommission() { return commission; }
     public Meta getMeta() { return meta; }
@@ -286,6 +288,11 @@ public class AppProperties {
         private Duration readTimeout = Duration.ofSeconds(10);
         /** Interakt plan quota (300/min Growth, 600/min Advanced). */
         private int rateLimitPerMinute = 300;
+        /**
+         * Zapier Catch Hook for bulk WhatsApp (HTTPS). When set, campaigns with
+         * deliveryMode=ZAPIER POST each recipient here with HMAC header.
+         */
+        private String zapierHookUrl = "";
 
         public Mode getMode() { return mode; }
         public void setMode(Mode mode) { this.mode = mode; }
@@ -303,6 +310,8 @@ public class AppProperties {
         public void setReadTimeout(Duration readTimeout) { this.readTimeout = readTimeout; }
         public int getRateLimitPerMinute() { return rateLimitPerMinute; }
         public void setRateLimitPerMinute(int rateLimitPerMinute) { this.rateLimitPerMinute = rateLimitPerMinute; }
+        public String getZapierHookUrl() { return zapierHookUrl; }
+        public void setZapierHookUrl(String zapierHookUrl) { this.zapierHookUrl = zapierHookUrl; }
 
         public boolean live() { return mode == Mode.INTERAKT; }
 
@@ -333,6 +342,11 @@ public class AppProperties {
         private String secretKey = "";
         /** SNS subscription confirmation / notification signing secret. */
         private String webhookSecret = "";
+        /**
+         * Zapier Catch Hook for bulk email (HTTPS). When set, campaigns with
+         * deliveryMode=ZAPIER POST each recipient here with HMAC header.
+         */
+        private String zapierHookUrl = "";
 
         public Mode getMode() { return mode; }
         public void setMode(Mode mode) { this.mode = mode; }
@@ -350,6 +364,8 @@ public class AppProperties {
         public void setSecretKey(String secretKey) { this.secretKey = secretKey; }
         public String getWebhookSecret() { return webhookSecret; }
         public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
+        public String getZapierHookUrl() { return zapierHookUrl; }
+        public void setZapierHookUrl(String zapierHookUrl) { this.zapierHookUrl = zapierHookUrl; }
 
         public boolean live() { return mode == Mode.SES; }
     }
@@ -434,6 +450,18 @@ public class AppProperties {
         }
         public int getCoordinateDepthCap() { return coordinateDepthCap; }
         public void setCoordinateDepthCap(int coordinateDepthCap) { this.coordinateDepthCap = coordinateDepthCap; }
+    }
+
+    /**
+     * Zapier Catch Hooks the CRM posts to (outbound). Inbound Facebook still
+     * uses {@link Webhook#secret} on {@code POST /api/webhook/lead}.
+     */
+    public static class Zapier {
+        /** Lifecycle events: lead.created, sla.breach, interested, quotation, booked. */
+        private String eventsHookUrl = "";
+
+        public String getEventsHookUrl() { return eventsHookUrl; }
+        public void setEventsHookUrl(String eventsHookUrl) { this.eventsHookUrl = eventsHookUrl; }
     }
 
     /**

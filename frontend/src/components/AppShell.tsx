@@ -11,9 +11,9 @@ export function AppShell({
   className?: string;
 }) {
   return (
-    <div className={`flex min-h-screen flex-col md:flex-row ${className}`}>
+    <div className={`flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden ${className}`}>
       <Sidebar />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
     </div>
   );
 }

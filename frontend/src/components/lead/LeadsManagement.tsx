@@ -5,12 +5,14 @@ import Link from "next/link";
 import {
   api,
   type DashboardSummary,
+  type EmailCampaignSummary,
   type Lead,
   type LeadListParams,
   type LeadStatusPayload,
   type SalesFunnelData,
   type SalesUser,
   type Trip,
+  type WhatsAppCampaignSummary,
 } from "@/lib/api";
 import { pickLostReason } from "@/lib/lostReasons";
 import { useAuth } from "@/lib/auth";
@@ -18,6 +20,8 @@ import { canManageTeam, canWriteLeads } from "@/lib/rbac";
 import { LeadForm } from "@/components/lead/LeadForm";
 import { LeadDetailDrawer } from "@/components/lead/LeadDetailDrawer";
 import { LeadImportModal } from "@/components/lead/LeadImportModal";
+import { BulkEmailCampaignModal } from "@/components/lead/BulkEmailCampaignModal";
+import { BulkWhatsAppCampaignModal } from "@/components/lead/BulkWhatsAppCampaignModal";
 import { NotificationBell } from "@/components/NotificationBell";
 import {
   STAGE_LABEL,
@@ -59,6 +63,16 @@ const AUTOMATIONS = [
     title: "Assignment",
     body: "Meta and website leads auto-assign to sales. Same trek or campaign sticks to one owner so the queue does not spray. Manual add still works.",
   },
+  {
+    key: "bulk-email",
+    title: "Bulk email",
+    body: "Managers select leads and queue a Zapier (or inline) email campaign. Consent and suppressions are checked before each send.",
+  },
+  {
+    key: "bulk-whatsapp",
+    title: "Bulk WhatsApp",
+    body: "Managers select leads and queue a Zapier (or inline) WhatsApp campaign. Consent and WA suppressions are checked before each send.",
+  },
 ];
 
 function monthRange() {
@@ -98,8 +112,8 @@ function Donut({ slices }: { slices: { key: string; label: string; value: number
     };
   });
   return (
-    <div className="flex items-center gap-3">
-      <svg viewBox="0 0 140 140" className="h-32 w-32 shrink-0">
+    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+      <svg viewBox="0 0 140 140" className="mx-auto h-28 w-28 shrink-0 sm:mx-0 sm:h-32 sm:w-32">
         {paths.map((p) => (
           <path key={p.key} d={p.d} fill={p.color} opacity={0.92} />
         ))}
@@ -111,12 +125,12 @@ function Donut({ slices }: { slices: { key: string; label: string; value: number
           {total}
         </text>
       </svg>
-      <ul className="min-w-0 flex-1 space-y-1 text-[11px]">
+      <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
         {paths.map((p) => (
-          <li key={p.key} className="flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-1.5 truncate text-slate-600">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: p.color }} />
-              {p.label}
+          <li key={p.key} className="flex items-start justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-1.5 text-slate-600">
+              <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: p.color }} />
+              <span className="leading-snug">{p.label}</span>
             </span>
             <span className="shrink-0 font-semibold text-slate-800">{formatPct(p.pct)}</span>
           </li>
@@ -129,14 +143,14 @@ function Donut({ slices }: { slices: { key: string; label: string; value: number
 function FunnelBars({ stages }: { stages: { label: string; count: number; color: string }[] }) {
   const max = Math.max(...stages.map((s) => s.count), 1);
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {stages.map((s, i) => (
         <div key={s.label} className="flex items-center gap-2">
-          <div className="w-24 shrink-0 truncate text-[11px] text-slate-500">{s.label}</div>
-          <div className="h-6 flex-1 rounded bg-slate-100">
+          <div className="w-[7.5rem] shrink-0 text-[11px] leading-snug text-slate-500">{s.label}</div>
+          <div className="h-6 min-w-0 flex-1 rounded bg-slate-100">
             <div
               className="flex h-6 items-center rounded px-2 text-[10px] font-semibold text-white"
-              style={{ width: `${Math.max(14, (s.count / max) * 100)}%`, background: s.color, opacity: 1 - i * 0.06 }}
+              style={{ width: `${Math.max(18, (s.count / max) * 100)}%`, background: s.color, opacity: 1 - i * 0.06 }}
             >
               {s.count.toLocaleString("en-IN")}
             </div>
@@ -151,6 +165,7 @@ export function LeadsManagement() {
   const { user } = useAuth();
   const canWrite = canWriteLeads(user?.role);
   const canReassign = canManageTeam(user?.role);
+  const canBulkEmail = canManageTeam(user?.role);
   const range = useMemo(() => monthRange(), []);
   const [search, setSearch] = useState("");
   const [tableSearch, setTableSearch] = useState("");
@@ -166,6 +181,9 @@ export function LeadsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showBulkEmail, setShowBulkEmail] = useState(false);
+  const [showBulkWhatsApp, setShowBulkWhatsApp] = useState(false);
+  const [campaignNotice, setCampaignNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
@@ -356,7 +374,9 @@ export function LeadsManagement() {
               <a href="mailto:" className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50" title="Email">
                 ✉
               </a>
-              <NotificationBell />
+              <div className="hidden md:block">
+                <NotificationBell placement="top" />
+              </div>
               {user && (
                 <div className="hidden items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 sm:flex">
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-700">
@@ -408,17 +428,17 @@ export function LeadsManagement() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {kpis.map((k) => (
-              <div key={k.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={k.label} className="flex min-h-[7.25rem] flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{k.label}</div>
-                <div className="mt-1 text-xl font-bold text-slate-900">{k.value}</div>
-                <div className="mt-1 text-xs font-medium text-slate-500">{k.note}</div>
+                <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{k.value}</div>
+                <div className="mt-auto pt-2 text-xs leading-snug text-slate-500">{k.note}</div>
               </div>
             ))}
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-4">
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Leads by Source</h3>
               {bySource.length ? <Donut slices={bySource} /> : <p className="text-xs text-slate-400">No leads in this view.</p>}
@@ -429,7 +449,9 @@ export function LeadsManagement() {
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Lead Trend</h3>
-              <p className="text-xs text-slate-400">Daily history is not stored yet. The counts above are the current book.</p>
+              <p className="text-xs leading-relaxed text-slate-400">
+                Daily history is not stored yet. The counts above are the current book.
+              </p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-800">Top Performing Campaigns</h3>
@@ -437,8 +459,8 @@ export function LeadsManagement() {
                 {campaigns.length === 0 && <li className="text-xs text-slate-400">No campaign data yet</li>}
                 {campaigns.map((c) => (
                   <li key={c.name}>
-                    <div className="mb-1 flex items-center justify-between text-[11px]">
-                      <span className="truncate font-medium text-slate-700">{c.name}</span>
+                    <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
+                      <span className="min-w-0 font-medium text-slate-700">{c.name}</span>
                       <span className="shrink-0 text-slate-500">{c.leads} leads</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-slate-100">
@@ -450,9 +472,9 @@ export function LeadsManagement() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 pt-3">
-              <div className="flex flex-wrap gap-1">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-slate-100 px-4 pt-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0">
                 {SOURCE_TABS.map((t) => (
                   <button
                     key={t.key}
@@ -460,7 +482,7 @@ export function LeadsManagement() {
                       setSourceTab(t.key);
                       setPage(0);
                     }}
-                    className={`rounded-t-lg px-3 py-2 text-xs font-semibold ${
+                    className={`shrink-0 rounded-t-lg px-3 py-2 text-xs font-semibold whitespace-nowrap ${
                       sourceTab === t.key ? "bg-sky-50 text-sky-700" : "text-slate-500 hover:bg-slate-50"
                     }`}
                   >
@@ -476,7 +498,7 @@ export function LeadsManagement() {
                     setPage(0);
                   }}
                   placeholder="Search leads…"
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                  className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs lg:flex-none"
                 />
                 <button
                   onClick={() => setShowFilters((v) => !v)}
@@ -524,10 +546,33 @@ export function LeadsManagement() {
             )}
 
             {selected.size > 0 && (
-              <div className="flex items-center gap-3 border-b border-sky-100 bg-sky-50 px-4 py-2 text-xs text-sky-800">
+              <div className="flex flex-wrap items-center gap-3 border-b border-sky-100 bg-sky-50 px-4 py-2 text-xs text-sky-800">
                 <span className="font-semibold">{selected.size} selected</span>
-                <span className="text-sky-600">Bulk actions: export / assign via team workflows</span>
+                {canBulkEmail ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkEmail(true)}
+                      className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+                    >
+                      Email campaign
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkWhatsApp(true)}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                    >
+                      WhatsApp campaign
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-sky-600">Managers can launch bulk email / WhatsApp from here</span>
+                )}
               </div>
+            )}
+
+            {campaignNotice && (
+              <p className="m-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{campaignNotice}</p>
             )}
 
             {error && <p className="m-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -583,35 +628,46 @@ export function LeadsManagement() {
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="min-w-full text-left text-sm">
+              <table className="w-full min-w-[1080px] table-fixed border-collapse text-left text-sm">
+                <colgroup>
+                  <col className="w-10" />
+                  <col className="w-[16%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[140px]" />
+                </colgroup>
                 <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
                   <tr>
                     <th className="px-3 py-3">
                       <input type="checkbox" checked={leads.length > 0 && selected.size === leads.length} onChange={toggleAll} />
                     </th>
-                    <th className="px-3 py-3">Name</th>
-                    <th className="px-3 py-3">Source</th>
-                    <th className="px-3 py-3">Trek interest</th>
-                    <th className="px-3 py-3">Location</th>
-                    <th className="px-3 py-3">Stage</th>
-                    <th className="px-3 py-3">Lead score</th>
-                    <th className="px-3 py-3">Assigned to</th>
-                    <th className="px-3 py-3">Last activity</th>
-                    <th className="px-3 py-3">Next follow up</th>
-                    <th className="px-3 py-3">Actions</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Name</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Source</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Trek interest</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Stage</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Score</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Assigned to</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Last activity</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Next follow up</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && (
                     <tr>
-                      <td colSpan={11} className="px-4 py-10 text-center text-slate-400">
+                      <td colSpan={10} className="px-4 py-10 text-center text-slate-400">
                         Loading leads…
                       </td>
                     </tr>
                   )}
                   {!loading && leads.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="px-4 py-10 text-center text-slate-400">
+                      <td colSpan={10} className="px-4 py-10 text-center text-slate-400">
                         No leads in this view
                       </td>
                     </tr>
@@ -631,67 +687,70 @@ export function LeadsManagement() {
                           selectedId === id ? "bg-sky-50/70" : ""
                         }`}
                       >
-                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-3 align-middle" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selected.has(id)} onChange={() => toggleOne(id)} />
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-[11px] font-bold text-sky-700">
+                        <td className="px-3 py-3 align-middle">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[11px] font-bold text-sky-700">
                               {initials(lead.customerName)}
                             </div>
-                            <div>
-                              <div className="font-medium text-slate-900">{lead.customerName}</div>
-                              <div className="text-xs text-slate-400">{lead.mobileNumber}</div>
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-slate-900">{lead.customerName}</div>
+                              <div className="truncate text-xs text-slate-400">{lead.mobileNumber}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-slate-600">{SOURCE_LABEL[lead.source ?? ""] ?? lead.source}</td>
-                        <td className="px-3 py-3 text-slate-700">{trip?.name || lead.destination || "—"}</td>
-                        <td className="px-3 py-3 text-slate-600">{lead.destination || "—"}</td>
-                        <td className="px-3 py-3">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STAGE_STYLE[status]}`}>
+                        <td className="px-3 py-3 align-middle text-slate-600">
+                          <span className="line-clamp-2">{SOURCE_LABEL[lead.source ?? ""] ?? lead.source}</span>
+                        </td>
+                        <td className="px-3 py-3 align-middle text-slate-700">
+                          <span className="line-clamp-2">{trip?.name || lead.destination || "—"}</span>
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${STAGE_STYLE[status]}`}>
                             {STAGE_LABEL[status] ?? status}
                           </span>
                         </td>
-                        <td className="px-3 py-3">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${scoreStyle(score)}`}>
+                        <td className="px-3 py-3 align-middle">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${scoreStyle(score)}`}>
                             {score}
                           </span>
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700">
+                        <td className="px-3 py-3 align-middle">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700">
                               {initials(lead.ownerName)}
                             </div>
-                            <span className="text-slate-700">{lead.ownerName || "Unassigned"}</span>
+                            <span className="truncate text-slate-700">{lead.ownerName || "Unassigned"}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-xs text-slate-500">
-                          <div>{relativeTime(lead.lastContactedAt || lead.updatedAt)}</div>
+                        <td className="px-3 py-3 align-middle text-xs text-slate-500">
+                          <div className="whitespace-nowrap">{relativeTime(lead.lastContactedAt || lead.updatedAt)}</div>
                           <div className="text-slate-400">{lead.lastContactedAt ? "Contacted" : "Updated"}</div>
                         </td>
-                        <td className="px-3 py-3 text-xs text-slate-600">
+                        <td className="px-3 py-3 align-middle text-xs text-slate-600">
                           {lead.followUpDate ? (
                             <>
-                              <div className="font-medium">{lead.followUpDate}</div>
-                              <div className="text-slate-400">Scheduled follow-up</div>
+                              <div className="font-medium whitespace-nowrap">{lead.followUpDate}</div>
+                              <div className="text-slate-400">Scheduled</div>
                             </>
                           ) : (
                             "—"
                           )}
                         </td>
-                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-1">
-                            <a href={`tel:${lead.mobileNumber}`} className="rounded-md border px-2 py-1 text-[11px] font-semibold text-slate-600">
+                        <td className="px-3 py-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-wrap gap-1">
+                            <a href={`tel:${lead.mobileNumber}`} className="rounded-md border px-2 py-1 text-[11px] font-semibold whitespace-nowrap text-slate-600">
                               Call
                             </a>
                             {wa && (
-                              <a href={wa} target="_blank" rel="noreferrer" className="rounded-md border border-emerald-200 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                              <a href={wa} target="_blank" rel="noreferrer" className="rounded-md border border-emerald-200 px-2 py-1 text-[11px] font-semibold whitespace-nowrap text-emerald-700">
                                 WA
                               </a>
                             )}
                             {lead.email && (
-                              <a href={`mailto:${lead.email}`} className="rounded-md border px-2 py-1 text-[11px] font-semibold text-slate-600">
+                              <a href={`mailto:${lead.email}`} className="rounded-md border px-2 py-1 text-[11px] font-semibold whitespace-nowrap text-slate-600">
                                 Email
                               </a>
                             )}
@@ -770,6 +829,38 @@ export function LeadsManagement() {
           onDone={() => {
             setPage(0);
             load();
+          }}
+        />
+      )}
+
+      {showBulkEmail && canBulkEmail && (
+        <BulkEmailCampaignModal
+          leadIds={[...selected]}
+          leads={leads}
+          onClose={() => setShowBulkEmail(false)}
+          onLaunched={(campaign: EmailCampaignSummary) => {
+            setShowBulkEmail(false);
+            setSelected(new Set());
+            setCampaignNotice(
+              `Queued email “${campaign.name}” · ${campaign.totalRecipients} recipients · ${campaign.deliveryMode} · ${campaign.status}`,
+            );
+            setError(null);
+          }}
+        />
+      )}
+
+      {showBulkWhatsApp && canBulkEmail && (
+        <BulkWhatsAppCampaignModal
+          leadIds={[...selected]}
+          leads={leads}
+          onClose={() => setShowBulkWhatsApp(false)}
+          onLaunched={(campaign: WhatsAppCampaignSummary) => {
+            setShowBulkWhatsApp(false);
+            setSelected(new Set());
+            setCampaignNotice(
+              `Queued WhatsApp “${campaign.name}” · ${campaign.totalRecipients} recipients · ${campaign.deliveryMode} · ${campaign.status}`,
+            );
+            setError(null);
           }}
         />
       )}

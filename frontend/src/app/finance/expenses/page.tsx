@@ -232,37 +232,68 @@ function ExpensesView() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
+      {loading && <p className="py-8 text-center text-sm text-slate-400">Loading…</p>}
+      {!loading && rows.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+          No expenses posted yet — add guide fees, permits, hotels…
+        </p>
+      )}
+
+      <div className="space-y-3 md:hidden">
+        {rows.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-semibold text-slate-900">{r.title}</div>
+                <div className="mt-0.5 text-xs uppercase tracking-wide text-slate-400">
+                  {r.category.replaceAll("_", " ")}
+                  {r.vendorName ? ` · ${r.vendorName}` : ""}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="font-semibold tabular-nums text-slate-900">{inr(r.amount)}</div>
+                <span
+                  className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    r.status === "POSTED"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : r.status === "VOID"
+                        ? "bg-slate-100 text-slate-500"
+                        : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {r.status}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span>{r.expenseDate}{r.tripName ? ` · ${r.tripName}` : ""}</span>
+              {canWrite && r.status === "POSTED" && (
+                <button onClick={() => voidRow(r.id)} className="font-semibold text-red-600">
+                  Void
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+        <table className="min-w-[760px] w-full text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-4 py-3 font-medium">Date</th>
-              <th className="px-4 py-3 font-medium">Category</th>
-              <th className="px-4 py-3 font-medium">Title</th>
-              <th className="px-4 py-3 font-medium">Trek</th>
-              <th className="px-4 py-3 font-medium">Amount</th>
-              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Category</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Title</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Trek</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Amount</th>
+              <th className="px-4 py-3 font-medium whitespace-nowrap">Status</th>
               {canWrite && <th className="px-4 py-3 font-medium" />}
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-slate-400">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-slate-400">
-                  No expenses posted yet — add guide fees, permits, hotels…
-                </td>
-              </tr>
-            )}
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/60">
-                <td className="px-4 py-3 text-slate-600">{r.expenseDate}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-slate-600">{r.expenseDate}</td>
                 <td className="px-4 py-3 text-xs font-medium uppercase text-slate-500">
                   {r.category.replaceAll("_", " ")}
                 </td>
@@ -271,7 +302,7 @@ function ExpensesView() {
                   {r.vendorName && <div className="text-xs text-slate-400">{r.vendorName}</div>}
                 </td>
                 <td className="px-4 py-3 text-slate-500">{r.tripName ?? "—"}</td>
-                <td className="px-4 py-3 font-semibold tabular-nums">{inr(r.amount)}</td>
+                <td className="px-4 py-3 font-semibold tabular-nums whitespace-nowrap">{inr(r.amount)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${

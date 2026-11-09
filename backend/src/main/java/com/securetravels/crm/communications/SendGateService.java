@@ -115,6 +115,10 @@ public class SendGateService {
         if (request.subjectType() == SubjectType.CUSTOMER && request.subjectId() != null) {
             return consent.effective(request.subjectId(), request.channel(), Purpose.MARKETING);
         }
+        // Email marketing is keyed by address (suppressions / opt-outs), not mobile.
+        if (request.channel() == TimelineEvent.Channel.EMAIL) {
+            return consent.effectiveForEmail(request.email(), request.channel());
+        }
         return consent.effectiveForMobile(request.mobile(), request.channel());
     }
 
