@@ -16,15 +16,15 @@ const RULES = [
   },
   {
     title: "Call outcomes",
-    body: "NO_ANSWER / BUSY / CALLBACK → auto CALLBACK in 2 hours. CONNECTED → closes the first-call task. WRONG_NUMBER → alerts managers.",
+    body: "NO_ANSWER / BUSY / CALLBACK → auto CALLBACK in 2 hours. CONNECTED → closes the first-call task. WRONG_NUMBER → alerts managers. Every outcome publishes lead.call to Zapier.",
   },
   {
     title: "Interested cadence",
-    body: "Mark Interested → Follow-up 1 tomorrow, then +2 / +5 / +7 days. Open cadence tasks are replaced, not duplicated.",
+    body: "Mark Interested → clears open first-call/callback, then Follow-up 1 tomorrow, then +2 / +5 / +7 days. Open cadence tasks are replaced, not duplicated.",
   },
   {
-    title: "Quote & book",
-    body: "Quotation sent → chase in 2 days. Booking confirmed → cancel open follow-ups, open ops handoff, queue WhatsApp confirmation.",
+    title: "Quote and book",
+    body: "Quotation sent → chase in 2 days. Booking confirmed or Lost → cancel open follow-ups. Ops handoff and WhatsApp confirmation stay on the booking confirm flow.",
   },
   {
     title: "Reminders & digest",
@@ -32,7 +32,7 @@ const RULES = [
   },
   {
     title: "Zapier alerts",
-    body: "lead.created / interested / quotation / booked / sla.breach post to ZAPIER_EVENTS_HOOK_URL for Slack or Gmail.",
+    body: "lead.created / interested / quotation / booked / lost / call / sla.breach post to ZAPIER_EVENTS_HOOK_URL for Slack or Gmail.",
   },
   {
     title: "Bulk email (Zap)",
@@ -45,9 +45,13 @@ const RULES = [
 ];
 
 function nextStep(task: Task): { label: string; href: string } {
+  if (task.type === "QUOTATION" && task.leadId) {
+    return { label: "Open the deal", href: `/deals?leadId=${task.leadId}` };
+  }
   if (task.type === "QUOTATION") return { label: "Open the deal", href: "/deals" };
   if (task.type === "PAYMENT_REMINDER") return { label: "Open bookings", href: "/bookings" };
   if (task.type === "OPS") return { label: "Open bookings", href: "/bookings" };
+  if (task.leadId) return { label: "Open the lead", href: `/leads?focus=${task.leadId}` };
   return { label: "Open the lead", href: "/leads" };
 }
 
@@ -57,6 +61,7 @@ export function AutomationsDesk() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>("ALL");
+  const [completingId, setCompletingId] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -87,6 +92,19 @@ export function AutomationsDesk() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  const completeTask = async (taskId: string) => {
+    setCompletingId(taskId);
+    setError(null);
+    try {
+      await api.completeTask(taskId);
+      await reload();
+    } catch (err) {
+      setError(formatApiError(err, "Could not complete the task"));
+    } finally {
+      setCompletingId(null);
+    }
+  };
 
   const overdue = tasks.filter((task) => task.status === "OVERDUE").length;
   const escalated = tasks.filter((task) => task.escalatedAt).length;
@@ -209,6 +227,7 @@ export function AutomationsDesk() {
             ) : (
               visible.map((task) => {
                 const step = nextStep(task);
+                const busy = completingId === task.id;
                 return (
                   <tr key={task.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">
@@ -224,9 +243,21 @@ export function AutomationsDesk() {
                       {task.dueAt ? new Date(task.dueAt).toLocaleString() : "—"}
                     </td>
                     <td className="px-3 py-2">
-                      <Link href={step.href} className="text-xs font-medium text-sky-700 hover:underline">
-                        {step.label}
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={step.href} className="text-xs font-medium text-sky-700 hover:underline">
+                          {step.label}
+                        </Link>
+                        {task.id && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => completeTask(task.id as string)}
+                            className="text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                          >
+                            {busy ? "Completing…" : "Complete"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

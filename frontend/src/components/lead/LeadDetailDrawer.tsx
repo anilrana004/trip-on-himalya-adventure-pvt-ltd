@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   api,
   type Lead,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/leadUi";
 
 const STATUSES = ["NEW", "INTERESTED", "QUOTATION_SENT", "BOOKING_CONFIRMED", "LOST"] as const;
+const DEAL_STAGES = new Set(["INTERESTED", "QUOTATION_SENT"]);
 
 type Props = {
   leadId: string;
@@ -46,6 +48,7 @@ export function LeadDetailDrawer({
   onChanged,
   onStatusChange,
 }: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState<"details" | "activity" | "automation" | "notes" | "files">("details");
   const [lead, setLead] = useState<Lead | null>(null);
   const [activity, setActivity] = useState<LeadActivity[]>([]);
@@ -88,7 +91,8 @@ export function LeadDetailDrawer({
     setSaving(true);
     setError(null);
     try {
-      if (status !== lead.status) {
+      const statusChanged = status !== lead.status;
+      if (statusChanged) {
         await onStatusChange(lead.id, { status: status as LeadStatusPayload["status"] });
       }
       await api.updateLead(lead.id, {
@@ -96,6 +100,12 @@ export function LeadDetailDrawer({
         remarks: remarks || undefined,
         ...(canReassign && ownerId && ownerId !== lead.ownerId ? { ownerId } : {}),
       });
+      // Commercial stages own a deal — take sales to the pipeline desk.
+      if (statusChanged && DEAL_STAGES.has(status)) {
+        onChanged();
+        router.push(`/deals?leadId=${lead.id}`);
+        return;
+      }
       const fresh = await api.getLead(lead.id);
       setLead(fresh);
       setOwnerId(fresh.ownerId ?? "");
@@ -181,18 +191,36 @@ export function LeadDetailDrawer({
             </dl>
 
             <div className="grid grid-cols-2 gap-2">
-              <Link
-                href={`/bookings?leadId=${lead.id}`}
-                className="rounded-xl bg-sky-600 px-3 py-2.5 text-center text-xs font-semibold text-white hover:bg-sky-700"
-              >
-                Convert to Booking
-              </Link>
-              <a
-                href={lead.email ? `mailto:${lead.email}?subject=Trek itinerary` : "#"}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Send Itinerary
-              </a>
+              {DEAL_STAGES.has(lead.status || "") || DEAL_STAGES.has(status) ? (
+                <Link
+                  href={`/deals?leadId=${lead.id}`}
+                  className="rounded-xl bg-sky-600 px-3 py-2.5 text-center text-xs font-semibold text-white hover:bg-sky-700"
+                >
+                  Open deal
+                </Link>
+              ) : (
+                <Link
+                  href={`/deals?leadId=${lead.id}`}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Work as deal
+                </Link>
+              )}
+              {lead.status === "QUOTATION_SENT" || status === "QUOTATION_SENT" ? (
+                <Link
+                  href={`/bookings?leadId=${lead.id}`}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Convert to Booking
+                </Link>
+              ) : (
+                <a
+                  href={lead.email ? `mailto:${lead.email}?subject=Trek itinerary` : "#"}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Send Itinerary
+                </a>
+              )}
             </div>
 
             <section>

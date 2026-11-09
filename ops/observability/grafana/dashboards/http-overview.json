@@ -1,6 +1,6 @@
 {
   "uid": "st-http",
-  "title": "SecureTravels - HTTP Overview",
+  "title": "Trip On Himalaya - HTTP Overview",
   "description": "Request rate, server error rate and latency per route. Covers the 'request latency and error rate per endpoint' requirement of Phase 3 Module 5.",
   "tags": ["securetravels", "http"],
   "timezone": "browser",
@@ -57,7 +57,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Server error rate (5xx / total)",
-      "description": "Matches the SecureTravelsHighServerErrorRate alert. 4xx is excluded on purpose: a user typing a bad id is not an outage.",
+      "description": "Matches the TripOnHimalayaHighServerErrorRate alert. 4xx is excluded on purpose: a user typing a bad id is not an outage.",
       "datasource": { "type": "prometheus", "uid": "securetravels-prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
       "targets": [

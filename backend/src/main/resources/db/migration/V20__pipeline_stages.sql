@@ -1,5 +1,5 @@
 -- =====================================================================
--- SecureTravels CRM — Phase 7, Module 2 (Pipeline stage configuration)
+-- Trip On Himalaya CRM — Phase 7, Module 2 (Pipeline stage configuration)
 -- Configurable opportunity pipeline stages. A stage can be a sales team
 -- custom stage or a seeded default; the weights are the kickoff defaults
 -- (Qualified 20%, Quotation Sent 40%, Negotiation 70%). Opportunity

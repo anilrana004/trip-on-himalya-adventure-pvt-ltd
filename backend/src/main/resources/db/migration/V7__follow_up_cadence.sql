@@ -1,5 +1,5 @@
 -- =====================================================================
--- SecureTravels CRM — Module 2 (Follow-up automation cadence)
+-- Trip On Himalaya CRM — Module 2 (Follow-up automation cadence)
 -- Product decision (spec §19.2, 2026-09-11): cumulative day-offsets
 -- Day+1, Day+3, Day+8, Day+15. Rename prior types and re-apply the
 -- CHECK constraint that lists TYPE values.

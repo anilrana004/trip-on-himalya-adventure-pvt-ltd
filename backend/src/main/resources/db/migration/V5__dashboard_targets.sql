@@ -1,5 +1,5 @@
 -- =====================================================================
--- SecureTravels CRM — Module 8 (Sales Dashboard + Targets)
+-- Trip On Himalaya CRM — Module 8 (Sales Dashboard + Targets)
 --
 -- Legacy M4/M5/M6 rolled into a monthly sales-target table. A row with
 -- user_id IS NULL is the company-wide target for that month; neither value

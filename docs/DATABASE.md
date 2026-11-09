@@ -1,4 +1,4 @@
-# SecureTravels CRM — Database Design
+# Trip On Himalaya CRM — Database Design
 
 > **Single source of truth: `backend/src/main/resources/db/migration/`** —
 > Flyway applies schema, `ddl-auto: validate` prevents drift. This document
@@ -471,7 +471,7 @@ verified end-to-end and regression-safe; full invoicing/payouts/P&L stay
 `leads.account_id` and `bookings.account_id` are nullable FKs set on create
 (inherited lead→booking); retail stays untouched.
 
-### `account_commission_payables` (what SecureTravels owes a travel agent)
+### `account_commission_payables` (what Trip On Himalaya owes a travel agent)
 | Field | Type | Notes |
 |---|---|---|
 | id | uuid PK | |

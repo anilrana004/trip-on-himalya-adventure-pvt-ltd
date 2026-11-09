@@ -12,7 +12,7 @@
 
 ## Finding 1 — Multi-branch: NOT justified (defer Modules 2 and 4)
 
-**Question:** Does SecureTravels operate from more than one physical location
+**Question:** Does Trip On Himalaya operate from more than one physical location
 now, or have concrete, funded plans to within the next 1–2 quarters?
 
 **Evidence gathered:**

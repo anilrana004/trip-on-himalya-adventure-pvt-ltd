@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -139,6 +140,8 @@ function Column({
 
 export function DealsBoard() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const focusLeadId = searchParams.get("leadId");
   const canWrite = canWriteLeads(user?.role);
 
   const [stages, setStages] = useState<PipelineStage[]>([]);
@@ -173,13 +176,25 @@ export function DealsBoard() {
     setTrips(tripRows);
     setOwners(sales);
     setBookings(bookingRows);
+    return oppRows;
   }, []);
 
   useEffect(() => {
     load()
+      .then((oppRows) => {
+        if (!focusLeadId) return;
+        const match = oppRows.find((d) => d.leadId === focusLeadId);
+        if (match) {
+          setSelectedId(match.id);
+          setNotice("Opened the deal for this lead.");
+        } else {
+          setCreating(true);
+          setNotice("No deal yet for this lead — create one to put it on the pipeline.");
+        }
+      })
       .catch((err) => setError(formatApiError(err, "Could not load deals")))
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [load, focusLeadId]);
 
   const leadById = useMemo(() => {
     const map = new Map<string, Lead>();
@@ -363,6 +378,7 @@ export function DealsBoard() {
           stages={stages}
           trips={trips}
           busy={busy}
+          preferredLeadId={focusLeadId}
           onClose={() => setCreating(false)}
           onCreate={async (payload) => {
             setBusy(true);
@@ -442,6 +458,7 @@ function CreateDeal({
   stages,
   trips,
   busy,
+  preferredLeadId,
   onClose,
   onCreate,
 }: {
@@ -449,12 +466,23 @@ function CreateDeal({
   stages: PipelineStage[];
   trips: Trip[];
   busy: boolean;
+  preferredLeadId?: string | null;
   onClose: () => void;
   onCreate: (payload: { leadId: string; stageKey?: string; expectedValue: number; expectedDate: string }) => Promise<void>;
 }) {
-  const [leadId, setLeadId] = useState(candidates[0]?.id ?? "");
+  const initialLeadId =
+    (preferredLeadId && candidates.some((c) => c.id === preferredLeadId) ? preferredLeadId : null)
+    || candidates[0]?.id
+    || "";
+  const [leadId, setLeadId] = useState(initialLeadId);
   const lead = candidates.find((l) => l.id === leadId);
-  const [stageKey, setStageKey] = useState(stages[0]?.key ?? "QUALIFIED");
+  const preferredStage =
+    lead?.status === "QUOTATION_SENT"
+      ? "QUOTATION_SENT"
+      : lead?.status === "INTERESTED"
+        ? "QUALIFIED"
+        : stages[0]?.key ?? "QUALIFIED";
+  const [stageKey, setStageKey] = useState(preferredStage);
   const [value, setValue] = useState(String(lead?.budget ?? ""));
   const [date, setDate] = useState(lead?.travelDate || new Date().toISOString().slice(0, 10));
 

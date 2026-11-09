@@ -257,7 +257,7 @@ export function SeoDesk() {
               </div>
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs text-emerald-700">securetravels.in › {previewSlug}</div>
+                <div className="text-xs text-emerald-700">triponhimalaya.com › {previewSlug}</div>
                 <div className="mt-0.5 text-sm font-medium text-sky-800">{previewTitle}</div>
                 <p className="mt-1 text-xs text-slate-600">
                   {previewDescription || "No search description yet. Write the sentence under the title."}

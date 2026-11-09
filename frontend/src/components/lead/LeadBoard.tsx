@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -121,6 +122,7 @@ export function LeadBoard({
   onOpen,
   canWrite = true,
 }: LeadBoardProps) {
+  const router = useRouter();
   const [active, setActive] = useState<Lead | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -158,6 +160,9 @@ export function LeadBoard({
         payload.note = "Moved to LOST on the board";
       }
       await onStatusChange(lead.id ?? "", payload);
+      if ((target === "INTERESTED" || target === "QUOTATION_SENT") && lead.id) {
+        router.push(`/deals?leadId=${lead.id}`);
+      }
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Could not move lead");
     }

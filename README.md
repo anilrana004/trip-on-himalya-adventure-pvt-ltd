@@ -6,11 +6,11 @@ handoff, departure, Customer 360.
 
 **Maintainer:** Anil Singh Rana (`anilrana004`)
 
-The UI says Trip On Himalaya. The Java package remains `com.securetravels`
-(see `architecture/adr/0009-product-name-versus-package.md`). Older docs under
-`docs/` and `architecture/` still say SecureTravels and still describe early
-phases as unfinished. When a doc and the code disagree, trust the code and
-this file.
+Product name everywhere in the UI and docs is **Trip On Himalaya**. The Java
+package remains `com.securetravels` (see
+`architecture/adr/0009-product-name-versus-package.md`). Demo logins stay on
+`@securetravels.in` until a dedicated email migration. When a doc and the code
+disagree, trust the code and this file.
 
 ## Stack
 

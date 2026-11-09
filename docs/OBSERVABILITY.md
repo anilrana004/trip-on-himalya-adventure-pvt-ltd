@@ -1,6 +1,6 @@
 # Observability (Phase 3 Module 5)
 
-Prometheus metrics, alert rules and Grafana dashboards for the SecureTravels CRM.
+Prometheus metrics, alert rules and Grafana dashboards for the Trip On Himalaya CRM.
 
 ## Status
 
@@ -139,17 +139,17 @@ named in the Phase 3 brief:
 
 | Condition | Rule |
 | --- | --- |
-| Growing dead-letter queue | `SecureTravelsDeadLetterQueueGrowing` |
-| Error-rate spike | `SecureTravelsHighServerErrorRate` |
-| Connection pool exhausted | `SecureTravelsConnectionPoolExhausted` |
+| Growing dead-letter queue | `TripOnHimalayaDeadLetterQueueGrowing` |
+| Error-rate spike | `TripOnHimalayaHighServerErrorRate` |
+| Connection pool exhausted | `TripOnHimalayaConnectionPoolExhausted` |
 
 Every `for:` duration is non-zero. Each of these conditions has a benign cause
 at least once a day — a deploy, a burst, a slow query — and a paging alert that
 fires on it teaches people to ignore alerts.
 
 Two rules exist purely to catch *blindness* rather than faults:
-`SecureTravelsQueueMetricsStale` and
-`SecureTravelsQueueMetricsStaleWhileBrokerMode`. Because the depth gauges cache,
+`TripOnHimalayaQueueMetricsStale` and
+`TripOnHimalayaQueueMetricsStaleWhileBrokerMode`. Because the depth gauges cache,
 a broker outage would otherwise leave the dashboards showing confident, stale
 numbers.
 

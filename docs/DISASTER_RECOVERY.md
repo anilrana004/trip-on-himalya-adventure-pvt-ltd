@@ -1,4 +1,4 @@
-# SecureTravels CRM — Disaster Recovery
+# Trip On Himalaya CRM — Disaster Recovery
 
 > **Status: ratified since Phase 1 Prompt 3; automation added 2026-09-26;
 > Railway Cron packaging added 2026-10-28.** Backed by `scripts/backup-postgres.sh`,

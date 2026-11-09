@@ -1,5 +1,5 @@
 -- =====================================================================
--- SecureTravels CRM - Phase 3, Module 2 (Reporting & Analytics)
+-- Trip On Himalaya CRM - Phase 3, Module 2 (Reporting & Analytics)
 --
 -- Two independent additions, both answering the deferred-OpenSearch decision
 -- in docs/ARCHITECTURE.md 4.1 and 4.2.

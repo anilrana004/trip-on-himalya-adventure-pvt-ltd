@@ -1,4 +1,4 @@
-# SecureTravels CRM — Architecture
+# Trip On Himalaya CRM — Architecture
 
 > **Status: ratified since Phase 1 Prompt 3.** This file is the architectural
 > contract for every future phase. See ADR 0002 for the reasoning behind the

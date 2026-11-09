@@ -1,4 +1,4 @@
-# Existing System Audit — Trip On Himalaya / SecureTravels CRM
+# Existing System Audit — Trip On Himalaya / Trip On Himalaya CRM
 
 > **Phase 0 discovery.** Read-only audit of the repository as of 2026-10-28.  
 > No production infrastructure was changed. No credentials are recorded here.  

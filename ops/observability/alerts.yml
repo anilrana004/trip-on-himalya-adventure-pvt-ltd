@@ -21,7 +21,7 @@ groups:
       # to sit at a flat non-zero depth, because deriv() of a constant series is
       # ~0 but floating point noise is not exactly 0. Requiring a non-zero floor
       # as well makes this "messages are accumulating", not "a message exists".
-      - alert: SecureTravelsDeadLetterQueueGrowing
+      - alert: TripOnHimalayaDeadLetterQueueGrowing
         expr: >-
           securetravels_rabbitmq_queue_depth{queue="securetravels.whatsapp.dispatch.dlq"} > 0
           and deriv(securetravels_rabbitmq_queue_depth{queue="securetravels.whatsapp.dispatch.dlq"}[30m]) > 0
@@ -36,7 +36,7 @@ groups:
             exhausted their retry budget, so customers are not being reached.
             Inspect with: rabbitmqctl list_queues name messages
 
-      - alert: SecureTravelsDeadLetterQueueNotEmpty
+      - alert: TripOnHimalayaDeadLetterQueueNotEmpty
         expr: securetravels_rabbitmq_queue_depth{queue="securetravels.whatsapp.dispatch.dlq"} > 0
         for: 15m
         labels:
@@ -50,7 +50,7 @@ groups:
 
       # A backlog that is not shrinking means dispatch has fallen behind the send
       # rate. Distinct from the DLQ alert: nothing has failed yet.
-      - alert: SecureTravelsDispatchQueueBacklogGrowing
+      - alert: TripOnHimalayaDispatchQueueBacklogGrowing
         expr: >-
           securetravels_rabbitmq_queue_depth{queue="securetravels.whatsapp.dispatch"} > 10
           and deriv(securetravels_rabbitmq_queue_depth{queue="securetravels.whatsapp.dispatch"}[30m]) > 0
@@ -70,7 +70,7 @@ groups:
       # unreadable the last value is retained on purpose, which means the depth
       # can look healthy while being wrong. These two make that state loud instead
       # of quietly wrong.
-      - alert: SecureTravelsQueueMetricsStale
+      - alert: TripOnHimalayaQueueMetricsStale
         expr: securetravels_rabbitmq_queue_metrics_up == 0
         for: 5m
         labels:
@@ -83,7 +83,7 @@ groups:
             meaningless) or the broker is unreachable and the displayed queue depth
             is a stale value. Check the mode before acting.
 
-      - alert: SecureTravelsQueueMetricsStaleWhileBrokerMode
+      - alert: TripOnHimalayaQueueMetricsStaleWhileBrokerMode
         expr: >-
           securetravels_rabbitmq_queue_metrics_up == 0
           and securetravels_rabbitmq_queue_metrics_stale_seconds < 600
@@ -106,7 +106,7 @@ groups:
       # application Micrometer reports error="none" for 4xx AND for a 500 with no
       # exception, so an error-rate built on `error` would read a permanent 0.
       # A 5xx-only numerator also keeps "someone typed a bad id" from paging.
-      - alert: SecureTravelsHighServerErrorRate
+      - alert: TripOnHimalayaHighServerErrorRate
         expr: >-
           sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
           /
@@ -119,7 +119,7 @@ groups:
           summary: "Over 5% of requests are returning 5xx"
           description: "Server error ratio has exceeded 5% for 10 minutes."
 
-      - alert: SecureTravelsHighServerErrorCount
+      - alert: TripOnHimalayaHighServerErrorCount
         # Absolute floor, so a 1-request-per-hour service cannot page on a
         # single failure by having a 100% ratio.
         expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) > 0.5
@@ -130,7 +130,7 @@ groups:
           summary: "More than 0.5 server errors per second"
           description: "Sustained 5xx throughput; check which route via the uri label."
 
-      - alert: SecureTravelsHighP95Latency
+      - alert: TripOnHimalayaHighP95Latency
         expr: >-
           histogram_quantile(0.95,
             sum by (le, uri) (rate(http_server_requests_seconds_bucket[10m]))
@@ -150,7 +150,7 @@ groups:
       # `pending` is the honest signal: it counts threads blocked waiting for a
       # connection. Saturation alone is not a fault, but pending>0 for 5 minutes
       # means requests are queueing for the database.
-      - alert: SecureTravelsConnectionPoolExhausted
+      - alert: TripOnHimalayaConnectionPoolExhausted
         expr: hikaricp_connections_pending > 0
         for: 5m
         labels:
@@ -162,7 +162,7 @@ groups:
             maximum is {{ $value | printf "%.0f" }}; either raise it, or find the
             query holding connections open.
 
-      - alert: SecureTravelsConnectionPoolNearExhaustion
+      - alert: TripOnHimalayaConnectionPoolNearExhaustion
         expr: >-
           hikaricp_connections_active
           /
@@ -178,7 +178,7 @@ groups:
   - name: securetravels.jvm
     interval: 30s
     rules:
-      - alert: SecureTravelsHighHeapUsage
+      - alert: TripOnHimalayaHighHeapUsage
         expr: >-
           sum(jvm_memory_used_bytes{area="heap"})
           /
@@ -191,7 +191,7 @@ groups:
           summary: "JVM heap above 85%"
           description: "Sustained heap pressure; watch for GC thrash before it becomes an outage."
 
-      - alert: SecureTravelsThreadCountHigh
+      - alert: TripOnHimalayaThreadCountHigh
         expr: jvm_threads_live_threads > 400
         for: 15m
         labels:
@@ -203,7 +203,7 @@ groups:
   - name: securetravels.availability
     interval: 30s
     rules:
-      - alert: SecureTravelsBackendDown
+      - alert: TripOnHimalayaBackendDown
         expr: up{job="securetravels-backend"} == 0
         for: 2m
         labels:

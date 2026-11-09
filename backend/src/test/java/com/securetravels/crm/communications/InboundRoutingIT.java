@@ -172,7 +172,7 @@ class InboundRoutingIT extends BaseIT {
         byte[] body = json.getBytes(StandardCharsets.UTF_8);
         return mockMvc.perform(post("/api/v1/webhooks/sms")
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("X-SecureTravels-Signature", HmacSigner.sign("test-sms-webhook-secret", body))
+                .header("X-Trip On Himalaya-Signature", HmacSigner.sign("test-sms-webhook-secret", body))
                 .content(body));
     }
 
@@ -180,7 +180,7 @@ class InboundRoutingIT extends BaseIT {
         byte[] body = raw.getBytes(StandardCharsets.UTF_8);
         return mockMvc.perform(post("/api/v1/webhooks/email")
                 .contentType(MediaType.APPLICATION_JSON)
-                .header("X-SecureTravels-Signature", HmacSigner.sign("test-email-webhook-secret", body))
+                .header("X-Trip On Himalaya-Signature", HmacSigner.sign("test-email-webhook-secret", body))
                 .content(body));
     }
 

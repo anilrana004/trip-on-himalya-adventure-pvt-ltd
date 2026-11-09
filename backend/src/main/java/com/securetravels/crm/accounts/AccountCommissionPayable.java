@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Phase 7 Module 1 — what SecureTravels owes an account (travel agent)
+ * Phase 7 Module 1 — what Trip On Himalaya owes an account (travel agent)
  * for a confirmed booking. Exactly one row per booking: the unique
  * booking_id is the idempotency guard, mirroring sales_commission_ledger.
  * A credit is never deleted, only VOIDed with a retained reason.

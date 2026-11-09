@@ -1,4 +1,4 @@
-# Module Map — SecureTravels CRM
+# Module Map — Trip On Himalaya CRM
 
 Mermaid `flowchart` of the module layout across phases. Single jar, one
 inbound route per module (see `ARCHITECTURE.md`).

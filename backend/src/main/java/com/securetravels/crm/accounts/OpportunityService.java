@@ -75,20 +75,80 @@ public class OpportunityService {
         }
 
         PipelineStage stage = resolveStage(request.stageKey());
+        Opportunity saved = persistNew(lead, stage, request.expectedValue(), request.expectedDate());
+        return toResponse(saved);
+    }
 
+    /**
+     * Idempotent bridge from the lead journey into Deals: INTERESTED → QUALIFIED,
+     * QUOTATION_SENT → QUOTATION_SENT. Creates the opportunity when missing; if an
+     * open one already exists, advances the stage when the preferred stage is further.
+     * Safe to call from {@code LeadService.updateStatus} in the same transaction.
+     */
+    @Transactional
+    public Opportunity ensureOpenForLead(Lead lead, String preferredStageKey) {
+        if (lead == null || lead.getId() == null || lead.getOwnerId() == null) {
+            return null;
+        }
+        if (lead.getStatus() == Lead.Status.LOST || lead.getStatus() == Lead.Status.BOOKING_CONFIRMED) {
+            return null;
+        }
+
+        PipelineStage preferred = resolveStage(preferredStageKey);
+        Opportunity existing = opportunities.findByLeadId(lead.getId()).orElse(null);
+        if (existing != null) {
+            if (existing.getStatus() == Opportunity.Status.OPEN) {
+                advanceStageIfFurther(existing, preferred);
+                opportunities.save(existing);
+            }
+            return existing;
+        }
+
+        BigDecimal value = lead.getBudget() != null ? lead.getBudget() : BigDecimal.ZERO.setScale(2);
+        LocalDate date = lead.getTravelDate() != null
+                ? lead.getTravelDate()
+                : LocalDate.now().plusDays(30);
+        return persistNew(lead, preferred, value, date);
+    }
+
+    /** Close the open deal when the lead is lost or booking-confirmed. No-op if none/already closed. */
+    @Transactional
+    public void closeOpenForLead(UUID leadId, Opportunity.Status outcome, String note, UUID actorId) {
+        if (leadId == null || outcome == null || outcome == Opportunity.Status.OPEN) return;
+        Opportunity opp = opportunities.findByLeadId(leadId).orElse(null);
+        if (opp == null || opp.getStatus() != Opportunity.Status.OPEN) return;
+        opp.setStatus(outcome);
+        opp.setClosedAt(Instant.now());
+        opp.setClosedBy(actorId);
+        opp.setClosingNote(XssSanitizer.text(note));
+        opportunities.save(opp);
+        auditService.statusChange("OPPORTUNITY", opp.getId(), "status", "OPEN", outcome.name());
+    }
+
+    private Opportunity persistNew(Lead lead, PipelineStage stage, BigDecimal value, LocalDate date) {
         Opportunity opp = new Opportunity();
         opp.setLeadId(lead.getId());
         opp.setAccountId(lead.getAccountId());
         opp.setOwnerId(lead.getOwnerId());
         opp.setStageId(stage.getId());
-        opp.setExpectedValue(request.expectedValue());
-        opp.setExpectedDate(request.expectedDate());
+        opp.setExpectedValue(value);
+        opp.setExpectedDate(date);
         opp.setStageMovedAt(Instant.now());
 
         Opportunity saved = opportunities.save(opp);
         auditService.record("OPPORTUNITY", saved.getId(), AuditAction.CREATE,
                 "lead", null, saved.getLeadId().toString());
-        return toResponse(saved);
+        return saved;
+    }
+
+    private void advanceStageIfFurther(Opportunity opp, PipelineStage preferred) {
+        PipelineStage current = requireStage(opp.getStageId());
+        if (preferred.getSortOrder() > current.getSortOrder()) {
+            String previousKey = current.getStageKey();
+            opp.setStageId(preferred.getId());
+            opp.setStageMovedAt(Instant.now());
+            auditService.statusChange("OPPORTUNITY", opp.getId(), "stage", previousKey, preferred.getStageKey());
+        }
     }
 
     @Transactional(readOnly = true)

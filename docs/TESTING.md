@@ -1,4 +1,4 @@
-# SecureTravels CRM — Testing Strategy
+# Trip On Himalaya CRM — Testing Strategy
 
 > **Status: ratified since Phase 1 Prompt 3. Refreshed at Phase 1 Prompt 4.**
 > Live count: **134 tests**, all green (`mvn -B verify`), plus frontend

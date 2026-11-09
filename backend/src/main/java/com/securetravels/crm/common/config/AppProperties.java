@@ -457,7 +457,7 @@ public class AppProperties {
      * uses {@link Webhook#secret} on {@code POST /api/webhook/lead}.
      */
     public static class Zapier {
-        /** Lifecycle events: lead.created, sla.breach, interested, quotation, booked. */
+        /** Lifecycle events: lead.created/interested/quotation/booked/lost/call, sla.breach. */
         private String eventsHookUrl = "";
 
         public String getEventsHookUrl() { return eventsHookUrl; }

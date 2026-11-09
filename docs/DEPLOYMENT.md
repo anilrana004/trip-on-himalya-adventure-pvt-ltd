@@ -1,4 +1,4 @@
-# SecureTravels CRM — Deployment
+# Trip On Himalaya CRM — Deployment
 
 > **Status: ratified since Phase 1 Prompt 3; verified at Prompt 4.** This file grows as the
 > topology grows (single VPS → managed/managed-Postgres → multi-region in

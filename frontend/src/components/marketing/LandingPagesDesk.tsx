@@ -20,7 +20,9 @@ function norm(value?: string | null) {
 
 function nextStep(lead: Lead): { label: string; href: string } {
   if (lead.status === "BOOKING_CONFIRMED") return { label: "Open the booking", href: "/bookings" };
-  if (lead.status === "QUOTATION_SENT") return { label: "Open the deal", href: "/deals" };
+  if ((lead.status === "QUOTATION_SENT" || lead.status === "INTERESTED") && lead.id) {
+    return { label: "Open the deal", href: `/deals?leadId=${lead.id}` };
+  }
   if (lead.status === "LOST") return { label: "See the lead", href: "/leads" };
   if (lead.tripId) return { label: "Quote this trek", href: `/bookings?leadId=${lead.id}` };
   return { label: "Attach this trek, then quote", href: "/leads" };

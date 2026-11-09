@@ -29,8 +29,10 @@ import java.util.UUID;
 /**
  * Sales follow-up system:
  *   • New lead              → INITIAL_CALL due +5 min (SLA 15m for ads/web/storefront, else 1h)
- *   • Lead → INTERESTED     → FU1 tomorrow, FU2 +2d, FU3 +5d, FU4 +7d (from mark-interested time)
+ *   • Lead → INTERESTED     → clear first-call/callback, then FU1 tomorrow, FU2 +2d, FU3 +5d, FU4 +7d
  *   • Lead → QUOTATION_SENT → quotation task +2 days
+ *   • Lead → LOST / BOOKED  → cancel all open tasks
+ *   • Soft-dup Meta/inbound → CALLBACK +2h when no open first-call/callback
  *   • Call NO_ANSWER/BUSY/CALLBACK → CALLBACK task (+2h)
  *   • Call CONNECTED → complete open INITIAL_CALL
  *   • Call WRONG_NUMBER → alert managers
@@ -92,10 +94,13 @@ public class FollowUpAutomation {
 
     /**
      * Cadence starts when sales marks INTERESTED (not from lead createdAt), so a
-     * late status change does not create already-overdue follow-ups.
+     * late status change does not create already-overdue follow-ups. First-call
+     * and callback tasks are cancelled so the cadence is the only open queue.
      */
     @Transactional
     public void onInterested(Lead lead) {
+        cancelOpen(lead.getId(), Task.Type.INITIAL_CALL);
+        cancelOpen(lead.getId(), Task.Type.CALLBACK);
         cancelOpenFollowUps(lead.getId());
         Instant base = Instant.now();
         int[] days = {1, 3, 8, 15};
@@ -140,6 +145,46 @@ public class FollowUpAutomation {
                 leadPath(lead.getId())));
         log.info("[automation] lead={} booked; outstanding follow-ups cancelled", lead.getId());
         publishLeadSnapshot("lead.booked", lead);
+    }
+
+    /** Dead lead: stop SLA noise and notify the owner that the queue is clear. */
+    @Transactional
+    public void onLost(Lead lead) {
+        if (lead == null || lead.getId() == null) return;
+        cancelAllOpen(lead.getId());
+        lead.setFollowUpDate(null);
+        if (lead.getOwnerId() != null) {
+            String title = "Lead marked lost — follow-ups closed";
+            String body = "No further follow-up for " + lead.getCustomerName() + ".";
+            notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
+                    leadPath(lead.getId())));
+        }
+        log.info("[automation] lead={} lost; outstanding follow-ups cancelled", lead.getId());
+        publishLeadSnapshot("lead.lost", lead);
+    }
+
+    /**
+     * Soft-duplicate Meta/inbound hit on an active lead: if there is no open
+     * first-call or callback, schedule a CALLBACK in 2 hours so speed-to-lead
+     * still fires. Does not create a second lead.
+     */
+    @Transactional
+    public void onSoftDuplicate(Lead lead) {
+        if (lead == null || lead.getId() == null || lead.getOwnerId() == null) return;
+        if (lead.getStatus() == Lead.Status.LOST) return;
+        List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
+        boolean hasOpenCall = tasks.existsByLeadIdAndTypeAndStatusIn(lead.getId(), Task.Type.INITIAL_CALL, open)
+                || tasks.existsByLeadIdAndTypeAndStatusIn(lead.getId(), Task.Type.CALLBACK, open);
+        if (hasOpenCall) {
+            log.info("[automation] lead={} soft-dup ignored; open call task already exists", lead.getId());
+            return;
+        }
+        Instant due = Instant.now().plus(2, ChronoUnit.HOURS);
+        scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.CALLBACK, due, 4,
+                "Callback — lead contacted again",
+                lead.getCustomerName() + " came in again on the same number. Call them.");
+        lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+        log.info("[automation] lead={} soft-dup scheduled CALLBACK due={}", lead.getId(), due);
     }
 
     /**
@@ -190,6 +235,9 @@ public class FollowUpAutomation {
                 // no automatic task — sales decides next step
             }
         }
+        Map<String, Object> callData = new LinkedHashMap<>(leadPayload(lead.getId(), lead.getOwnerId()));
+        callData.put("outcome", outcome.name());
+        zapier.publishAsync("lead.call", callData);
         return completedFirstCalls;
     }
 

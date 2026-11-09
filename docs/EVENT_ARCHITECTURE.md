@@ -1,4 +1,4 @@
-# SecureTravels CRM — Event & Async Architecture
+# Trip On Himalaya CRM — Event & Async Architecture
 
 > **Status: Module 4 (Phase 2) added a broker for outbound WhatsApp delivery.**
 > ADR `0003-no-message-broker-until-phase-6` is **superseded** by ADR

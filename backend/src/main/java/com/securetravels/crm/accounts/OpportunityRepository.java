@@ -18,6 +18,8 @@ public interface OpportunityRepository extends JpaRepository<Opportunity, UUID> 
 
     boolean existsByLeadId(UUID leadId);
 
+    java.util.Optional<Opportunity> findByLeadId(UUID leadId);
+
     @Query(value = """
             select o.* from opportunities o
             join pipeline_stages s on s.id = o.stage_id

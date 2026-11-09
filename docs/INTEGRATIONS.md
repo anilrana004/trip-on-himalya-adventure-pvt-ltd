@@ -1,4 +1,4 @@
-# SecureTravels CRM — Integrations Map
+# Trip On Himalaya CRM — Integrations Map
 
 > **Status: ratified since Phase 1 Prompt 3.** This file answers "what's
 > connected to what" at any point in the project. Status column is the

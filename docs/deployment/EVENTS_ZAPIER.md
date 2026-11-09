@@ -3,7 +3,7 @@
 CRM posts sales events to a Catch Hook. Zapier fans out to Slack, Gmail, Teams, etc. Cadence and tasks still live in the CRM — Zapier is the alert pipe.
 
 ```text
-Lead created / Interested / Quotation / Booked / SLA breach
+Lead created / Interested / Quotation / Booked / Lost / Call / SLA breach
   → ZapierEventsClient (async)
   → POST ZAPIER_EVENTS_HOOK_URL  (HMAC)
   → Zapier → Slack channel / email / SMS
@@ -30,6 +30,8 @@ Lead created / Interested / Quotation / Booked / SLA breach
 | `lead.interested` | Status → INTERESTED (cadence started) |
 | `lead.quotation` | Status → QUOTATION_SENT |
 | `lead.booked` | Status → BOOKING_CONFIRMED |
+| `lead.lost` | Status → LOST (open tasks cancelled) |
+| `lead.call` | Call attempt logged (`data.outcome`) |
 | `sla.breach` | Follow-up SLA escalated to managers |
 
 ### Payload shape

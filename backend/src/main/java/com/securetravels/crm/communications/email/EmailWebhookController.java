@@ -32,7 +32,7 @@ public class EmailWebhookController {
     @PostMapping
     public ResponseEntity<Integer> ses(
             @RequestBody byte[] rawBody,
-            @RequestHeader(value = "X-SecureTravels-Signature", required = false) String signature) {
+            @RequestHeader(value = "X-Trip On Himalaya-Signature", required = false) String signature) {
         return ResponseEntity.ok(webhooks.handle(rawBody, signature));
     }
 }

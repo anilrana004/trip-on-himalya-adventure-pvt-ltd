@@ -14,8 +14,8 @@
     <groupId>com.securetravels</groupId>
     <artifactId>securetravels-crm</artifactId>
     <version>0.1.0</version>
-    <name>SecureTravels CRM</name>
-    <description>Phase 1 CRM backend for SecureTravels (Himalayan trekking / pilgrimage operator)</description>
+    <name>Trip On Himalaya CRM</name>
+    <description>Phase 1 CRM backend for Trip On Himalaya (Himalayan trekking / pilgrimage operator)</description>
 
     <properties>
         <java.version>25</java.version>

@@ -1,5 +1,5 @@
 -- =====================================================================
--- SecureTravels CRM — Phase 7, Module 4 (Commission plans)
+-- Trip On Himalaya CRM — Phase 7, Module 4 (Commission plans)
 -- Configurable partner-commission terms for travel-agent accounts,
 -- replacing the single flat default rate. A plan states the basis it
 -- is computed on (NET/GROSS), the method (PERCENT/FIXED/TIERED) and

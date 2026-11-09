@@ -16,10 +16,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -159,6 +161,122 @@ class FollowUpAutomationTest {
         assertThat(open.getStatus()).isEqualTo(Task.Status.CANCELLED);
         verify(tasks, never()).save(any(Task.class));
         verify(notifications).save(any(Notification.class));
+    }
+
+    @Test
+    void lostCancelsPendingAndOverdueTasksAndPublishes() {
+        Task pending = new Task(UUID.randomUUID(), assignee, Task.Type.INITIAL_CALL,
+                Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
+        Task overdue = new Task(UUID.randomUUID(), assignee, Task.Type.CALLBACK,
+                Instant.now().minus(1, ChronoUnit.HOURS), Instant.now());
+        overdue.markOverdue(Instant.now());
+        when(tasks.findByLeadIdAndStatusIn(any(), anyList())).thenReturn(List.of(pending, overdue));
+
+        Lead lead = new Lead();
+        ReflectionTestUtils.setField(lead, "id", UUID.randomUUID());
+        lead.setOwnerId(assignee);
+        lead.setCustomerName("Amit");
+        lead.setStatus(Lead.Status.LOST);
+
+        automation.onLost(lead);
+
+        assertThat(pending.getStatus()).isEqualTo(Task.Status.CANCELLED);
+        assertThat(overdue.getStatus()).isEqualTo(Task.Status.CANCELLED);
+        assertThat(lead.getFollowUpDate()).isNull();
+        verify(tasks, never()).save(any(Task.class));
+        verify(notifications).save(any(Notification.class));
+        verify(zapier).publishAsync(eq("lead.lost"), any());
+    }
+
+    @Test
+    void interestedCancelsOpenInitialCallAndCallback() {
+        when(tasks.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(users.findById(assignee)).thenReturn(Optional.of(user));
+        Task firstCall = new Task(UUID.randomUUID(), assignee, Task.Type.INITIAL_CALL,
+                Instant.now(), Instant.now().plus(1, ChronoUnit.HOURS));
+        Task callback = new Task(UUID.randomUUID(), assignee, Task.Type.CALLBACK,
+                Instant.now(), Instant.now().plus(4, ChronoUnit.HOURS));
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.INITIAL_CALL), anyList()))
+                .thenReturn(List.of(firstCall));
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.CALLBACK), anyList()))
+                .thenReturn(List.of(callback));
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.FOLLOW_UP_1D), anyList()))
+                .thenReturn(List.of());
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.FOLLOW_UP_3D), anyList()))
+                .thenReturn(List.of());
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.FOLLOW_UP_8D), anyList()))
+                .thenReturn(List.of());
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.FOLLOW_UP_15D), anyList()))
+                .thenReturn(List.of());
+
+        Lead lead = new Lead();
+        lead.setOwnerId(assignee);
+        lead.setCustomerName("Amit");
+
+        automation.onInterested(lead);
+
+        assertThat(firstCall.getStatus()).isEqualTo(Task.Status.CANCELLED);
+        assertThat(callback.getStatus()).isEqualTo(Task.Status.CANCELLED);
+        verify(tasks, times(4)).save(any(Task.class));
+    }
+
+    @Test
+    void softDuplicateSchedulesCallbackWhenNoOpenCallTask() {
+        when(tasks.save(any(Task.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(users.findById(assignee)).thenReturn(Optional.of(user));
+        when(tasks.existsByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.INITIAL_CALL), anyList()))
+                .thenReturn(false);
+        when(tasks.existsByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.CALLBACK), anyList()))
+                .thenReturn(false);
+
+        Lead lead = new Lead();
+        ReflectionTestUtils.setField(lead, "id", UUID.randomUUID());
+        lead.setOwnerId(assignee);
+        lead.setCustomerName("Amit");
+        lead.setStatus(Lead.Status.NEW);
+
+        automation.onSoftDuplicate(lead);
+
+        Task t = captureSavedTasks(1).get(0);
+        assertThat(t.getType()).isEqualTo(Task.Type.CALLBACK);
+        assertThat(t.getStatus()).isEqualTo(Task.Status.PENDING);
+        assertThat(lead.getFollowUpDate()).isNotNull();
+    }
+
+    @Test
+    void softDuplicateSkipsWhenOpenInitialCallExists() {
+        when(tasks.existsByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.INITIAL_CALL), anyList()))
+                .thenReturn(true);
+
+        Lead lead = new Lead();
+        ReflectionTestUtils.setField(lead, "id", UUID.randomUUID());
+        lead.setOwnerId(assignee);
+        lead.setCustomerName("Amit");
+        lead.setStatus(Lead.Status.NEW);
+
+        automation.onSoftDuplicate(lead);
+
+        verify(tasks, never()).save(any(Task.class));
+    }
+
+    @Test
+    void callOutcomePublishesLeadCallEvent() {
+        when(tasks.findByLeadIdAndTypeAndStatusIn(any(), eq(Task.Type.INITIAL_CALL), anyList()))
+                .thenReturn(List.of());
+
+        Lead lead = new Lead();
+        ReflectionTestUtils.setField(lead, "id", UUID.randomUUID());
+        lead.setOwnerId(assignee);
+        lead.setCustomerName("Amit");
+        when(leads.findById(lead.getId())).thenReturn(Optional.of(lead));
+        when(users.findById(assignee)).thenReturn(Optional.of(user));
+
+        automation.onCallOutcome(lead, com.securetravels.crm.lead.LeadCallAttempt.Outcome.CONNECTED);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(zapier).publishAsync(eq("lead.call"), dataCaptor.capture());
+        assertThat(dataCaptor.getValue()).containsEntry("outcome", "CONNECTED");
     }
 
     private List<Task> captureSavedTasks(int expected) {

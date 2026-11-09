@@ -1,4 +1,4 @@
-# SecureTravels CRM — API Standards
+# Trip On Himalaya CRM — API Standards
 
 > **Status: ratified since Phase 1 Prompt 3.** Every future endpoint must
 > follow this contract. The API is REST over JSON, generated OpenAPI 3,

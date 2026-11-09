@@ -1,4 +1,4 @@
-# SecureTravels CRM — Automation Inventory (Phase 6 Step 0)
+# Trip On Himalaya CRM — Automation Inventory (Phase 6 Step 0)
 
 > **Status: Phase 6 kickoff artefact (2026-09-29).** Ground truth for what
 > today's code does *automatically*, and the classification that decides what

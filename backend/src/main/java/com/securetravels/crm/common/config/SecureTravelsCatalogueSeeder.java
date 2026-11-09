@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Upserts the live Secure Travels catalogue (https://securetravels.in/) so CRM
+ * Upserts the live Trip On Himalaya catalogue (https://triponhimalaya.com/) so CRM
  * treks/packages stay usable for itineraries, quotations and batches even when
  * {@code app.bootstrap-demo-data=false} (Docker prod profile).
  */
@@ -48,7 +48,7 @@ public class SecureTravelsCatalogueSeeder implements CommandLineRunner {
                 created++;
             }
         }
-        log.info("[catalogue] Secure Travels treks synced: {} created, {} updated (source securetravels.in)",
+        log.info("[catalogue] Trip On Himalaya treks synced: {} created, {} updated (source triponhimalaya.com)",
                 created, updated);
     }
 
@@ -85,11 +85,11 @@ public class SecureTravelsCatalogueSeeder implements CommandLineRunner {
                 name, slug, Trip.Category.TREK, Trip.BookingType.FIXED_BATCH, diff, cost, days,
                 """
                 Day 1: Assemble / drive to base (%s). Briefing & gear check.
-                Day 2–%d: Trek as per Secure Travels field itinerary — camps, meals, summit / high point.
+                Day 2–%d: Trek as per Trip On Himalaya field itinerary — camps, meals, summit / high point.
                 Final day: Descend to roadhead and depart.
 
                 Region: %s · Best season: %s
-                Source: https://securetravels.in/
+                Source: https://triponhimalaya.com/
                 """.formatted(region, Math.max(2, days - 1), region, season),
                 "Trek guide, forest permits (where applicable), camping / stay as per plan, meals on trek days, first-aid support",
                 "Personal trekking gear, travel to pickup point, travel insurance, tips, personal expenses"
@@ -106,7 +106,7 @@ public class SecureTravelsCatalogueSeeder implements CommandLineRunner {
                 Final day: Return transfer / drop.
 
                 Region: %s
-                Source: https://securetravels.in/
+                Source: https://triponhimalaya.com/
                 """.formatted(region, region),
                 "Accommodation as per itinerary, transfers, guide / local support, breakfast & dinner (package specific)",
                 "Flights / trains to joining point, personal offerings, tips, travel insurance"
@@ -121,18 +121,18 @@ public class SecureTravelsCatalogueSeeder implements CommandLineRunner {
                 diff, cost, days,
                 """
                 Day 1: Arrival / start of road trip (%s).
-                Mid days: Sightseeing, stays and activities as per Secure Travels package.
+                Mid days: Sightseeing, stays and activities as per Trip On Himalaya package.
                 Final day: Departure transfer.
 
                 Region: %s
-                Source: https://securetravels.in/
+                Source: https://triponhimalaya.com/
                 """.formatted(region, region),
                 "Hotels / camps as per plan, sightseeing transfers, breakfast (package specific), trip captain support",
                 "Flights, lunches unless mentioned, adventure activities marked optional, personal expenses"
         );
     }
 
-    /** Catalogue mirrored from https://securetravels.in/ (selling prices where listed). */
+    /** Catalogue mirrored from https://triponhimalaya.com/ (selling prices where listed). */
     private static final List<CatalogueTrip> CATALOGUE = List.of(
             // —— Uttarakhand treks ——
             trek("Kedarkantha Trek", "kedarkantha-trek", Trip.Difficulty.MODERATE,

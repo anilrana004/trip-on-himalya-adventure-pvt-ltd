@@ -1,6 +1,6 @@
 {
   "uid": "st-rabbitmq",
-  "title": "SecureTravels - RabbitMQ Messaging",
+  "title": "Trip On Himalaya - RabbitMQ Messaging",
   "description": "Dispatch queue depth, dead-letter depth and the freshness of the depth reading. Covers the 'growing dead-letter queue pages someone' requirement of Phase 3 Module 5.",
   "tags": ["securetravels", "rabbitmq"],
   "timezone": "browser",

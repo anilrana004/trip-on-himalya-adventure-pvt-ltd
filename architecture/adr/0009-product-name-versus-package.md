@@ -6,10 +6,10 @@
 
 ## Context
 
-Staff see **Trip On Himalaya** (Basecamp OS) in the UI. The repository, Maven
-artifact, Java package `com.securetravels`, database name, and demo mailbox
-domain still say SecureTravels. That split is confusing, and a global rename
-looks like the obvious cleanup.
+Staff see **Trip On Himalaya** (Basecamp OS) in the UI and docs. The repository
+folder, Maven artifact, Java package `com.securetravels`, database name, and
+demo mailbox domain still use the technical id `securetravels`. Renaming those
+looks like cleanup but is a large, low-value diff.
 
 The package name is in every import, the test tree, the Flyway history, and
 the deployed JAR name. Renaming it does not change a screen, a permission, or

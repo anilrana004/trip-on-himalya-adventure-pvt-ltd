@@ -1,4 +1,4 @@
-# SecureTravels CRM — Coding Standards
+# Trip On Himalaya CRM — Coding Standards
 
 > **Status: ratified since Phase 1 Prompt 3.** Language toolchains: Java 25
 > (Temurin LTS, Spring Boot 3.5) and TypeScript 5.8 (Next.js 15 App Router).

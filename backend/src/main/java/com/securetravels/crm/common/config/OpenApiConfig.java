@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI secureTravelsOpenApi() {
+    public OpenAPI tripOnHimalayaOpenApi() {
         final String schemeName = "bearerAuth";
         return new OpenAPI()
                 .info(new Info()

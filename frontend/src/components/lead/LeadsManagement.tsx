@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   api,
   type DashboardSummary,
@@ -163,6 +164,7 @@ function FunnelBars({ stages }: { stages: { label: string; count: number; color:
 
 export function LeadsManagement() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const canWrite = canWriteLeads(user?.role);
   const canReassign = canManageTeam(user?.role);
   const canBulkEmail = canManageTeam(user?.role);
@@ -193,6 +195,11 @@ export function LeadsManagement() {
     () => new Map((trips as (Trip & { id?: string })[]).filter((t) => t.id).map((t) => [t.id as string, t])),
     [trips],
   );
+
+  useEffect(() => {
+    const focus = searchParams.get("focus");
+    if (focus) setSelectedId(focus);
+  }, [searchParams]);
 
   useEffect(() => {
     api.getTrips().then(setTrips).catch(() => setTrips([]));

@@ -1,4 +1,4 @@
-# SecureTravels CRM — Product Requirements (the "what")
+# Trip On Himalaya CRM — Product Requirements (the "what")
 
 The long-term goal is a **Salesforce-class Travel Operating System** — not
 just a CRM, but Sales + Marketing + Service + Travel Operations + Finance +

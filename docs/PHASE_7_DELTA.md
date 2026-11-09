@@ -1,4 +1,4 @@
-# SecureTravels CRM — Phase 7 Step 0 Delta (Sales CRM Depth)
+# Trip On Himalaya CRM — Phase 7 Step 0 Delta (Sales CRM Depth)
 
 > **Status: ratified 2026-10-01 (Step 0); Modules 1–3 shipped 2026-10-01 (§7, §8, §9).**
 > This file is the overlap audit and

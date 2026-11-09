@@ -32,7 +32,7 @@ public class SmsWebhookController {
     @PostMapping
     public ResponseEntity<Integer> inbound(
             @RequestBody byte[] rawBody,
-            @RequestHeader(value = "X-SecureTravels-Signature", required = false) String signature) {
+            @RequestHeader(value = "X-Trip On Himalaya-Signature", required = false) String signature) {
         return ResponseEntity.ok(webhooks.handle(rawBody, signature));
     }
 }

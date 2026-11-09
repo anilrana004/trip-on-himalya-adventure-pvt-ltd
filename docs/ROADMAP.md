@@ -1,4 +1,4 @@
-# SecureTravels CRM — ROADMAP (the "when")
+# Trip On Himalaya CRM — ROADMAP (the "when")
 
 > **Status: ratified since Phase 1 Prompt 3.** This is the agreed phase
 > sequencing for the entire multi-year program. Every future prompt should

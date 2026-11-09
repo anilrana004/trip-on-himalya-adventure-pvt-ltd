@@ -1,5 +1,5 @@
 -- =====================================================================
--- SecureTravels CRM — Module 1 (Lead Management full build)
+-- Trip On Himalaya CRM — Module 1 (Lead Management full build)
 -- 1. Leads now carry an optional link to the canonical customer360 record
 --    (a "returning customer / new trip interest"). The link is written at
 --    lead creation when the normalized phone matches an existing Customer360.

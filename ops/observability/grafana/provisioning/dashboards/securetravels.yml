@@ -4,7 +4,7 @@ apiVersion: 1
 providers:
   - name: securetravels
     orgId: 1
-    folder: SecureTravels
+    folder: Trip On Himalaya
     type: file
     disableDeletion: false
     updateIntervalSeconds: 30

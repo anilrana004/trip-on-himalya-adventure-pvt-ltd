@@ -1,4 +1,4 @@
-# SecureTravels CRM — Security & Privacy
+# Trip On Himalaya CRM — Security & Privacy
 
 > **Status: ratified since Phase 1 Prompt 3.** This is the **single source of
 > truth** for what is *implemented* vs *deferred*. It is a living document —

@@ -1,6 +1,8 @@
 package com.securetravels.crm.lead;
 
 import com.securetravels.crm.accounts.AccountService;
+import com.securetravels.crm.accounts.Opportunity;
+import com.securetravels.crm.accounts.OpportunityService;
 import com.securetravels.crm.common.audit.AuditAction;
 import com.securetravels.crm.common.audit.AuditLog;
 import com.securetravels.crm.common.audit.AuditLogRepository;
@@ -68,13 +70,15 @@ public class LeadService {
     private final FollowUpAutomation automation;
     private final com.securetravels.crm.webhook.RoundRobinService roundRobin;
     private final AccountService accounts;
+    private final OpportunityService opportunities;
     private final LeadCallAttemptRepository callAttempts;
 
     public LeadService(LeadRepository leads, UserRepository users, Customer360Repository customers,
                        AuditLogRepository auditLogRepository, AuditService auditService,
                        LeadScoringService scoringService, FollowUpAutomation automation,
                        com.securetravels.crm.webhook.RoundRobinService roundRobin,
-                       AccountService accounts, LeadCallAttemptRepository callAttempts) {
+                       AccountService accounts, OpportunityService opportunities,
+                       LeadCallAttemptRepository callAttempts) {
         this.leads = leads;
         this.users = users;
         this.customers = customers;
@@ -84,6 +88,7 @@ public class LeadService {
         this.automation = automation;
         this.roundRobin = roundRobin;
         this.accounts = accounts;
+        this.opportunities = opportunities;
         this.callAttempts = callAttempts;
     }
 
@@ -123,8 +128,9 @@ public class LeadService {
         if (phoneDup != null) {
             if (phoneDup.getMetaLeadId() == null || phoneDup.getMetaLeadId().isBlank()) {
                 phoneDup.setMetaLeadId(metaLeadId);
-                leads.save(phoneDup);
             }
+            automation.onSoftDuplicate(phoneDup);
+            leads.save(phoneDup);
             return new LeadIngestResult(toResponse(phoneDup), true);
         }
 
@@ -225,6 +231,7 @@ public class LeadService {
         Lead existing = leads.findFirstActiveDuplicate(digits).orElse(null);
         if (existing != null) {
             existing.setLastContactedAt(Instant.now());
+            automation.onSoftDuplicate(existing);
             log.info("[lead] inbound message matched existing lead {} for {}", existing.getId(), digits);
             return leads.save(existing);
         }
@@ -488,12 +495,21 @@ public class LeadService {
         }
         if (request.status() == Lead.Status.INTERESTED) {
             automation.onInterested(lead);
+            opportunities.ensureOpenForLead(lead, "QUALIFIED");
             leads.save(lead); // followUpDate set by cadence
         } else if (request.status() == Lead.Status.QUOTATION_SENT) {
             automation.onQuotationSent(lead);
+            opportunities.ensureOpenForLead(lead, "QUOTATION_SENT");
             leads.save(lead);
         } else if (request.status() == Lead.Status.BOOKING_CONFIRMED) {
             automation.onBooked(lead);
+            opportunities.closeOpenForLead(lead.getId(), Opportunity.Status.WON,
+                    "Lead booking confirmed", caller.id());
+            leads.save(lead);
+        } else if (request.status() == Lead.Status.LOST) {
+            automation.onLost(lead);
+            opportunities.closeOpenForLead(lead.getId(), Opportunity.Status.LOST,
+                    request.note() != null ? request.note() : "Lead marked lost", caller.id());
             leads.save(lead);
         }
         return toResponse(lead);

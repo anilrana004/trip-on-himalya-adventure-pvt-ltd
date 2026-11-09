@@ -1,4 +1,4 @@
-# Entity-Relationship Diagram — SecureTravels CRM (Phase 1, V1–V6)
+# Entity-Relationship Diagram — Trip On Himalaya CRM (Phase 1, V1–V6)
 
 Mermaid `erDiagram` mirroring `docs/DATABASE.md`. Notation: `}o` = zero-or-more,
 `}|` = exactly-one, `|o` = zero-or-one.

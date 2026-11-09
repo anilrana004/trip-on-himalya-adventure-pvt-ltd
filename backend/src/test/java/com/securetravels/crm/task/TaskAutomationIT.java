@@ -74,10 +74,16 @@ class TaskAutomationIT extends BaseIT {
 
         var open = taskRepository.findByLeadIdOrderByDueAtAsc(UUID.fromString(id)).stream()
                 .filter(t -> t.getStatus() == Task.Status.PENDING).toList();
-        assertThat(open).hasSize(5)
+        assertThat(open).hasSize(4)
                 .extracting(Task::getType)
-                .contains(Task.Type.INITIAL_CALL, Task.Type.FOLLOW_UP_1D, Task.Type.FOLLOW_UP_3D,
+                .containsExactly(Task.Type.FOLLOW_UP_1D, Task.Type.FOLLOW_UP_3D,
                         Task.Type.FOLLOW_UP_8D, Task.Type.FOLLOW_UP_15D);
+
+        var cancelledFirstCall = taskRepository.findByLeadIdOrderByDueAtAsc(UUID.fromString(id)).stream()
+                .filter(t -> t.getType() == Task.Type.INITIAL_CALL)
+                .toList();
+        assertThat(cancelledFirstCall).isNotEmpty()
+                .allMatch(t -> t.getStatus() == Task.Status.CANCELLED);
 
         Lead lead = leadRepository.findById(UUID.fromString(id)).orElseThrow();
         for (Task t : open) {
@@ -88,10 +94,10 @@ class TaskAutomationIT extends BaseIT {
                 case FOLLOW_UP_15D -> 15;
                 default -> -1;
             };
-            if (expected > 0) {
-                assertThat(t.getDueAt())
-                        .isCloseTo(lead.getCreatedAt().plus(expected, ChronoUnit.DAYS), within(90, ChronoUnit.SECONDS));
-            }
+            // Cadence is from mark-interested time, not lead createdAt.
+            assertThat(t.getDueAt())
+                    .isCloseTo(Instant.now().plus(expected, ChronoUnit.DAYS), within(120, ChronoUnit.SECONDS));
+            assertThat(lead.getFollowUpDate()).isNotNull();
         }
     }
 

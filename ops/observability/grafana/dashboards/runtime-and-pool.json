@@ -1,6 +1,6 @@
 {
   "uid": "st-runtime",
-  "title": "SecureTravels - Runtime and Connection Pool",
+  "title": "Trip On Himalaya - Runtime and Connection Pool",
   "description": "JVM health and HikariCP connection pool utilisation. Covers the 'database connection pool utilization' and 'JVM health' requirements of Phase 3 Module 5.",
   "tags": ["securetravels", "jvm", "hikari"],
   "timezone": "browser",

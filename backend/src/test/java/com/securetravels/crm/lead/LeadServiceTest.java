@@ -44,6 +44,7 @@ class LeadServiceTest {
     @Mock private FollowUpAutomation automation;
     @Mock private com.securetravels.crm.webhook.RoundRobinService roundRobin;
     @Mock private com.securetravels.crm.accounts.AccountService accounts;
+    @Mock private com.securetravels.crm.accounts.OpportunityService opportunities;
     @Mock private LeadCallAttemptRepository callAttempts;
 
     private LeadService service;
@@ -53,7 +54,7 @@ class LeadServiceTest {
     @BeforeEach
     void setUp() {
         service = new LeadService(leads, users, customers, auditLogRepository, auditService,
-                scoringService, automation, roundRobin, accounts, callAttempts);
+                scoringService, automation, roundRobin, accounts, opportunities, callAttempts);
         principalId = UUID.randomUUID();
         principal = new UserPrincipal(principalId, "sales@securetravels.in", "Ravi", Role.SALES, true);
     }
@@ -90,7 +91,7 @@ class LeadServiceTest {
         assertThat(response.heat()).isEqualTo(Lead.Heat.HOT);
         assertThat(response.customerName()).isEqualTo("Amit Verma");
         verify(scoringService).score(any(Lead.class));
-        verify(automation).onLeadCreated(any(), eq(principalId));
+        verify(automation).onLeadCreated(any(), eq(principalId), eq(Lead.Source.WHATSAPP));
         verify(auditService).record(eq("LEAD"), any(), eq(AuditAction.CREATE), eq("lead"), any(), any());
     }
 
@@ -120,7 +121,10 @@ class LeadServiceTest {
         assertThat(response.status()).isEqualTo(Lead.Status.LOST);
         assertThat(response.heat()).isEqualTo(Lead.Heat.COLD);
         assertThat(response.lostReason()).isEqualTo(Lead.LostReason.PRICE_TOO_HIGH);
-        verify(leads).save(lead);
+        verify(leads, org.mockito.Mockito.atLeastOnce()).save(lead);
+        verify(automation).onLost(lead);
+        verify(opportunities).closeOpenForLead(eq(lead.getId()),
+                eq(com.securetravels.crm.accounts.Opportunity.Status.LOST), any(), eq(principalId));
         verify(auditService).statusChange("LEAD", lead.getId(), "lost_reason", null, "PRICE_TOO_HIGH");
     }
 
