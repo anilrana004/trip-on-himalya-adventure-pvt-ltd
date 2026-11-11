@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM â€” Phase 2, Module 1 (Documents & Compliance)
+-- SecureTravels CRM â€” Phase 2, Module 1 (Documents & Compliance)
 -- 1) Batch status gains READY_FOR_DEPARTURE (compliance hard gate).
 -- 2) Trips gain a difficulty rating for the medical-cert threshold rule.
 -- 3) Documents gain CONSENT_FORM (minor consent <18; signed form scan).

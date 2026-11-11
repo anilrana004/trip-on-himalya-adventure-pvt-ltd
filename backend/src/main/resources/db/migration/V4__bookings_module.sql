@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Module 4 (Bookings)
+-- SecureTravels CRM — Module 4 (Bookings)
 -- Link a booking to its originating lead so the confirmation can drive
 -- the lead stepper (QUOTATION_SENT -> BOOKING_CONFIRMED) and a
 -- cancellation can reopen it. Seats are the same batch pool (I3); the

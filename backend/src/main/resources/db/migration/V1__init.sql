@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Phase 1 schema (approved 2026-09)
+-- SecureTravels CRM — Phase 1 schema (approved 2026-09)
 -- Trip/Batch/Booking architecture with FIXED_BATCH vs CUSTOM_FIT.
 -- Invariants I1/I2 enforced by trigger trg_booking_consistency.
 --

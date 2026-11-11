@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Phase 7, Module 3 (Opportunities + revenue forecast)
+-- SecureTravels CRM — Phase 7, Module 3 (Opportunities + revenue forecast)
 -- An opportunity is the sales-deal view of a lead, matched to a configured
 -- pipeline stage (V20). Expected-value weighting is applied at read time
 -- against the live stage probability, so forecast numbers always reflect

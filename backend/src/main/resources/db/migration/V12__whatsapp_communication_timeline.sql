@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Phase 2, Module 4 (WhatsApp / Interakt)
+-- SecureTravels CRM — Phase 2, Module 4 (WhatsApp / Interakt)
 --
 -- Module 4 introduces customer-facing communication: outbound WhatsApp
 -- templates through Interakt, an inbound webhook for replies and delivery

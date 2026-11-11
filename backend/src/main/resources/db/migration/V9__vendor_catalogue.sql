@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Phase 2, Module 2 (Vendor Management)
+-- SecureTravels CRM — Phase 2, Module 2 (Vendor Management)
 -- Upgrades the Phase-1 "guides" placeholder and the bare "driver_id"
 -- into a single vendor catalogue covering guides, hotels, transport
 -- and drivers (payout metadata kept bank-obfuscated — see SECURITY.md).

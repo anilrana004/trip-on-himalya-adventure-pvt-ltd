@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Phase 7, Module 1 (Account records)
+-- SecureTravels CRM — Phase 7, Module 1 (Account records)
 -- B2B/corporate + travel-agent accounts, their links onto leads and
 -- bookings, the travel-agent commission payable, and account-first
 -- invoices. Full payables/invoicing depth stays Phase 9; this ships the
@@ -7,7 +7,7 @@
 -- =====================================================================
 
 -- 1) Accounts master: a legal entity (corporate) or travel agent that
---    books through Trip On Himalaya. Primary contact fields are PII and are
+--    books through SecureTravels. Primary contact fields are PII and are
 --    sanitised on write like customer data.
 CREATE TABLE accounts (
     id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -39,7 +39,7 @@ CREATE INDEX idx_leads_account ON leads(account_id);
 ALTER TABLE bookings ADD COLUMN account_id uuid REFERENCES accounts(id);
 CREATE INDEX idx_bookings_account ON bookings(account_id);
 
--- 3) Travel-agent commission payable: what Trip On Himalaya owes an account
+-- 3) Travel-agent commission payable: what SecureTravels owes an account
 --    on a confirmed booking. One row per booking — the unique booking_id
 --    is the idempotency guard, mirroring sales_commission_ledger. A
 --    credit is never deleted; it is VOIDed with a retained reason.

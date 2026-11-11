@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Module 9 (End-to-end automation chain)
+-- SecureTravels CRM — Module 9 (End-to-end automation chain)
 -- Public webhook lead intake:
 --   • webhook_logs     — every inbound web request (success / duplicate /
 --                        failure) with the raw payload for auditability

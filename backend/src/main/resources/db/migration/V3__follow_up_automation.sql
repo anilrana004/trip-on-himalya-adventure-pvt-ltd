@@ -1,5 +1,5 @@
 -- =====================================================================
--- Trip On Himalaya CRM — Module 2 (Follow-up automation)
+-- SecureTravels CRM — Module 2 (Follow-up automation)
 -- In-app / email notification feed. Every scheduled follow-up task
 -- generates one IN_APP row here (email rows are emitted by the stub
 -- notifier behind a flag and are not persisted until SMTP is wired).
