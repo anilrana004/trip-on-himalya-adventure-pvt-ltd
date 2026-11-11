@@ -6,7 +6,7 @@ INSERT INTO trips (
     itinerary, inclusions, exclusions, is_active, created_at, updated_at, version
 )
 SELECT gen_random_uuid(), v.name, v.slug, v.category, v.booking_type, v.difficulty,
-       v.base_cost, v.duration_days, v.itinerary, v.inclusions, v.exclusions,
+       v.base_cost, v.duration_days, v.itinerary, pack.inclusions, pack.exclusions,
        TRUE, now(), now(), 0
 FROM (VALUES
     ('Bali Pass Trek', 'bali-pass-trek', 'TREK', 'FIXED_BATCH', 'VERY_DIFFICULT', 18999.00, 8,
