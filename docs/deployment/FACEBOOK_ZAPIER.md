@@ -24,7 +24,7 @@ Facebook Lead Form
 
 ```javascript
 const crypto = require("crypto");
-const secret = inputData.webhook_secret; // store as Zapier input field = WEBHOOK_SECRET
+const secret = inputData.webhook_secret; // Zapier input = Railway WEBHOOK_SECRET
 const bodyObj = {
   customer_name: inputData.full_name || inputData.name,
   mobile_number: String(inputData.phone_number || inputData.phone || "").replace(/\D/g, "").slice(-10),
@@ -34,7 +34,9 @@ const bodyObj = {
   destination: inputData.trek || inputData.destination || null,
 };
 const body = JSON.stringify(bodyObj);
-const signature = crypto.createHmac("sha256", secret).update(body).digest("hex");
+// CRM requires the exact header form: sha256=<hex> over the raw body string
+const signature =
+  "sha256=" + crypto.createHmac("sha256", secret).update(body).digest("hex");
 const res = await fetch(inputData.crm_webhook_url, {
   method: "POST",
   headers: {
@@ -50,6 +52,14 @@ Zap inputs: `webhook_secret`, `crm_webhook_url` (= `https://YOUR-API/api/webhook
 4. **Expect:** HTTP 201 created or 200 duplicate  
 
 Required body: `customer_name`, `mobile_number`, `consent_given: true`, `lead_source: "FACEBOOK_ADS"`.
+
+### Common failure
+
+| Symptom | Cause |
+|---|---|
+| CRM **401** | Signature missing `sha256=` prefix, or secret ≠ Railway `WEBHOOK_SECRET`, or body was re-serialized after signing |
+| CRM **400** | Phone not 10-digit Indian mobile, or `consent_given` false/missing |
+| CRM **503** | No active SALES user to assign |
 
 ## What CRM automates after the Zap (do not rebuild in Zapier)
 
