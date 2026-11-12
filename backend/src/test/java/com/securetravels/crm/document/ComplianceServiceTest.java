@@ -37,6 +37,7 @@ class ComplianceServiceTest {
     @Mock private TripRepository tripRepository;
     @Mock private BatchRepository batchRepository;
     @Mock private AuditService auditService;
+    @Mock private DocumentMissingReminderService documentReminders;
 
     private ComplianceService service;
     private UserPrincipal opsCaller;
@@ -51,7 +52,7 @@ class ComplianceServiceTest {
         props.getCompliance().setReadyThresholdPercent(100);
         props.getCompliance().setMedicalThreshold(Trip.Difficulty.DIFFICULT);
         service = new ComplianceService(checklists, travellerRepository, bookingRepository,
-                tripRepository, batchRepository, auditService, props);
+                tripRepository, batchRepository, auditService, props, documentReminders);
         opsCaller = new UserPrincipal(UUID.randomUUID(), "ops@securetravels.in", "OPS", Role.OPS, true);
     }
 

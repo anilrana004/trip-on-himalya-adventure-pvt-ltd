@@ -71,6 +71,18 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     /** Confirmed bookings on a departure batch (compliance gate scope). */
     List<Booking> findByBatchIdAndStatus(UUID batchId, Booking.Status status);
 
+    /** Near-departure / post-trip sweeps: status + travelDate window (inclusive). */
+    @Query("""
+            select b from Booking b
+            where b.status = :status
+              and b.travelDate is not null
+              and b.travelDate >= :from
+              and b.travelDate <= :to
+            order by b.travelDate asc""")
+    List<Booking> findByStatusAndTravelDateBetween(@Param("status") Booking.Status status,
+                                                   @Param("from") LocalDate from,
+                                                   @Param("to") LocalDate to);
+
     // ------------------------------------------------------------------ accounts (Phase 7, Module 1)
 
     long countByAccountId(UUID accountId);

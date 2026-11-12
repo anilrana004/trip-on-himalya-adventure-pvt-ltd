@@ -82,6 +82,9 @@ app:
   compliance:
     ready-threshold-percent: ${COMPLIANCE_READY_THRESHOLD_PERCENT:100}
     medical-threshold: ${COMPLIANCE_MEDICAL_THRESHOLD:DIFFICULT}
+    doc-reminder-lead-days: ${COMPLIANCE_DOC_REMINDER_LEAD_DAYS:21}
+  payments:
+    razorpay-webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
   storage:
     endpoint: ${STORAGE_ENDPOINT:http://127.0.0.1:9000}
     region: ${STORAGE_REGION:us-east-1}

@@ -96,6 +96,7 @@ public class Task extends CreatedUpdated {
     public Instant getEscalatedAt() { return escalatedAt; }
     public Instant getLastRemindedAt() { return lastRemindedAt; }
     public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public void complete(Instant at) {
         this.status = Status.COMPLETED;

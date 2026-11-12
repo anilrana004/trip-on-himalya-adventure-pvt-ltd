@@ -229,6 +229,52 @@ public class PaymentService {
         return toResponse(payment);
     }
 
+    /**
+     * CORE C4 — gateway webhook confirmation. Looks up the CRM payment by
+     * {@code gateway_ref} (Razorpay payment id). Already-COMPLETED is a no-op.
+     * PENDING / PARTIAL / OVERDUE → COMPLETED with the same side effects as
+     * {@link #transition} (retire reminders, ops sync, customer360).
+     *
+     * @return true when the row was newly completed; false when already done / unknown.
+     */
+    @Transactional
+    public boolean confirmFromGateway(String gatewayRef, Instant paidAt) {
+        if (gatewayRef == null || gatewayRef.isBlank()) {
+            throw new BadRequestException("gatewayRef is required");
+        }
+        String ref = XssSanitizer.text(gatewayRef.trim());
+        Payment payment = payments.findByGatewayRef(ref).orElse(null);
+        if (payment == null) {
+            log.warn("[payments][gateway] no payment for gateway_ref={}", ref);
+            return false;
+        }
+        if (payment.getStatus() == Payment.Status.COMPLETED) {
+            return false;
+        }
+        if (payment.getStatus() == Payment.Status.CANCELLED || payment.getStatus() == Payment.Status.REFUNDED) {
+            throw new ConflictException("Payment " + payment.getId() + " is " + payment.getStatus()
+                    + " and cannot be completed from the gateway");
+        }
+        if (payment.getStatus() != Payment.Status.PENDING
+                && payment.getStatus() != Payment.Status.PARTIAL
+                && payment.getStatus() != Payment.Status.OVERDUE) {
+            throw new ConflictException("Illegal gateway completion from " + payment.getStatus());
+        }
+        Booking booking = bookings.findById(payment.getBookingId())
+                .orElseThrow(() -> new NotFoundException("Booking not found: " + payment.getBookingId()));
+        String oldStatus = payment.getStatus().name();
+        payment.setStatus(Payment.Status.COMPLETED);
+        payment.setPaidAt(paidAt == null ? Instant.now() : paidAt);
+        payments.save(payment);
+        auditService.statusChange("PAYMENT", payment.getId(), "status", oldStatus, Payment.Status.COMPLETED.name());
+        retireReminders(booking.getId());
+        operationsService.syncPaymentStatus(booking.getId());
+        customerService.maintainAggregates(booking.getCustomerId());
+        log.info("[payments][gateway] booking={} payment={} {} -> COMPLETED ref={}",
+                booking.getId(), payment.getId(), oldStatus, ref);
+        return true;
+    }
+
     /** Public so the reminder sweep can create tasks without coupling to this service's DTOs. */
     @Transactional
     public void ensureReminder(Booking booking, Payment payment) {

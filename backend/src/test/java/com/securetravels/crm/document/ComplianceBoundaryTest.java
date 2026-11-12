@@ -57,6 +57,7 @@ class ComplianceBoundaryTest {
     @Mock private TripRepository tripRepository;
     @Mock private BatchRepository batchRepository;
     @Mock private AuditService auditService;
+    @Mock private DocumentMissingReminderService documentReminders;
 
     private ComplianceService service;
 
@@ -71,7 +72,7 @@ class ComplianceBoundaryTest {
         props.getCompliance().setReadyThresholdPercent(100);
         props.getCompliance().setMedicalThreshold(Trip.Difficulty.DIFFICULT);
         service = new ComplianceService(checklists, travellerRepository, bookingRepository,
-                tripRepository, batchRepository, auditService, props);
+                tripRepository, batchRepository, auditService, props, documentReminders);
     }
 
     // ------------------------------------------------------------ traveller level

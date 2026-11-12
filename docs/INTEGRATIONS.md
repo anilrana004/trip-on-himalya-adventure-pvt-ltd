@@ -16,7 +16,7 @@ before any work starts.
 | 2 | **Email (SMTP)** | Follow-up / notification emails | Partial | 1→2 | `IN_APP` rows always persisted; `EMAIL` rows emitted by stub behind a flag — real SMTP wiring in Phase 2 (`notifications` table, `EmailNotifier`) |
 | 3 | **S3-compatible object storage** | ID proofs, medical certs, trip photos | Schema only | 2 | `documents` table stores `storage_key`; presigned upload path + compliance workflows land in Phase 2 |
 | 4 | **Interakt (WhatsApp Business API)** | Outbound template sends, delivery status, inbound replies | **Built** (sandbox default) | 4 | `communications` package, 9 templates, `Interakt-Signature` HMAC webhook; `app.whatsapp.mode=INTERAKT` + `INTERAKT_API_KEY` activates the live adapter (`API_INTEGRATIONS.md`) |
-| 5 | **Razorpay / Cashfree** | Payment gateway (advance/full/balance) | Planned | 5 | `payments.gateway_ref` reserved; **never** store raw card data |
+| 5 | **Razorpay / Cashfree** | Payment gateway (advance/full/balance) | **Built** (Razorpay webhook) | 5 | `POST /api/webhook/payments/razorpay` + `RAZORPAY_WEBHOOK_SECRET`; completes by `gateway_ref`. Cashfree still planned. **Never** store raw card data |
 | 6 | **Redis** | Shared rate limiting, cache, automation state | Planned | 2 | lands with Phase 2 (see `EVENT_ARCHITECTURE.md`) |
 | 7 | **RabbitMQ** | Durable queue for outbound WhatsApp delivery | **Built** (optional) | 4 | `app.messaging.mode=BROKER`; publish failure falls back inline. ADR 0005 supersedes 0003 |
 | 8 | **OpenSearch** | Search/analytics store | Not Started | 3 | reporting suite reads land here |
@@ -29,10 +29,12 @@ before any work starts.
 ## 2. Outbound vs inbound
 
 - **Inbound today:** website webhook (HMAC), Interakt webhook (HMAC, delivery
-  status + customer replies, Module 4). Planned: Meta lead-forms (P9),
-  Google (P9), Razorpay (P5).
+  status + customer replies, Module 4), Razorpay payment webhook (HMAC,
+  `gateway_ref` → COMPLETED). Planned: Meta lead-forms (P9), Google (P9),
+  Cashfree.
 - **Outbound today:** Interakt template messages (Module 4) via the `INLINE`
-  sandbox adapter by default; email remains a stub. A `POST /api/whatsapp/send`
+  sandbox adapter by default; staff mail uses `EmailGateway` (sandbox/SES).
+  Guest email/SMS via SendGate. A `POST /api/whatsapp/send`
   or a confirmed booking both produce real `whatsapp_messages` rows and
   timeline entries, so the pipeline is exercised end to end without credentials.
 

@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
@@ -17,4 +18,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     /** Pending lines whose due date has already passed (overdue sweep). */
     List<Payment> findByStatusAndDueDateBefore(Payment.Status status, LocalDate before);
+
+    /** Gateway webhook idempotency (unique when not null — V49). */
+    Optional<Payment> findByGatewayRef(String gatewayRef);
 }

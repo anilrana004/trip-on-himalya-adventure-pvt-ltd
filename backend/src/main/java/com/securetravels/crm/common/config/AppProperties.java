@@ -28,6 +28,7 @@ public class AppProperties {
     private final Meta meta = new Meta();
     private final Cookie cookie = new Cookie();
     private final Attendance attendance = new Attendance();
+    private final Payments payments = new Payments();
     /** Browser origin used in follow-up emails. Override with APP_PUBLIC_URL in prod. */
     private String publicUrl = "http://localhost:3001";
     /** Off unless a profile opts in. Production and Railway must never inherit a true default. */
@@ -51,6 +52,7 @@ public class AppProperties {
     public Meta getMeta() { return meta; }
     public Cookie getCookie() { return cookie; }
     public Attendance getAttendance() { return attendance; }
+    public Payments getPayments() { return payments; }
     public String getPublicUrl() { return publicUrl; }
     public void setPublicUrl(String publicUrl) { this.publicUrl = publicUrl; }
     public boolean isBootstrapDemoData() { return bootstrapDemoData; }
@@ -166,11 +168,18 @@ public class AppProperties {
     public static class Compliance {
         private int readyThresholdPercent = 100;
         private Trip.Difficulty medicalThreshold = Trip.Difficulty.DIFFICULT;
+        /**
+         * Document-missing chase window: CONFIRMED bookings with travelDate
+         * within this many days get an OPS/CUSTOM task (+ optional DOCUMENT_LINK).
+         */
+        private int docReminderLeadDays = 21;
 
         public int getReadyThresholdPercent() { return readyThresholdPercent; }
         public void setReadyThresholdPercent(int readyThresholdPercent) { this.readyThresholdPercent = readyThresholdPercent; }
         public Trip.Difficulty getMedicalThreshold() { return medicalThreshold; }
         public void setMedicalThreshold(Trip.Difficulty medicalThreshold) { this.medicalThreshold = medicalThreshold; }
+        public int getDocReminderLeadDays() { return docReminderLeadDays; }
+        public void setDocReminderLeadDays(int docReminderLeadDays) { this.docReminderLeadDays = docReminderLeadDays; }
     }
 
     /** S3-compatible object storage for documents (presigned PUT uploads only;
@@ -531,6 +540,23 @@ public class AppProperties {
 
         public boolean configured() {
             return accessToken != null && !accessToken.isBlank();
+        }
+    }
+
+    /**
+     * Payment gateway webhooks (CORE C4). Razorpay signs with HMAC-SHA256 hex
+     * of the raw body ({@code X-Razorpay-Signature}). Blank secret fails closed.
+     */
+    public static class Payments {
+        private String razorpayWebhookSecret = "";
+
+        public String getRazorpayWebhookSecret() { return razorpayWebhookSecret; }
+        public void setRazorpayWebhookSecret(String razorpayWebhookSecret) {
+            this.razorpayWebhookSecret = razorpayWebhookSecret;
+        }
+
+        public boolean razorpayConfigured() {
+            return razorpayWebhookSecret != null && !razorpayWebhookSecret.isBlank();
         }
     }
 }

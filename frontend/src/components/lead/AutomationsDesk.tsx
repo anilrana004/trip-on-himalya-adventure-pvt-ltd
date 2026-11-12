@@ -27,8 +27,20 @@ const RULES = [
     body: "Quotation sent → chase in 2 days. Booking confirmed or Lost → cancel open follow-ups. Ops handoff and WhatsApp confirmation stay on the booking confirm flow.",
   },
   {
+    title: "Documents before departure",
+    body: "CONFIRMED bookings inside the doc-reminder lead window get a Documents missing task when any traveller is not GREEN. Checklist going GREEN retires the task; DOCUMENT_LINK may queue to the guest.",
+  },
+  {
+    title: "Post-trip & re-engage",
+    body: "After return (+1…+7 days) CRM queues POST_TRIP_REVIEW (marketing consent). At last_trip_date + 90 days it sends a one-shot re-engage. Blocked sends open a REVIEW task for sales.",
+  },
+  {
+    title: "Payment gateway",
+    body: "Razorpay payment.captured / authorized webhooks complete the CRM payment whose gateway_ref matches the Razorpay id (HMAC). Manual transition still works.",
+  },
+  {
     title: "Reminders & digest",
-    body: "Due-soon and overdue reminders to sales every few minutes. Morning inactive-lead nudge. 09:00 manager SLA digest.",
+    body: "Due-soon and overdue reminders to sales every few minutes. Morning inactive-lead nudge. 09:00 manager SLA digest. Staff emails go through EmailGateway (sandbox/SES).",
   },
   {
     title: "Zapier alerts",

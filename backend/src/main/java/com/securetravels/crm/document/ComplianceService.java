@@ -21,6 +21,7 @@ import com.securetravels.crm.trip.Trip;
 import com.securetravels.crm.trip.TripRepository;
 import com.securetravels.crm.user.Role;
 import com.securetravels.crm.user.UserPrincipal;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,10 +56,12 @@ public class ComplianceService {
     private final BatchRepository batches;
     private final AuditService auditService;
     private final AppProperties props;
+    private final DocumentMissingReminderService documentReminders;
 
     public ComplianceService(TravellerChecklistRepository checklists, TravellerRepository travellers,
                              BookingRepository bookings, TripRepository trips, BatchRepository batches,
-                             AuditService auditService, AppProperties props) {
+                             AuditService auditService, AppProperties props,
+                             @Lazy DocumentMissingReminderService documentReminders) {
         this.checklists = checklists;
         this.travellers = travellers;
         this.bookings = bookings;
@@ -66,6 +69,7 @@ public class ComplianceService {
         this.batches = batches;
         this.auditService = auditService;
         this.props = props;
+        this.documentReminders = documentReminders;
     }
 
     public int readyThresholdPercent() {
@@ -107,7 +111,9 @@ public class ComplianceService {
         if (changed) {
             checklists.save(checklist);
         }
-        return travellerSummary(travellerId);
+        TravellerComplianceResponse view = travellerSummary(travellerId);
+        documentReminders.retireIfComplete(traveller.getBookingId());
+        return view;
     }
 
     @Transactional(readOnly = true)
@@ -196,6 +202,8 @@ public class ComplianceService {
         }
         if (changed) {
             checklists.save(checklist);
+            Traveller traveller = getTraveller(travellerId);
+            documentReminders.retireIfComplete(traveller.getBookingId());
         }
     }
 
