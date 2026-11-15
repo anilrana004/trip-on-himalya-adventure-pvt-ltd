@@ -1,5 +1,7 @@
 package com.securetravels.crm.payment;
 
+import com.securetravels.crm.automation.event.AutomationEventShadow;
+import com.securetravels.crm.automation.runtime.LegacyAutomationGate;
 import com.securetravels.crm.booking.Booking;
 import com.securetravels.crm.booking.BookingRepository;
 import com.securetravels.crm.common.audit.AuditService;
@@ -35,15 +37,20 @@ public class PaymentSweep {
     private final PaymentService paymentService;
     private final OperationsService operationsService;
     private final AuditService auditService;
+    private final AutomationEventShadow eventShadow;
+    private final LegacyAutomationGate legacy;
 
     public PaymentSweep(PaymentRepository payments, BookingRepository bookings,
                         PaymentService paymentService, OperationsService operationsService,
-                        AuditService auditService) {
+                        AuditService auditService, AutomationEventShadow eventShadow,
+                        LegacyAutomationGate legacy) {
         this.payments = payments;
         this.bookings = bookings;
         this.paymentService = paymentService;
         this.operationsService = operationsService;
         this.auditService = auditService;
+        this.eventShadow = eventShadow;
+        this.legacy = legacy;
     }
 
     @Scheduled(fixedDelay = 86_400_000, initialDelay = 90_000)
@@ -59,6 +66,7 @@ public class PaymentSweep {
             p.setStatus(Payment.Status.OVERDUE);
             payments.save(p);
             auditService.statusChange("PAYMENT", p.getId(), "status", old, Payment.Status.OVERDUE.name());
+            eventShadow.publish("payment", "overdue", p.getId());
             overdued++;
         }
         if (overdued > 0) {
@@ -74,8 +82,12 @@ public class PaymentSweep {
         for (Payment p : dueSoon) {
             Booking booking = bookings.findById(p.getBookingId()).orElse(null);
             if (booking == null) continue;
-            paymentService.ensureReminder(booking, p);
-            reminded++;
+            if (legacy.enabled()) {
+                paymentService.ensureReminder(booking, p);
+                reminded++;
+            }
+            // Always publish so the engine (M5) can create the reminder when legacy is off.
+            eventShadow.publish("payment", "due_soon", p.getId());
         }
 
         if (overdued > 0 || reminded > 0) {

@@ -78,6 +78,12 @@ public class MetaLeadgenService {
         if (!MetaHubSignature.matches(signatureHeader, props.getMeta().getAppSecret(), raw)) {
             throw new WebhookSignatureException("Missing or invalid " + MetaHubSignature.HEADER);
         }
+        if (!props.getMeta().isLeadgenIngestEnabled()) {
+            // Signature OK — acknowledge so Meta does not retry, but do not create
+            // CRM leads while the Facebook Lead Ads Zap owns intake.
+            log.info("[meta-leadgen] ingest disabled (META_LEADGEN_INGEST_ENABLED=false); ack only");
+            return;
+        }
         JsonNode root;
         try {
             root = objectMapper.readTree(raw);

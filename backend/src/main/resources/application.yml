@@ -77,8 +77,11 @@ app:
       refill-per-window: 20
       window-minutes: 1
   # Outbound Catch Hooks (Slack / Gmail / etc.). Separate from email/WA campaign hooks.
+  # events-enabled=false keeps the URL for rollback but stops CRM→Zapier posts
+  # (native in-app + EmailGateway alerts still run). See docs/automation/.
   zapier:
     events-hook-url: ${ZAPIER_EVENTS_HOOK_URL:}
+    events-enabled: ${ZAPIER_EVENTS_ENABLED:false}
   compliance:
     ready-threshold-percent: ${COMPLIANCE_READY_THRESHOLD_PERCENT:100}
     medical-threshold: ${COMPLIANCE_MEDICAL_THRESHOLD:DIFFICULT}
@@ -156,6 +159,11 @@ app:
     # dry-run-enabled keeps the engine flowing (runs, conditions, verdicts) but
     # records every effect step as SKIPPED instead of performing it.
     dry-run-enabled: ${AUTOMATION_DRY_RUN_ENABLED:false}
+    # Seed/keep M1–M9 templates ACTIVE (engine owns effects after cutover).
+    migrate-shadow-enabled: ${AUTOMATION_MIGRATE_SHADOW_ENABLED:true}
+    # Cutover: false = hard-coded FollowUp/WA/reminder/ops-prep/scarcity notify off.
+    # Rollback: set true (+ optionally AUTOMATION_DRY_RUN_ENABLED=true).
+    legacy-effects-enabled: ${AUTOMATION_LEGACY_EFFECTS_ENABLED:false}
     # 0 = unlimited. Rate limit caps run creation per workflow per minute;
     # max-active-runs-per-workflow caps concurrent live (RUNNING/WAITING) runs.
     rate-limit-per-workflow-per-minute: ${AUTOMATION_RATE_LIMIT_PER_WORKFLOW_PER_MINUTE:0}
@@ -184,6 +192,9 @@ app:
     connect-timeout: ${META_CONNECT_TIMEOUT:5s}
     read-timeout: ${META_READ_TIMEOUT:20s}
     max-retries: ${META_MAX_RETRIES:2}
+    # Default false: ack Meta webhooks without creating leads while FB Zap owns intake.
+    # Flip true only after dual-path approval (docs/automation/MIGRATION_STATUS.md).
+    leadgen-ingest-enabled: ${META_LEADGEN_INGEST_ENABLED:false}
 
 management:
   endpoints:

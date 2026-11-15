@@ -21,5 +21,10 @@ public record WebhookLeadRequest(
         BigDecimal budget,
         @JsonAlias("message") String remarks,
         @JsonAlias("consent_given") boolean consentGiven,
-        @JsonAlias("consent_scope") String consentScope
+        @JsonAlias("consent_scope") String consentScope,
+        /**
+         * Optional Meta Lead Ads id. When set, intake uses {@code createFromMeta}
+         * so Zapier and native Meta share the same external key (dual-path safe).
+         */
+        @JsonAlias("meta_lead_id") String metaLeadId
 ) {}

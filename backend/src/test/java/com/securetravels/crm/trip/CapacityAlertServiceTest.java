@@ -23,7 +23,7 @@ class CapacityAlertServiceTest {
         props.getCapacity().setMinGroupFillPercent(minGroupFillPercent);
         props.getCapacity().setMinGroupLeadDays(leadDays);
         // Notification/email collaborators are irrelevant to the pure predicate.
-        return new CapacityAlertService(null, null, null, null, props);
+        return new CapacityAlertService(null, null, null, null, props, null, null);
     }
 
     private Batch batch(LocalDate departure, int max, int booked, Batch.Status status) {

@@ -137,40 +137,169 @@ export function AutomationsDesk() {
     <div className="space-y-4">
       {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <p className="text-sm text-slate-600">
-        Live sales automation for Trip On Himalaya. Facebook enters via Zapier; everything after that — assignment,
-        calls, cadence, SLA, digests — runs inside this CRM. Rows below are open tasks already created.
+        Live sales automation for Trip On Himalaya. Cadence, SLA, digests, and SendGate delivery run inside this CRM.
+        Zapier pipes are optional edge routes kept for rollback. Rows below are open tasks already created.
       </p>
+
+      {zapier?.native && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Native delivery</h2>
+            <span className="text-xs text-slate-500">
+              Campaigns default · {zapier.native.defaultCampaignDelivery}
+            </span>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            <li className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2">
+              <div className="text-sm font-medium text-slate-800">Email gateway</div>
+              <div className="mt-1 text-[11px] text-slate-500">Mode · {zapier.native.emailMode}</div>
+              <div className="mt-1 text-[11px] text-slate-500">{zapier.native.lifecycleAlerts}</div>
+            </li>
+            <li className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2">
+              <div className="text-sm font-medium text-slate-800">WhatsApp gateway</div>
+              <div className="mt-1 text-[11px] text-slate-500">Mode · {zapier.native.whatsappMode}</div>
+              <div className="mt-1 text-[11px] text-slate-500">{zapier.native.bookingWhatsApp}</div>
+            </li>
+            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-sm font-medium text-slate-800">Lead webhook secret</div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                {zapier.native.leadWebhookSecretConfigured
+                  ? "Configured — Facebook Zap / storefront HMAC intake ready"
+                  : "Set WEBHOOK_SECRET for signed inbound leads"}
+              </div>
+            </li>
+            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-800">Meta native leadgen</div>
+                <span
+                  className={`text-[11px] font-semibold ${
+                    zapier.native.metaLeadgenIngestEnabled ? "text-amber-700" : "text-slate-600"
+                  }`}
+                >
+                  {zapier.native.metaLeadgenIngestEnabled ? "Ingest ON" : "Ack only"}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                {zapier.native.metaIntake ||
+                  (zapier.native.metaConfigured
+                    ? "Graph token present"
+                    : "Set META_ACCESS_TOKEN / META_APP_SECRET for native path")}
+              </div>
+            </li>
+            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-800">MIGRATE engine shadow</div>
+                <span
+                  className={`text-[11px] font-semibold ${
+                    zapier.migrate?.engineLive
+                      ? "text-emerald-700"
+                      : zapier.native.migrateShadowEnabled
+                        ? "text-sky-700"
+                        : "text-slate-600"
+                  }`}
+                >
+                  {zapier.migrate?.engineLive
+                    ? "Engine live"
+                    : zapier.native.migrateShadowEnabled
+                      ? zapier.native.automationDryRun
+                        ? "Shadow · dry-run"
+                        : zapier.native.legacyEffectsEnabled
+                          ? "Templates + legacy"
+                          : "Templates ON"
+                      : "Off"}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                {zapier.native.migrateShadow ||
+                  "M1–M9 templates evaluate beside hard-coded FollowUp / sweeps"}
+              </div>
+            </li>
+          </ul>
+        </section>
+      )}
+
+      {zapier?.migrate && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">MIGRATE templates (M1–M9)</h2>
+            <span className="text-xs text-slate-500">
+              {zapier.migrate.templates.filter((t) => t.active).length}/{zapier.migrate.templates.length}{" "}
+              active
+              {zapier.migrate.engineLive
+                ? " · engine owns effects"
+                : zapier.migrate.dryRun
+                  ? " · effects skipped"
+                  : zapier.migrate.legacyEffectsEnabled
+                    ? " · legacy also on"
+                    : ""}
+            </span>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {zapier.migrate.templates.map((template) => (
+              <li
+                key={template.slug}
+                className={`rounded-lg border px-3 py-2 ${
+                  template.active
+                    ? "border-sky-200 bg-sky-50/40"
+                    : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-slate-800">{template.name}</div>
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      template.active ? "text-sky-700" : "text-slate-500"
+                    }`}
+                  >
+                    {template.active ? `v${template.version ?? "?"}` : "Not seeded"}
+                  </span>
+                </div>
+                <code className="mt-1 block truncate text-[10px] text-slate-400">{template.slug}</code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {zapier && (
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-900">Zapier pipes</h2>
             <span className="text-xs text-slate-500">
-              {zapier.hooks.filter((h) => h.configured).length}/{zapier.hooks.length} configured
+              {zapier.hooks.filter((h) => h.active ?? h.configured).length}/{zapier.hooks.length} active
+              {zapier.zapier && !zapier.zapier.eventsEnabled ? " · lifecycle posts paused" : ""}
             </span>
           </div>
           <ul className="grid gap-2 sm:grid-cols-2">
-            {zapier.hooks.map((hook) => (
-              <li
-                key={hook.id}
-                className={`rounded-lg border px-3 py-2 ${
-                  hook.configured ? "border-emerald-200 bg-emerald-50/50" : "border-amber-200 bg-amber-50/40"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium text-slate-800">{hook.label}</div>
-                  <span
-                    className={`text-[11px] font-semibold ${
-                      hook.configured ? "text-emerald-700" : "text-amber-700"
-                    }`}
-                  >
-                    {hook.configured ? "Ready" : "Set env"}
-                  </span>
-                </div>
-                <div className="mt-1 text-[11px] text-slate-500">{hook.zap}</div>
-                <code className="mt-1 block truncate text-[10px] text-slate-400">{hook.env}</code>
-              </li>
-            ))}
+            {zapier.hooks.map((hook) => {
+              const active = hook.active ?? hook.configured;
+              return (
+                <li
+                  key={hook.id}
+                  className={`rounded-lg border px-3 py-2 ${
+                    active
+                      ? "border-emerald-200 bg-emerald-50/50"
+                      : hook.configured
+                        ? "border-slate-200 bg-slate-50"
+                        : "border-amber-200 bg-amber-50/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium text-slate-800">{hook.label}</div>
+                    <span
+                      className={`text-[11px] font-semibold ${
+                        active ? "text-emerald-700" : hook.configured ? "text-slate-600" : "text-amber-700"
+                      }`}
+                    >
+                      {active ? "Ready" : hook.configured ? "Paused" : "Set env"}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-500">{hook.zap}</div>
+                  {hook.note && <div className="mt-1 text-[11px] text-slate-500">{hook.note}</div>}
+                  <code className="mt-1 block truncate text-[10px] text-slate-400">{hook.env}</code>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

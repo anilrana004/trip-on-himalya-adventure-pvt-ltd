@@ -8,6 +8,11 @@ package com.securetravels.crm.automation.definition;
 public enum ActionType {
     /** Materialise a {@code tasks} row (due offset, SLA, assignee resolution). */
     CREATE_TASK,
+    /**
+     * Cancel open (PENDING/OVERDUE) tasks on the subject lead. Optional
+     * {@code types} list; omit or empty = cancel all open tasks (M9 booked/lost cleanup).
+     */
+    CANCEL_OPEN_TASKS,
     /** Assign/rotate ownership of the subject (round-robin cursor or a specific user). */
     ASSIGN_OWNER,
     /** Write one allow-listed field on the subject entity. */

@@ -83,7 +83,12 @@ public final class FieldRegistry {
                 FieldDef.number("totalAmount", "bookings.total_amount"),
                 FieldDef.uuid("customerId", "bookings.customer_id"),
                 FieldDef.uuid("leadId", "bookings.lead_id"),
-                FieldDef.uuid("batchId", "bookings.batch_id")));
+                FieldDef.uuid("batchId", "bookings.batch_id"),
+                // Derived by SubjectSnapshotLoader (customer / trip join).
+                FieldDef.text("customerMobile", "derived:customer.mobile"),
+                FieldDef.text("customerName", "derived:customer.full_name"),
+                FieldDef.text("bookingRef", "bookings.booking_ref"),
+                FieldDef.text("packageName", "derived:trip.name")));
 
         m.put(ENTITY_PAYMENT, index(
                 FieldDef.enumsWritable("status", "payments.status",
@@ -91,7 +96,10 @@ public final class FieldRegistry {
                 FieldDef.enums("amountType", "payments.amount_type", "ADVANCE", "BALANCE", "FULL"),
                 FieldDef.date("dueDate", "payments.due_date"),
                 FieldDef.number("amount", "payments.amount"),
-                FieldDef.uuid("bookingId", "payments.booking_id")));
+                FieldDef.uuid("bookingId", "payments.booking_id"),
+                // Derived by SubjectSnapshotLoader for CREATE_TASK assignee / lead link.
+                FieldDef.uuid("leadId", "derived:booking.lead_id"),
+                FieldDef.uuid("ownerId", "derived:booking.owner")));
 
         m.put(ENTITY_TASK, index(
                 FieldDef.enums("type", "tasks.type",

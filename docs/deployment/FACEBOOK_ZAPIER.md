@@ -32,6 +32,8 @@ const bodyObj = {
   consent_given: true,
   lead_source: "FACEBOOK_ADS",
   destination: inputData.trek || inputData.destination || null,
+  // Optional: pass Meta lead id so CRM can dedupe against native /api/webhook/meta
+  meta_lead_id: inputData.lead_id || inputData.id || null,
 };
 const body = JSON.stringify(bodyObj);
 // CRM requires the exact header form: sha256=<hex> over the raw body string
@@ -51,7 +53,12 @@ output = [{ status: res.status, text: await res.text() }];
 Zap inputs: `webhook_secret`, `crm_webhook_url` (= `https://YOUR-API/api/webhook/lead`), plus mapped Facebook fields.  
 4. **Expect:** HTTP 201 created or 200 duplicate  
 
-Required body: `customer_name`, `mobile_number`, `consent_given: true`, `lead_source: "FACEBOOK_ADS"`.
+Required body: `customer_name`, `mobile_number`, `consent_given: true`, `lead_source: "FACEBOOK_ADS"`.  
+Optional: `meta_lead_id` — uses CRM `createFromMeta` idempotency (safe if native Meta ingest is later enabled).
+
+### Native Meta path (do not dual-enable yet)
+
+`POST /api/webhook/meta` is built, but **`META_LEADGEN_INGEST_ENABLED` defaults to `false`**: CRM verifies the signature and returns 200 without creating leads. Keep the Facebook Lead Ads Zap as intake until dual-path testing + explicit cutover (`docs/automation/MIGRATION_STATUS.md`).
 
 ### Common failure
 

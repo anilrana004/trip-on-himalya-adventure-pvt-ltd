@@ -45,8 +45,12 @@ public class SubjectSnapshotLoader {
         Map<String, List<FieldDef>> byTable = new LinkedHashMap<>();
 
         for (FieldDef field : FieldRegistry.fieldsOf(entity)) {
-            String[] tableCol = tableColumn(field.source());
-            if (tableCol == null) continue;              // derived / not a direct column
+            String source = field.source();
+            if (source == null || source.startsWith("derived:") || source.contains("(")) {
+                continue; // enriched after load, or non-column expression
+            }
+            String[] tableCol = tableColumn(source);
+            if (tableCol == null) continue;
             byTable.computeIfAbsent(tableCol[0], t -> new ArrayList<>()).add(field);
         }
 
@@ -68,8 +72,73 @@ public class SubjectSnapshotLoader {
         if (TABLE_BATCH.equalsIgnoreCase(indexTable(entity))) {
             fillPercent(values);
         }
+        if (ENTITY_BOOKING.equals(entity)) {
+            enrichBooking(values, subjectId);
+        }
+        if (ENTITY_PAYMENT.equals(entity)) {
+            enrichPayment(values, subjectId);
+        }
 
         return new RuntimeSnapshot(entity, subjectId, values);
+    }
+
+    private static final String ENTITY_BOOKING = "booking";
+    private static final String ENTITY_PAYMENT = "payment";
+
+    private void enrichBooking(Map<String, Object> values, UUID bookingId) {
+        try {
+            Map<String, Object> row = jdbc.queryForMap("""
+                    SELECT b.booking_ref AS booking_ref,
+                           COALESCE(NULLIF(c.whatsapp_number, ''), c.mobile_number) AS customer_mobile,
+                           c.full_name AS customer_name,
+                           t.name AS package_name
+                      FROM bookings b
+                      LEFT JOIN customer360 c ON c.id = b.customer_id
+                      LEFT JOIN trips t ON t.id = b.trip_id
+                     WHERE b.id = ?
+                    """, bookingId);
+            if (row.get("booking_ref") != null) {
+                values.put("bookingRef", String.valueOf(row.get("booking_ref")));
+            }
+            if (row.get("customer_mobile") != null) {
+                values.put("customerMobile", String.valueOf(row.get("customer_mobile")));
+            }
+            if (row.get("customer_name") != null) {
+                values.put("customerName", String.valueOf(row.get("customer_name")));
+            }
+            if (row.get("package_name") != null) {
+                values.put("packageName", String.valueOf(row.get("package_name")));
+            }
+        } catch (Exception ignored) {
+            // Snapshot stays usable for conditions even if joins miss.
+        }
+    }
+
+    private void enrichPayment(Map<String, Object> values, UUID paymentId) {
+        try {
+            Map<String, Object> row = jdbc.queryForMap("""
+                    SELECT b.lead_id AS lead_id,
+                           COALESCE(b.created_by, l.owner_id) AS owner_id
+                      FROM payments p
+                      JOIN bookings b ON b.id = p.booking_id
+                      LEFT JOIN leads l ON l.id = b.lead_id
+                     WHERE p.id = ?
+                    """, paymentId);
+            Object leadId = row.get("lead_id");
+            if (leadId instanceof UUID u) {
+                values.put("leadId", u);
+            } else if (leadId != null) {
+                values.put("leadId", UUID.fromString(String.valueOf(leadId)));
+            }
+            Object ownerId = row.get("owner_id");
+            if (ownerId instanceof UUID u) {
+                values.put("ownerId", u);
+            } else if (ownerId != null) {
+                values.put("ownerId", UUID.fromString(String.valueOf(ownerId)));
+            }
+        } catch (Exception ignored) {
+            // CREATE_TASK may skip if assignee cannot resolve.
+        }
     }
 
     private void fillPercent(Map<String, Object> values) {

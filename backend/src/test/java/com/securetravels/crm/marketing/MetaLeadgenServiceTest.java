@@ -59,6 +59,7 @@ class MetaLeadgenServiceTest {
         props.getMeta().setAppSecret(SECRET);
         props.getMeta().setAccessToken("token");
         props.getMeta().setWebhookVerifyToken("verify-me");
+        props.getMeta().setLeadgenIngestEnabled(true);
         service = new MetaLeadgenService(mapper, props, graph, events, leadService, roundRobin, trips, access);
 
         when(events.findByMetaLeadId(anyString())).thenReturn(Optional.empty());
@@ -87,6 +88,22 @@ class MetaLeadgenServiceTest {
         byte[] body = "{\"object\":\"page\",\"entry\":[]}".getBytes(StandardCharsets.UTF_8);
         assertThatThrownBy(() -> service.ingest(body, "sha256=deadbeef"))
                 .isInstanceOf(WebhookSignatureException.class);
+    }
+
+    @Test
+    void ingestDisabledAcksWithoutCreatingLeads() throws Exception {
+        props.getMeta().setLeadgenIngestEnabled(false);
+        ObjectNode webhook = mapper.createObjectNode();
+        webhook.put("object", "page");
+        ObjectNode change = webhook.putArray("entry").addObject().putArray("changes").addObject();
+        change.put("field", "leadgen");
+        change.putObject("value").put("leadgen_id", "lead_skipped");
+        byte[] raw = mapper.writeValueAsBytes(webhook);
+
+        service.ingest(raw, HmacSigner.sign(SECRET, raw));
+
+        verify(graph, never()).get(anyString(), any(), anyString(), anyMap());
+        verify(leadService, never()).createFromMeta(any(), any(), anyString());
     }
 
     @Test

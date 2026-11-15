@@ -19,7 +19,7 @@ export function BulkWhatsAppCampaignModal({ leadIds, leads, onClose, onLaunched 
   const [name, setName] = useState("");
   const [body, setBody] = useState("");
   const [templateCode, setTemplateCode] = useState("LEAD_FOLLOW_UP");
-  const [deliveryMode, setDeliveryMode] = useState<"ZAPIER" | "INLINE">("ZAPIER");
+  const [deliveryMode, setDeliveryMode] = useState<"ZAPIER" | "INLINE">("INLINE");
   const [templates, setTemplates] = useState<{ code: string; label: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,17 +146,6 @@ export function BulkWhatsAppCampaignModal({ leadIds, leads, onClose, onLaunched 
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setDeliveryMode("ZAPIER")}
-                className={`rounded-xl px-3 py-2 text-xs font-semibold ${
-                  deliveryMode === "ZAPIER"
-                    ? "bg-emerald-600 text-white"
-                    : "border border-slate-200 text-slate-600"
-                }`}
-              >
-                Zapier Catch Hook
-              </button>
-              <button
-                type="button"
                 onClick={() => setDeliveryMode("INLINE")}
                 className={`rounded-xl px-3 py-2 text-xs font-semibold ${
                   deliveryMode === "INLINE"
@@ -166,9 +155,21 @@ export function BulkWhatsAppCampaignModal({ leadIds, leads, onClose, onLaunched 
               >
                 Inline (CRM SendGate)
               </button>
+              <button
+                type="button"
+                onClick={() => setDeliveryMode("ZAPIER")}
+                className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                  deliveryMode === "ZAPIER"
+                    ? "bg-emerald-600 text-white"
+                    : "border border-slate-200 text-slate-600"
+                }`}
+              >
+                Zapier Catch Hook
+              </button>
             </div>
             <p className="mt-2 text-[11px] text-slate-500">
-              Zapier needs <code className="rounded bg-slate-100 px-1">ZAPIER_WHATSAPP_HOOK_URL</code> on the API.
+              Default is CRM SendGate (sandbox/Interakt). Zapier needs{" "}
+              <code className="rounded bg-slate-100 px-1">ZAPIER_WHATSAPP_HOOK_URL</code> and is kept for rollback.
               Skips no phone, no consent, or WhatsApp-suppressed numbers.
             </p>
           </fieldset>

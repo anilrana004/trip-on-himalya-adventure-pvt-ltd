@@ -1,5 +1,6 @@
 package com.securetravels.crm.communications;
 
+import com.securetravels.crm.automation.runtime.LegacyAutomationGate;
 import com.securetravels.crm.booking.BookingConfirmedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,13 +37,20 @@ public class BookingConfirmationNotifier {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final SendGateService sendGate;
+    private final LegacyAutomationGate legacy;
 
-    public BookingConfirmationNotifier(SendGateService sendGate) {
+    public BookingConfirmationNotifier(SendGateService sendGate, LegacyAutomationGate legacy) {
         this.sendGate = sendGate;
+        this.legacy = legacy;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onBookingConfirmed(BookingConfirmedEvent event) {
+        if (!legacy.enabled()) {
+            log.info("[whatsapp] legacy off — engine owns BOOKING_CONFIRMED for booking {}",
+                    event.bookingId());
+            return;
+        }
         try {
             SendDecision decision = sendGate.request(SendRequest.whatsappTemplate(
                     SubjectType.BOOKING,

@@ -1,5 +1,6 @@
 package com.securetravels.crm.operations;
 
+import com.securetravels.crm.automation.runtime.LegacyAutomationGate;
 import com.securetravels.crm.booking.Booking;
 import com.securetravels.crm.booking.BookingRepository;
 import com.securetravels.crm.common.audit.AuditAction;
@@ -82,12 +83,13 @@ public class OperationsService {
     private final NotificationRepository notifications;
     private final EmailNotifier email;
     private final AuditService auditService;
+    private final LegacyAutomationGate legacy;
 
     public OperationsService(OperationsHandoffRepository handoffs, BookingRepository bookings,
                              PaymentRepository payments, VendorRepository vendors, TripRepository trips,
                              Customer360Repository customers, LeadRepository leads, UserRepository users,
                              TaskRepository tasks, NotificationRepository notifications, EmailNotifier email,
-                             AuditService auditService) {
+                             AuditService auditService, LegacyAutomationGate legacy) {
         this.handoffs = handoffs;
         this.bookings = bookings;
         this.payments = payments;
@@ -100,6 +102,7 @@ public class OperationsService {
         this.notifications = notifications;
         this.email = email;
         this.auditService = auditService;
+        this.legacy = legacy;
     }
 
     // ------------------------------------------------------------------ booking hooks
@@ -119,11 +122,15 @@ public class OperationsService {
         auditService.record("OPERATIONS_HANDOFF", handoff.getId(), AuditAction.CREATE,
                 "booking_ref", null, booking.getBookingRef());
 
-        notifyOps(handoff, booking, "New ops handoff " + handoff.getOpsRef(),
-                "Booking " + booking.getBookingRef() + " confirmed for "
-                        + customerName(booking.getCustomerId()) + " — " + booking.getNumTravellers()
-                        + " pax, travel " + booking.getTravelDate() + ". Arrange hotel / transport / guide.");
-        openOpsPrepTask(handoff, booking);
+        if (legacy.enabled()) {
+            notifyOps(handoff, booking, "New ops handoff " + handoff.getOpsRef(),
+                    "Booking " + booking.getBookingRef() + " confirmed for "
+                            + customerName(booking.getCustomerId()) + " — " + booking.getNumTravellers()
+                            + " pax, travel " + booking.getTravelDate() + ". Arrange hotel / transport / guide.");
+            openOpsPrepTask(handoff, booking);
+        } else {
+            log.info("[operations] legacy off — engine owns ops prep/notify for booking={}", booking.getId());
+        }
         log.info("[operations] handoff={} booking={} travelDate={} pax={} by={}",
                 handoff.getOpsRef(), booking.getId(), booking.getTravelDate(), booking.getNumTravellers(), caller.id());
     }

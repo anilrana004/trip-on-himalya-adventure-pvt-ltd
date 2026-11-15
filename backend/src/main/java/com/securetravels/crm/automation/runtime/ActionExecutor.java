@@ -84,6 +84,7 @@ public class ActionExecutor {
                                  WorkflowRun run, WorkflowRunStep ledger, int attempts) {
         return switch (step.action()) {
             case CREATE_TASK -> createTask(step, snapshot, run, ledger, attempts);
+            case CANCEL_OPEN_TASKS -> cancelOpenTasks(step, snapshot, run, ledger, attempts);
             case ASSIGN_OWNER -> assignOwner(step, snapshot, run, ledger, attempts);
             case UPDATE_FIELD -> updateField(step, snapshot, run, ledger, attempts);
             case SEND_MESSAGE -> sendMessage(step, snapshot, run, ledger, attempts);
@@ -106,10 +107,14 @@ public class ActionExecutor {
         Task.Type type = Task.Type.valueOf(str(step.config(), "type"));
         UUID leadId = switch (snapshot.entity()) {
             case "lead" -> snapshot.subjectId();
-            case "booking" -> snapshot.asUuid("leadId");
+            case "booking", "payment" -> snapshot.asUuid("leadId");
             default -> null;
         };
-        UUID bookingId = "booking".equals(snapshot.entity()) ? snapshot.subjectId() : null;
+        UUID bookingId = switch (snapshot.entity()) {
+            case "booking" -> snapshot.subjectId();
+            case "payment" -> snapshot.asUuid("bookingId");
+            default -> null;
+        };
 
         UUID assigneeId = resolveAssignee(step.config(), snapshot);
         if (assigneeId == null) {
@@ -161,6 +166,39 @@ public class ActionExecutor {
             return d == null ? Instant.now() : d.atStartOfDay(ZoneOffset.UTC).toInstant();
         }
         return Instant.now();
+    }
+
+    // ------------------------------------------------------ CANCEL_OPEN_TASKS
+
+    private EffectOutcome cancelOpenTasks(StepDefinition step, RuntimeSnapshot snapshot,
+                                          WorkflowRun run, WorkflowRunStep ledger, int attempts) {
+        WorkflowStepEffect guard = beginEffect(run, ledger, attempts, "CANCEL_OPEN_TASKS");
+        if (!"lead".equals(snapshot.entity())) {
+            return skipGuard(guard,
+                    "CANCEL_OPEN_TASKS is lead-only; subject is a " + snapshot.entity());
+        }
+        UUID leadId = snapshot.subjectId();
+        List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
+        List<String> typeNames = stringList(step.config(), "types");
+        int cancelled = 0;
+        if (typeNames.isEmpty()) {
+            for (Task existing : tasks.findByLeadIdAndStatusIn(leadId, open)) {
+                existing.cancel();
+                cancelled++;
+            }
+        } else {
+            for (String typeName : typeNames) {
+                Task.Type type = Task.Type.valueOf(typeName);
+                for (Task existing : tasks.findByLeadIdAndTypeAndStatusIn(leadId, type, open)) {
+                    existing.cancel();
+                    cancelled++;
+                }
+            }
+        }
+        guard.summary("cancelled " + cancelled + " open task(s) on lead " + leadId
+                + (typeNames.isEmpty() ? " (all types)" : " types=" + typeNames));
+        effects.save(guard);
+        return EffectOutcome.applied();
     }
 
     // ----------------------------------------------------------- ASSIGN_OWNER
@@ -292,23 +330,31 @@ public class ActionExecutor {
         String title = str(step.config(), "title");
         String body = str(step.config(), "body");
         List<UUID> targets = new ArrayList<>();
-        UUID userId = uuid(step.config(), "userId");
-        if (userId != null) {
-            targets.add(userId);
+        String target = str(step.config(), "target");
+        if ("OWNER".equals(target)) {
+            UUID ownerId = snapshot.asUuid("ownerId");
+            if (ownerId != null) {
+                targets.add(ownerId);
+            }
         } else {
-            Role role = role(step.config());
-            if (role != null) {
-                users.findAllByRoleOrderByCreatedAtAsc(role).stream()
-                        .filter(User::isActive)
-                        .map(User::getId)
-                        .forEach(targets::add);
+            UUID userId = uuid(step.config(), "userId");
+            if (userId != null) {
+                targets.add(userId);
+            } else {
+                Role role = role(step.config());
+                if (role != null) {
+                    users.findAllByRoleOrderByCreatedAtAsc(role).stream()
+                            .filter(User::isActive)
+                            .map(User::getId)
+                            .forEach(targets::add);
+                }
             }
         }
         if (targets.isEmpty()) {
             return skipGuard(guard, "NOTIFY_USER: no recipients resolved");
         }
-        for (UUID target : targets) {
-            notifications.save(new Notification(target, Notification.Channel.IN_APP,
+        for (UUID recipient : targets) {
+            notifications.save(new Notification(recipient, Notification.Channel.IN_APP,
                     title, body, "/automation/runs/" + run.getId()));
         }
         guard.summary("notified " + targets.size() + " user(s): " + title);
@@ -489,9 +535,12 @@ public class ActionExecutor {
     private long parseTodayOffset(String token) {
         if (token.equals("today")) return 0;
         String rest = token.substring("today".length());
-        if (rest.isEmpty() || !rest.startsWith("+") || rest.length() == 1) return 0;
+        if (rest.isEmpty() || rest.length() == 1) return 0;
+        char sign = rest.charAt(0);
+        if (sign != '+' && sign != '-') return 0;
         try {
-            return Long.parseLong(rest.substring(1));
+            long days = Long.parseLong(rest.substring(1));
+            return sign == '-' ? -days : days;
         } catch (NumberFormatException e) {
             return 0;
         }
@@ -523,5 +572,19 @@ public class ActionExecutor {
         if (v == null) return null;
         if (v instanceof Number n) return ((Number) v).intValue();
         return Integer.parseInt(String.valueOf(v));
+    }
+
+    private List<String> stringList(Map<String, Object> config, String key) {
+        Object raw = config.get(key);
+        if (!(raw instanceof List<?> list) || list.isEmpty()) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        for (Object item : list) {
+            if (item != null) {
+                out.add(String.valueOf(item));
+            }
+        }
+        return out;
     }
 }

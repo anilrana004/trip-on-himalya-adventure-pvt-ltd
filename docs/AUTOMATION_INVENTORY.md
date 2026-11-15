@@ -7,6 +7,10 @@
 > template; every CORE item is a boundary the engine must never be able to
 > bypass. Companion ADRs: `0006-workflow-automation-engine-build-vs-buy.md`,
 > `0007-kafka-gate.md`.
+>
+> **Zapier edge pipes (2026-11-15):** see `docs/automation/ZAPIER_INVENTORY.md`
+> and `docs/automation/MIGRATION_PLAN.md`. Zapier is not the orchestration
+> brain — most rows below are already native CRM code.
 
 ## 1. How automations run today
 

@@ -825,12 +825,43 @@ export type ZapierHookStatus = {
   id: string;
   label: string;
   configured: boolean;
+  /** Hook URL/secret present and not paused by feature flag. */
+  active?: boolean;
   env: string;
   zap: string;
+  note?: string;
 };
 
 export type ZapierAutomationStatus = {
   hooks: ZapierHookStatus[];
+  native?: {
+    emailMode: string;
+    whatsappMode: string;
+    leadWebhookSecretConfigured: boolean;
+    defaultCampaignDelivery: string;
+    lifecycleAlerts: string;
+    bookingWhatsApp: string;
+    metaConfigured?: boolean;
+    metaLeadgenIngestEnabled?: boolean;
+    metaIntake?: string;
+    migrateShadowEnabled?: boolean;
+    automationDryRun?: boolean;
+    legacyEffectsEnabled?: boolean;
+    migrateShadow?: string;
+  };
+  zapier?: {
+    eventsEnabled: boolean;
+    eventsHookConfigured: boolean;
+    eventsActive: boolean;
+    eventStats?: Record<string, number>;
+  };
+  migrate?: {
+    shadowEnabled: boolean;
+    dryRun: boolean;
+    legacyEffectsEnabled?: boolean;
+    engineLive?: boolean;
+    templates: { slug: string; name: string; active: boolean; version?: number | null }[];
+  };
   docs: string[];
 };
 

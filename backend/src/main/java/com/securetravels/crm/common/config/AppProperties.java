@@ -423,6 +423,17 @@ public class AppProperties {
         private int eventMaxAttempts = 5;
         private boolean killSwitchEnabled = false;
         private boolean dryRunEnabled = false;
+        /**
+         * When true, bootstrap/keep M1–M9 workflow templates ACTIVE.
+         * Does not force dry-run after cutover — use {@link #dryRunEnabled}.
+         */
+        private boolean migrateShadowEnabled = true;
+        /**
+         * When true, hard-coded FollowUp / booking WA / payment reminder /
+         * ops prep notify / scarcity notify still apply side effects.
+         * Cutover default false: engine templates own those effects.
+         */
+        private boolean legacyEffectsEnabled = false;
         private int rateLimitPerWorkflowPerMinute = 0;
         private int maxActiveRunsPerWorkflow = 0;
         private int coordinateDepthCap = 10_000;
@@ -449,6 +460,14 @@ public class AppProperties {
         public void setKillSwitchEnabled(boolean killSwitchEnabled) { this.killSwitchEnabled = killSwitchEnabled; }
         public boolean isDryRunEnabled() { return dryRunEnabled; }
         public void setDryRunEnabled(boolean dryRunEnabled) { this.dryRunEnabled = dryRunEnabled; }
+        public boolean isMigrateShadowEnabled() { return migrateShadowEnabled; }
+        public void setMigrateShadowEnabled(boolean migrateShadowEnabled) {
+            this.migrateShadowEnabled = migrateShadowEnabled;
+        }
+        public boolean isLegacyEffectsEnabled() { return legacyEffectsEnabled; }
+        public void setLegacyEffectsEnabled(boolean legacyEffectsEnabled) {
+            this.legacyEffectsEnabled = legacyEffectsEnabled;
+        }
         public int getRateLimitPerWorkflowPerMinute() { return rateLimitPerWorkflowPerMinute; }
         public void setRateLimitPerWorkflowPerMinute(int rateLimitPerWorkflowPerMinute) {
             this.rateLimitPerWorkflowPerMinute = rateLimitPerWorkflowPerMinute;
@@ -464,13 +483,25 @@ public class AppProperties {
     /**
      * Zapier Catch Hooks the CRM posts to (outbound). Inbound Facebook still
      * uses {@link Webhook#secret} on {@code POST /api/webhook/lead}.
+     *
+     * <p>Migration (docs/automation): keep hooks for rollback; flip
+     * {@code eventsEnabled} / campaign INLINE defaults without deleting Zaps.
      */
     public static class Zapier {
         /** Lifecycle events: lead.created/interested/quotation/booked/lost/call, sla.breach. */
         private String eventsHookUrl = "";
+        /**
+         * When false, {@code ZapierEventsClient} no-ops even if the Catch Hook
+         * URL is set (native EmailGateway / in-app alerts remain). Default true
+         * so existing Railway configs keep posting until cutover approval.
+         */
+        /** Cutover default false — Catch Hook URL kept for rollback. */
+        private boolean eventsEnabled = false;
 
         public String getEventsHookUrl() { return eventsHookUrl; }
         public void setEventsHookUrl(String eventsHookUrl) { this.eventsHookUrl = eventsHookUrl; }
+        public boolean isEventsEnabled() { return eventsEnabled; }
+        public void setEventsEnabled(boolean eventsEnabled) { this.eventsEnabled = eventsEnabled; }
     }
 
     /**
@@ -516,6 +547,13 @@ public class AppProperties {
         private Duration connectTimeout = Duration.ofSeconds(5);
         private Duration readTimeout = Duration.ofSeconds(20);
         private int maxRetries = 2;
+        /**
+         * When false (default), {@code POST /api/webhook/meta} verifies the
+         * signature and returns 200 but does not Graph-fetch or create leads.
+         * Keeps the Facebook Lead Ads Zap as the sole intake until dual-path
+         * cutover is approved ({@code docs/automation/}).
+         */
+        private boolean leadgenIngestEnabled = false;
 
         public String getAppId() { return appId; }
         public void setAppId(String appId) { this.appId = appId; }
@@ -537,6 +575,10 @@ public class AppProperties {
         public void setReadTimeout(Duration readTimeout) { this.readTimeout = readTimeout; }
         public int getMaxRetries() { return maxRetries; }
         public void setMaxRetries(int maxRetries) { this.maxRetries = maxRetries; }
+        public boolean isLeadgenIngestEnabled() { return leadgenIngestEnabled; }
+        public void setLeadgenIngestEnabled(boolean leadgenIngestEnabled) {
+            this.leadgenIngestEnabled = leadgenIngestEnabled;
+        }
 
         public boolean configured() {
             return accessToken != null && !accessToken.isBlank();

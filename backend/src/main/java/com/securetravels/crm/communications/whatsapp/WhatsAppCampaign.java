@@ -34,7 +34,7 @@ public class WhatsAppCampaign {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_mode", nullable = false, length = 20)
-    private DeliveryMode deliveryMode = DeliveryMode.ZAPIER;
+    private DeliveryMode deliveryMode = DeliveryMode.INLINE;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -71,7 +71,7 @@ public class WhatsAppCampaign {
         this.name = name;
         this.templateCode = templateCode;
         this.bodyText = bodyText;
-        this.deliveryMode = deliveryMode == null ? DeliveryMode.ZAPIER : deliveryMode;
+        this.deliveryMode = deliveryMode == null ? DeliveryMode.INLINE : deliveryMode;
         this.createdBy = createdBy;
         this.createdAt = Instant.now();
     }

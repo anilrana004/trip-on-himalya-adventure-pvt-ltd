@@ -37,6 +37,15 @@ public class AutomationGuards {
         return cfg.isDryRunEnabled();
     }
 
+    public boolean migrateShadow() {
+        return cfg.isMigrateShadowEnabled();
+    }
+
+    /** Hard-coded MIGRATE side effects (FollowUp tasks, booking WA, etc.). */
+    public boolean legacyEffects() {
+        return cfg.isLegacyEffectsEnabled();
+    }
+
     public int depthCap() {
         return Math.max(1, cfg.getCoordinateDepthCap());
     }

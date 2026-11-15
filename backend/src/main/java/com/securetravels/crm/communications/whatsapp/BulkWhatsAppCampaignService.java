@@ -79,8 +79,9 @@ public class BulkWhatsAppCampaignService {
             template = "LEAD_FOLLOW_UP";
         }
 
+        // Native SendGate/Interakt is the default; ZAPIER remains an explicit opt-in for rollback.
         WhatsAppCampaign.DeliveryMode mode = request.deliveryMode() == null
-                ? WhatsAppCampaign.DeliveryMode.ZAPIER
+                ? WhatsAppCampaign.DeliveryMode.INLINE
                 : request.deliveryMode();
 
         WhatsAppCampaign campaign = campaigns.save(new WhatsAppCampaign(

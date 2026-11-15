@@ -86,8 +86,18 @@ public class WebhookService {
         Lead.Source channel = parseSource(req.source());
         String logSource = channel == Lead.Source.STOREFRONT ? LOG_STOREFRONT : LOG_WEBSITE;
 
+        String metaLeadId = blankToNull(req.metaLeadId());
+        if (metaLeadId != null) {
+            Lead byMeta = leads.findByMetaLeadId(metaLeadId).orElse(null);
+            if (byMeta != null) {
+                log(logSource, payload, byMeta.getId(), WebhookLog.Status.duplicate, null);
+                return new WebhookLeadResponse(true, true, byMeta.getId(), byMeta.getOwnerId(), null,
+                        "Duplicate Meta lead id; existing lead returned");
+            }
+        }
+
         Lead duplicate = findDuplicate(req);
-        if (duplicate != null) {
+        if (duplicate != null && metaLeadId == null) {
             log(logSource, payload, duplicate.getId(), WebhookLog.Status.duplicate, null);
             return new WebhookLeadResponse(true, true, duplicate.getId(), duplicate.getOwnerId(), null,
                     "Duplicate lead; existing lead returned");
@@ -101,6 +111,19 @@ public class WebhookService {
 
         LeadCreateRequest createReq = toCreateRequest(req, channel, tripId, destination);
         User owner = roundRobin.assignForEnquiry(createReq.tripId(), createReq.destination(), null);
+
+        if (metaLeadId != null) {
+            LeadService.LeadIngestResult ingested = leadService.createFromMeta(createReq, owner.getId(), metaLeadId);
+            log(logSource, payload, ingested.lead().id(),
+                    ingested.duplicate() ? WebhookLog.Status.duplicate : WebhookLog.Status.success, null);
+            return new WebhookLeadResponse(true, ingested.duplicate(), ingested.lead().id(), owner.getId(),
+                    owner.getFullName(),
+                    ingested.duplicate()
+                            ? "Duplicate Meta/phone lead; existing lead returned"
+                            : "Lead created and assigned to " + owner.getFullName()
+                                    + ". 5-minute call task scheduled.");
+        }
+
         LeadResponse created = leadService.createAutomated(createReq, owner.getId());
 
         log(logSource, payload, created.id(), WebhookLog.Status.success, null);
@@ -216,6 +239,9 @@ public class WebhookService {
         }
         if (req.remarks() != null && req.remarks().length() > MAX_REMARKS) {
             throw new BadRequestException("remarks must be at most " + MAX_REMARKS + " characters");
+        }
+        if (req.metaLeadId() != null && req.metaLeadId().length() > 64) {
+            throw new BadRequestException("metaLeadId must be at most 64 characters");
         }
         if (!req.consentGiven()) {
             throw new BadRequestException("Explicit consent (consent_given=true) is required to create a lead");

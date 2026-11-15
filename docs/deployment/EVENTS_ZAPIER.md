@@ -14,13 +14,16 @@ Lead created / Interested / Quotation / Booked / Lost / Call / SLA breach
 | Variable | Purpose |
 |---|---|
 | `ZAPIER_EVENTS_HOOK_URL` | Catch Hook HTTPS URL |
+| `ZAPIER_EVENTS_ENABLED` | Cutover default `false` (CRM→Zapier posts paused; URL kept for rollback). Set `true` to restore Catch Hook posts. Native in-app + EmailGateway alerts still run either way. |
 | `WEBHOOK_SECRET` | HMAC for `X-Webhook-Signature` |
+
+Migration status: `docs/automation/MIGRATION_STATUS.md`.
 
 ## Zap
 
 1. **Trigger:** Webhooks by Zapier → Catch Hook  
 2. **Action:** Slack “Send Channel Message” (or Gmail)  
-3. Map `event`, `data.customerName`, `data.mobile`, `data.ownerName`, `data.stage`
+3. Map `event`, `customerName`, `mobile`, `ownerName`, `stage` (also nested under `data.*`)
 
 ### Events
 

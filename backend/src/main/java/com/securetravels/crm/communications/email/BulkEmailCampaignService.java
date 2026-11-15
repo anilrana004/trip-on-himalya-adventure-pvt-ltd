@@ -78,8 +78,9 @@ public class BulkEmailCampaignService {
             template = "LEAD_FOLLOW_UP";
         }
 
+        // Native SendGate/SES is the default; ZAPIER remains an explicit opt-in for rollback.
         EmailCampaign.DeliveryMode mode = request.deliveryMode() == null
-                ? EmailCampaign.DeliveryMode.ZAPIER
+                ? EmailCampaign.DeliveryMode.INLINE
                 : request.deliveryMode();
 
         EmailCampaign campaign = campaigns.save(new EmailCampaign(

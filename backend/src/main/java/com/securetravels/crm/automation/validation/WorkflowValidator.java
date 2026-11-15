@@ -59,8 +59,9 @@ public class WorkflowValidator {
     private static final Set<String> USER_ROLES = Set.of("SALES", "OPS", "MANAGER", "ADMIN", "CEO");
     private static final Set<String> TASK_TYPES = Set.of(
             "INITIAL_CALL", "FOLLOW_UP_1D", "FOLLOW_UP_3D", "FOLLOW_UP_8D", "FOLLOW_UP_15D",
-            "QUOTATION", "PAYMENT_REMINDER", "OPS", "REVIEW", "CUSTOM");
+            "QUOTATION", "PAYMENT_REMINDER", "OPS", "REVIEW", "CUSTOM", "CALLBACK");
     private static final Set<String> ASSIGNEE_METHODS = Set.of("OWNER", "ROUND_ROBIN", "ROLE", "USER");
+    private static final Set<String> NOTIFY_TARGETS = Set.of("OWNER");
     private static final Set<String> HTTP_METHODS = Set.of("GET", "POST", "PUT", "PATCH");
     private static final Set<String> ASSIGN_OWNER_METHODS = Set.of("ROUND_ROBIN", "SPECIFIC");
 
@@ -323,6 +324,7 @@ public class WorkflowValidator {
         Map<String, Object> cfg = step.config() == null ? Map.of() : step.config();
         switch (step.action()) {
             case CREATE_TASK -> validateCreateTask(result, entity, step, cfg);
+            case CANCEL_OPEN_TASKS -> validateCancelOpenTasks(result, entity, step, cfg);
             case ASSIGN_OWNER -> validateAssignOwner(result, step, cfg);
             case UPDATE_FIELD -> validateUpdateField(result, entity, step, cfg);
             case SEND_MESSAGE -> validateSendMessage(result, entity, step, cfg);
@@ -509,16 +511,46 @@ public class WorkflowValidator {
         }
     }
 
+    private void validateCancelOpenTasks(ValidationResult result, String entity, StepDefinition step,
+                                         Map<String, Object> cfg) {
+        if (!"lead".equals(entity)) {
+            result.add(ValidationIssue.error("CANCEL_OPEN_TASKS is lead-only", step.id()));
+        }
+        Object typesRaw = cfg.get("types");
+        if (typesRaw == null) {
+            return;
+        }
+        if (!(typesRaw instanceof List<?> list)) {
+            result.add(ValidationIssue.error("CANCEL_OPEN_TASKS 'types' must be a list of task types",
+                    step.id()));
+            return;
+        }
+        for (Object item : list) {
+            String type = stringOf(item);
+            if (!TASK_TYPES.contains(type)) {
+                result.add(ValidationIssue.error("CANCEL_OPEN_TASKS type '" + type
+                        + "' must be one of " + TASK_TYPES, step.id()));
+            }
+        }
+    }
+
     private void validateNotifyUser(ValidationResult result, StepDefinition step,
                                     Map<String, Object> cfg) {
+        String target = stringOf(cfg.get("target"));
         String role = stringOf(cfg.get("role"));
         String userId = stringOf(cfg.get("userId"));
-        if (role != null) {
+        if (target != null) {
+            if (!NOTIFY_TARGETS.contains(target)) {
+                result.add(ValidationIssue.error("NOTIFY_USER 'target' must be one of "
+                        + NOTIFY_TARGETS, step.id()));
+            }
+        } else if (role != null) {
             if (!USER_ROLES.contains(role)) {
                 result.add(ValidationIssue.error("NOTIFY_USER 'role' must be a user role", step.id()));
             }
         } else if (userId == null || !isUuid(cfg.get("userId"))) {
-            result.add(ValidationIssue.error("NOTIFY_USER needs a valid 'role' or 'userId'",
+            result.add(ValidationIssue.error(
+                    "NOTIFY_USER needs 'target' OWNER, a valid 'role', or 'userId'",
                     step.id()));
         }
         if (stringOf(cfg.get("title")) == null || stringOf(cfg.get("title")).isBlank()) {
@@ -772,7 +804,7 @@ public class WorkflowValidator {
 
     private static boolean isDateLike(String s) {
         String v = s.trim();
-        if (v.equals("today") || v.equals("today+1") || v.equals("today-1")) {
+        if (v.equals("today") || v.matches("today[+-]\\d+")) {
             return true;
         }
         try {

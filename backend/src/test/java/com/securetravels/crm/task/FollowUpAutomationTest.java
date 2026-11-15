@@ -1,5 +1,9 @@
 package com.securetravels.crm.task;
 
+import com.securetravels.crm.automation.event.AutomationEvent;
+import com.securetravels.crm.automation.event.EventPublisher;
+import com.securetravels.crm.automation.runtime.AutomationGuards;
+import com.securetravels.crm.automation.runtime.LegacyAutomationGate;
 import com.securetravels.crm.automation.zapier.ZapierEventsClient;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
@@ -44,6 +48,7 @@ class FollowUpAutomationTest {
     @Mock private NotificationRepository notifications;
     @Mock private EmailNotifier email;
     @Mock private ZapierEventsClient zapier;
+    @Mock private EventPublisher domainEvents;
 
     private FollowUpAutomation automation;
     private UUID assignee;
@@ -53,7 +58,11 @@ class FollowUpAutomationTest {
     void setUp() {
         AppProperties props = new AppProperties();
         props.setPublicUrl("http://localhost:3001");
-        automation = new FollowUpAutomation(tasks, users, leads, notifications, email, zapier, props);
+        // Unit tests assert the hard-coded path; cutover default is legacy off.
+        props.getAutomation().setLegacyEffectsEnabled(true);
+        LegacyAutomationGate legacy = new LegacyAutomationGate(new AutomationGuards(props));
+        automation = new FollowUpAutomation(tasks, users, leads, notifications, email, zapier, domainEvents,
+                legacy, props);
         assignee = UUID.randomUUID();
         user = new User("sales@securetravels.in", "pw", "Ravi", Role.SALES, "9876500000");
     }
@@ -64,8 +73,10 @@ class FollowUpAutomationTest {
         when(users.findById(assignee)).thenReturn(Optional.of(user));
 
         Instant now = Instant.now();
-        automation.onLeadCreated(UUID.randomUUID(), assignee);
+        UUID leadId = UUID.randomUUID();
+        automation.onLeadCreated(leadId, assignee);
 
+        verify(domainEvents).publish(any(AutomationEvent.class));
         Task t = captureSavedTasks(1).get(0);
         assertThat(t.getType()).isEqualTo(Task.Type.INITIAL_CALL);
         assertThat(t.getStatus()).isEqualTo(Task.Status.PENDING);

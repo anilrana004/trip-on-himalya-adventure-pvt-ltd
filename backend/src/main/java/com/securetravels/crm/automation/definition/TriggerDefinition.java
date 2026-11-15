@@ -28,4 +28,8 @@ public record TriggerDefinition(
     public static TriggerDefinition event(String event) {
         return new TriggerDefinition(TriggerKind.EVENT, event, null, null, null, null);
     }
+
+    public static TriggerDefinition dateOffset(String entity, String dateField, int offsetDays) {
+        return new TriggerDefinition(TriggerKind.DATE_OFFSET, null, entity, null, dateField, offsetDays);
+    }
 }

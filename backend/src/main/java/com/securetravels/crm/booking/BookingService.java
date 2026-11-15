@@ -30,6 +30,7 @@ import com.securetravels.crm.operations.OperationsService;
 import com.securetravels.crm.trip.Batch;
 import com.securetravels.crm.trip.BatchRepository;
 import com.securetravels.crm.trip.BookingType;
+import com.securetravels.crm.automation.event.AutomationEventShadow;
 import com.securetravels.crm.trip.CapacityAlertService;
 import com.securetravels.crm.trip.SeatHold;
 import com.securetravels.crm.trip.SeatHoldRepository;
@@ -93,6 +94,7 @@ public class BookingService {
     private final AccountInvoiceService invoices;
     private final AppProperties appProperties;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final AutomationEventShadow eventShadow;
 
     public BookingService(BookingRepository bookings, TravellerRepository travellers,
                           SeatHoldRepository seatHolds, BatchRepository batches, TripRepository trips,
@@ -103,7 +105,8 @@ public class BookingService {
                           CommissionLedgerService commissionLedger,
                           AccountService accounts, AccountCommissionPayableService commissionPayables,
                           AccountInvoiceService invoices, AppProperties appProperties,
-                          org.springframework.context.ApplicationEventPublisher events) {
+                          org.springframework.context.ApplicationEventPublisher events,
+                          AutomationEventShadow eventShadow) {
         this.bookings = bookings;
         this.travellers = travellers;
         this.seatHolds = seatHolds;
@@ -125,6 +128,7 @@ public class BookingService {
         this.invoices = invoices;
         this.appProperties = appProperties;
         this.events = events;
+        this.eventShadow = eventShadow;
     }
 
     @Transactional
@@ -301,6 +305,8 @@ public class BookingService {
      * not exist, and a WhatsApp failure cannot fail the confirmation.
      */
     private void publishBookingConfirmed(Booking booking) {
+        // Outbox shadow for MIGRATE M4/M7 engine templates (dry-run while flag on).
+        eventShadow.publish("booking", "confirmed", booking.getId());
         customers.findById(booking.getCustomerId()).ifPresent(customer -> {
             String mobile = customer.getWhatsappNumber() != null && !customer.getWhatsappNumber().isBlank()
                     ? customer.getWhatsappNumber() : customer.getMobileNumber();

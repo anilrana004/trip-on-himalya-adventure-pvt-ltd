@@ -1,5 +1,7 @@
 package com.securetravels.crm.trip;
 
+import com.securetravels.crm.automation.event.AutomationEventShadow;
+import com.securetravels.crm.automation.runtime.LegacyAutomationGate;
 import com.securetravels.crm.common.audit.AuditAction;
 import com.securetravels.crm.common.audit.AuditService;
 import com.securetravels.crm.common.config.AppProperties;
@@ -56,14 +58,19 @@ public class CapacityAlertService {
     private final EmailNotifier email;
     private final AuditService auditService;
     private final AppProperties props;
+    private final AutomationEventShadow eventShadow;
+    private final LegacyAutomationGate legacy;
 
     public CapacityAlertService(NotificationRepository notifications, UserRepository users,
-                                EmailNotifier email, AuditService auditService, AppProperties props) {
+                                EmailNotifier email, AuditService auditService, AppProperties props,
+                                AutomationEventShadow eventShadow, LegacyAutomationGate legacy) {
         this.notifications = notifications;
         this.users = users;
         this.email = email;
         this.auditService = auditService;
         this.props = props;
+        this.eventShadow = eventShadow;
+        this.legacy = legacy;
     }
 
     public int alertFillPercent() {
@@ -106,9 +113,14 @@ public class CapacityAlertService {
                 + fill + "% full (" + batch.getSeatsBooked() + " of " + batch.getMaxCapacity()
                 + " seats). " + batch.seatsAvailable() + " seat(s) left.";
 
-        raise(Role.OPS, title, body, "/trips/" + trip.getId());
+        if (legacy == null || legacy.enabled()) {
+            raise(Role.OPS, title, body, "/trips/" + trip.getId());
+        }
         auditService.record("BATCH", batch.getId(), AuditAction.UPDATE,
                 "capacity_alerted_at", null, String.valueOf(fill) + "%");
+        if (eventShadow != null) {
+            eventShadow.publish("batch", "scarcity_alert", batch.getId());
+        }
         log.info("[capacity] scarcity alert batch={} fill={} threshold={}",
                 batch.getId(), fill, alertFillPercent());
         return true;

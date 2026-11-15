@@ -1,5 +1,8 @@
 package com.securetravels.crm.task;
 
+import com.securetravels.crm.automation.event.AutomationEvent;
+import com.securetravels.crm.automation.event.EventPublisher;
+import com.securetravels.crm.automation.runtime.LegacyAutomationGate;
 import com.securetravels.crm.automation.zapier.ZapierEventsClient;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.notify.EmailNotifier;
@@ -50,17 +53,22 @@ public class FollowUpAutomation {
     private final NotificationRepository notifications;
     private final EmailNotifier email;
     private final ZapierEventsClient zapier;
+    private final EventPublisher domainEvents;
+    private final LegacyAutomationGate legacy;
     private final String appUrl;
 
     public FollowUpAutomation(TaskRepository tasks, UserRepository users, LeadRepository leads,
                               NotificationRepository notifications, EmailNotifier email,
-                              ZapierEventsClient zapier, AppProperties props) {
+                              ZapierEventsClient zapier, EventPublisher domainEvents,
+                              LegacyAutomationGate legacy, AppProperties props) {
         this.tasks = tasks;
         this.users = users;
         this.leads = leads;
         this.notifications = notifications;
         this.email = email;
         this.zapier = zapier;
+        this.domainEvents = domainEvents;
+        this.legacy = legacy;
         String configured = props.getPublicUrl() == null ? "" : props.getPublicUrl().trim();
         this.appUrl = configured.endsWith("/") ? configured.substring(0, configured.length() - 1) : configured;
     }
@@ -72,13 +80,17 @@ public class FollowUpAutomation {
 
     @Transactional
     public void onLeadCreated(UUID leadId, UUID assigneeId, Lead.Source source) {
-        Instant dueAt = Instant.now().plus(5, ChronoUnit.MINUTES);
-        Instant sla = isFastTrack(source)
-                ? Instant.now().plus(15, ChronoUnit.MINUTES)
-                : dueAt.plus(1, ChronoUnit.HOURS);
-        scheduleOne(leadId, assigneeId, Task.Type.INITIAL_CALL, dueAt, sla,
-                "Call within 5 minutes",
-                "New lead assigned to you — call the customer now.");
+        if (legacy.enabled()) {
+            Instant dueAt = Instant.now().plus(5, ChronoUnit.MINUTES);
+            Instant sla = isFastTrack(source)
+                    ? Instant.now().plus(15, ChronoUnit.MINUTES)
+                    : dueAt.plus(1, ChronoUnit.HOURS);
+            scheduleOne(leadId, assigneeId, Task.Type.INITIAL_CALL, dueAt, sla,
+                    "Call within 5 minutes",
+                    "New lead assigned to you — call the customer now.");
+        } else {
+            log.info("[automation] legacy off — engine owns speed-to-lead for lead={}", leadId);
+        }
         publishLeadEvent("lead.created", leadId, assigneeId);
     }
 
@@ -99,51 +111,63 @@ public class FollowUpAutomation {
      */
     @Transactional
     public void onInterested(Lead lead) {
-        cancelOpen(lead.getId(), Task.Type.INITIAL_CALL);
-        cancelOpen(lead.getId(), Task.Type.CALLBACK);
-        cancelOpenFollowUps(lead.getId());
-        Instant base = Instant.now();
-        int[] days = {1, 3, 8, 15};
-        String[] titles = {
-                "Follow-up 1 — tomorrow",
-                "Follow-up 2 — 2 days later",
-                "Follow-up 3 — 5 days later",
-                "Follow-up 4 — 7 days later"
-        };
-        Instant firstDue = null;
-        for (int i = 0; i < days.length; i++) {
-            Instant due = base.plus(days[i], ChronoUnit.DAYS);
-            if (firstDue == null) firstDue = due;
-            scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.valueOf("FOLLOW_UP_" + days[i] + "D"),
-                    due, 24, titles[i],
-                    titles[i] + " for " + lead.getCustomerName() + ".");
-        }
-        if (firstDue != null) {
-            lead.setFollowUpDate(LocalDate.ofInstant(firstDue, ZONE));
+        if (legacy.enabled()) {
+            cancelOpen(lead.getId(), Task.Type.INITIAL_CALL);
+            cancelOpen(lead.getId(), Task.Type.CALLBACK);
+            cancelOpenFollowUps(lead.getId());
+            Instant base = Instant.now();
+            int[] days = {1, 3, 8, 15};
+            String[] titles = {
+                    "Follow-up 1 — tomorrow",
+                    "Follow-up 2 — 2 days later",
+                    "Follow-up 3 — 5 days later",
+                    "Follow-up 4 — 7 days later"
+            };
+            Instant firstDue = null;
+            for (int i = 0; i < days.length; i++) {
+                Instant due = base.plus(days[i], ChronoUnit.DAYS);
+                if (firstDue == null) firstDue = due;
+                scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.valueOf("FOLLOW_UP_" + days[i] + "D"),
+                        due, 24, titles[i],
+                        titles[i] + " for " + lead.getCustomerName() + ".");
+            }
+            if (firstDue != null) {
+                lead.setFollowUpDate(LocalDate.ofInstant(firstDue, ZONE));
+            }
+        } else {
+            log.info("[automation] legacy off — engine owns cadence for lead={}", lead.getId());
         }
         publishLeadSnapshot("lead.interested", lead);
     }
 
     @Transactional
     public void onQuotationSent(Lead lead) {
-        cancelOpen(lead.getId(), Task.Type.QUOTATION);
-        Instant due = Instant.now().plus(2, ChronoUnit.DAYS);
-        scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.QUOTATION,
-                due, 24, "Quotation follow-up",
-                "Send / confirm the quotation for " + lead.getCustomerName() + ".");
-        lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+        if (legacy.enabled()) {
+            cancelOpen(lead.getId(), Task.Type.QUOTATION);
+            Instant due = Instant.now().plus(2, ChronoUnit.DAYS);
+            scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.QUOTATION,
+                    due, 24, "Quotation follow-up",
+                    "Send / confirm the quotation for " + lead.getCustomerName() + ".");
+            lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+        } else {
+            log.info("[automation] legacy off — engine owns quotation chase for lead={}", lead.getId());
+        }
         publishLeadSnapshot("lead.quotation", lead);
     }
 
     @Transactional
     public void onBooked(Lead lead) {
-        cancelAllOpen(lead.getId());
-        lead.setFollowUpDate(null);
-        String title = "Booking confirmed — follow-up closed";
-        String body = "No further follow-up needed for " + lead.getCustomerName() + ".";
-        notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
-                leadPath(lead.getId())));
-        log.info("[automation] lead={} booked; outstanding follow-ups cancelled", lead.getId());
+        if (legacy.enabled()) {
+            cancelAllOpen(lead.getId());
+            lead.setFollowUpDate(null);
+            String title = "Booking confirmed — follow-up closed";
+            String body = "No further follow-up needed for " + lead.getCustomerName() + ".";
+            notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
+                    leadPath(lead.getId())));
+            log.info("[automation] lead={} booked; outstanding follow-ups cancelled", lead.getId());
+        } else {
+            log.info("[automation] legacy off — engine owns booked cleanup for lead={}", lead.getId());
+        }
         publishLeadSnapshot("lead.booked", lead);
     }
 
@@ -151,15 +175,19 @@ public class FollowUpAutomation {
     @Transactional
     public void onLost(Lead lead) {
         if (lead == null || lead.getId() == null) return;
-        cancelAllOpen(lead.getId());
-        lead.setFollowUpDate(null);
-        if (lead.getOwnerId() != null) {
-            String title = "Lead marked lost — follow-ups closed";
-            String body = "No further follow-up for " + lead.getCustomerName() + ".";
-            notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
-                    leadPath(lead.getId())));
+        if (legacy.enabled()) {
+            cancelAllOpen(lead.getId());
+            lead.setFollowUpDate(null);
+            if (lead.getOwnerId() != null) {
+                String title = "Lead marked lost — follow-ups closed";
+                String body = "No further follow-up for " + lead.getCustomerName() + ".";
+                notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
+                        leadPath(lead.getId())));
+            }
+            log.info("[automation] lead={} lost; outstanding follow-ups cancelled", lead.getId());
+        } else {
+            log.info("[automation] legacy off — skip lost cleanup side effects for lead={}", lead.getId());
         }
-        log.info("[automation] lead={} lost; outstanding follow-ups cancelled", lead.getId());
         publishLeadSnapshot("lead.lost", lead);
     }
 
@@ -170,6 +198,9 @@ public class FollowUpAutomation {
      */
     @Transactional
     public void onSoftDuplicate(Lead lead) {
+        if (!legacy.enabled()) {
+            return;
+        }
         if (lead == null || lead.getId() == null || lead.getOwnerId() == null) return;
         if (lead.getStatus() == Lead.Status.LOST) return;
         List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
@@ -285,10 +316,12 @@ public class FollowUpAutomation {
         data.put("dueAt", task.getDueAt() == null ? null : task.getDueAt().toString());
         data.putAll(leadPayload(task.getLeadId(), task.getAssigneeId()));
         zapier.publishAsync("sla.breach", data);
+        shadowDomainEvent("lead", "sla_breach", task.getLeadId());
     }
 
     private void publishLeadEvent(String event, UUID leadId, UUID assigneeId) {
         zapier.publishAsync(event, leadPayload(leadId, assigneeId));
+        shadowLeadEvent(event, leadId);
     }
 
     private void publishLeadSnapshot(String event, Lead lead) {
@@ -304,6 +337,30 @@ public class FollowUpAutomation {
                 lead.getSource() == null ? null : lead.getSource().name(),
                 owner,
                 lead.getStatus() == null ? null : lead.getStatus().name()));
+        shadowLeadEvent(event, lead.getId());
+    }
+
+    /**
+     * Writes to the automation outbox alongside Zapier Catch Hook posts so
+     * native workflows can shadow without cutting over yet.
+     */
+    private void shadowLeadEvent(String event, UUID leadId) {
+        if (event == null || !event.startsWith("lead.") || leadId == null) {
+            return;
+        }
+        shadowDomainEvent("lead", event.substring("lead.".length()), leadId);
+    }
+
+    private void shadowDomainEvent(String entity, String action, UUID subjectId) {
+        if (domainEvents == null || subjectId == null || entity == null || action == null || action.isBlank()) {
+            return;
+        }
+        try {
+            domainEvents.publish(new AutomationEvent(entity, action, subjectId, Instant.now()));
+        } catch (Exception ex) {
+            log.warn("[automation] outbox shadow failed entity={} action={} subject={}: {}",
+                    entity, action, subjectId, ex.getMessage());
+        }
     }
 
     private Map<String, Object> leadPayload(UUID leadId, UUID assigneeId) {

@@ -44,6 +44,10 @@ app:
     # bean per scenario and restores it after, so no static overrides here.
     kill-switch-enabled: false
     dry-run-enabled: false
+    # Phase 4 templates stay off under test unless a specific IT opts in.
+    migrate-shadow-enabled: false
+    # Keep hard-coded paths on in ITs that assert FollowUp/sweeps behaviour.
+    legacy-effects-enabled: true
     rate-limit-per-workflow-per-minute: 0
     max-active-runs-per-workflow: 0
     coordinate-depth-cap: 10000
