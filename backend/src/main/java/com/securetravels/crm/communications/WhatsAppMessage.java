@@ -82,7 +82,7 @@ public class WhatsAppMessage extends CreatedUpdated {
     private String callbackData;
 
     @Column(nullable = false, length = 30)
-    private String provider = "INTERAKT";
+    private String provider = "META_WHATSAPP";
 
     @Column(name = "provider_message_id", length = 80)
     private String providerMessageId;

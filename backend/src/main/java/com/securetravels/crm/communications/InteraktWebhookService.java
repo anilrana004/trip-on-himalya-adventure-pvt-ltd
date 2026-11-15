@@ -46,7 +46,8 @@ public class InteraktWebhookService {
 
     private static final Logger log = LoggerFactory.getLogger(InteraktWebhookService.class);
 
-    private static final String PROVIDER = InteraktWhatsAppGateway.PROVIDER;
+    /** Legacy inbound Interakt webhook rows; live send path is Meta Cloud API. */
+    private static final String PROVIDER = "INTERAKT";
 
     private final WhatsAppMessageRepository messages;
     private final TimelineEventRepository timeline;
@@ -78,7 +79,8 @@ public class InteraktWebhookService {
      */
     @Transactional
     public int handle(byte[] rawBody, String providedSignature) {
-        if (!HmacSigner.matches(providedSignature, props.getWhatsApp().getWebhookSecret(), rawBody)) {
+        String secret = props.getWhatsApp().getAppSecret();
+        if (!HmacSigner.matches(providedSignature, secret, rawBody)) {
             log.warn("[interakt] rejected webhook with invalid or missing signature");
             throw new WebhookSignatureException("Invalid Interakt webhook signature");
         }

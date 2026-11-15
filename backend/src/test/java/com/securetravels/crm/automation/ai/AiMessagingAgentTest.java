@@ -1,6 +1,5 @@
 package com.securetravels.crm.automation.ai;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.securetravels.crm.automation.runtime.RuntimeSnapshot;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.communications.TimelineEvent;
@@ -21,14 +20,13 @@ class AiMessagingAgentTest {
     void setUp() {
         props = new AppProperties();
         props.getAi().setEnabled(true);
-        props.getAi().setProvider(AppProperties.Ai.Provider.STUB);
-        agent = new AiMessagingAgent(props, new ObjectMapper());
+        agent = new AiMessagingAgent(props);
     }
 
     @Test
-    void readyWhenStubEnabled() {
+    void readyWhenEnabled() {
         assertThat(agent.ready()).isTrue();
-        assertThat(agent.statusLabel()).contains("STUB");
+        assertThat(agent.statusLabel()).contains("OWN");
     }
 
     @Test
@@ -38,14 +36,22 @@ class AiMessagingAgentTest {
     }
 
     @Test
-    void stubComposeFollowUp() {
+    void metaChannelWorkableWhenConfigured() {
+        props.getWhatsApp().setMode(AppProperties.WhatsApp.Mode.META);
+        props.getWhatsApp().setPhoneNumberId("123");
+        props.getWhatsApp().setAccessToken("token");
+        assertThat(agent.channelWorkable(TimelineEvent.Channel.WHATSAPP)).isTrue();
+    }
+
+    @Test
+    void ownComposeFollowUp() {
         RuntimeSnapshot snap = new RuntimeSnapshot("lead", UUID.randomUUID(), Map.of(
                 "customerName", "Anil",
                 "destination", "Kedarkantha",
                 "source", "WEBSITE",
                 "status", "INTERESTED"));
         AiComposeResult result = agent.compose("FOLLOW_UP", TimelineEvent.Channel.EMAIL, snap, 2);
-        assertThat(result.provider()).isEqualTo("STUB");
+        assertThat(result.provider()).isEqualTo("OWN");
         assertThat(result.subject()).containsIgnoringCase("Kedarkantha");
         assertThat(result.body()).contains("Anil");
         assertThat(result.bodyValues()).containsExactly("Kedarkantha", "Anil");

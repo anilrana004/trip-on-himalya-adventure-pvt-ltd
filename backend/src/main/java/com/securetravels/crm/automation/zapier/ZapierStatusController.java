@@ -98,7 +98,7 @@ public class ZapierStatusController {
         nativePath.put("migrateShadow", cutoverSummary());
         nativePath.put("aiAgentEnabled", props.getAi().isEnabled());
         nativePath.put("aiAgentReady", aiAgent.ready());
-        nativePath.put("aiAgentProvider", props.getAi().getProvider().name());
+        nativePath.put("aiAgentProvider", props.getAi().providerLabel());
         nativePath.put("aiAgentStatus", aiAgent.statusLabel());
         nativePath.put("aiEmailWorkable", aiAgent.channelWorkable(TimelineEvent.Channel.EMAIL));
         nativePath.put("aiWhatsappWorkable", aiAgent.channelWorkable(TimelineEvent.Channel.WHATSAPP));

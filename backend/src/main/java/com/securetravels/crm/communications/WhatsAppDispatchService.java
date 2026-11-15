@@ -144,7 +144,7 @@ public class WhatsAppDispatchService implements OutboundChannelDispatcher {
         timeline.save(TimelineEvent.outboundTemplate(
                 subjectType, subjectId, TimelineEvent.Kind.TEMPLATE_QUEUED, templateCode,
                 "Queued " + templateCode + " to " + digits,
-                props.getWhatsApp().live() ? InteraktWhatsAppGateway.PROVIDER : SandboxWhatsAppGateway.PROVIDER,
+                props.getWhatsApp().live() ? MetaWhatsAppGateway.PROVIDER : SandboxWhatsAppGateway.PROVIDER,
                 null, digits, values));
 
         events.publishEvent(new WhatsAppQueuedEvent(row.getId()));

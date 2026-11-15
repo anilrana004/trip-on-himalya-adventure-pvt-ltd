@@ -48,7 +48,7 @@ const RULES = [
   },
   {
     title: "AI messaging agent (M12/M13)",
-    body: "When AI_AGENT_ENABLED is on and email/WhatsApp is workable, INTERESTED and quotation events get an AI-composed LEAD_FOLLOW_UP via SendGate. STUB works without an API key; OPENAI needs AI_AGENT_API_KEY.",
+    body: "In-house OWN agent (no third-party LLM). When AI_AGENT_ENABLED is on and email/WhatsApp is workable, INTERESTED and quotation events get composed LEAD_FOLLOW_UP via SendGate. WhatsApp live path is Meta Cloud API.",
   },
 ];
 

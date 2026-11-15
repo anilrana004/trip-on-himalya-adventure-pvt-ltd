@@ -8,19 +8,14 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * HTTP client for Interakt, created only in live mode.
- *
- * <p>The timeouts are not cosmetic. Without a read timeout a provider stall
- * holds a dispatch thread and, in the inline path, blocks the caller — and with
- * a default 10-minute Interakt quota window, "slow" is a realistic case, not a
- * hypothetical one.
+ * HTTP client for Meta WhatsApp Cloud API (live mode only).
  */
 @Configuration
-@ConditionalOnProperty(prefix = "app.whatsapp", name = "mode", havingValue = "INTERAKT")
-public class InteraktClientConfig {
+@ConditionalOnProperty(prefix = "app.whatsapp", name = "mode", havingValue = "META")
+public class MetaWhatsAppClientConfig {
 
     @Bean
-    public RestClient interaktRestClient(RestClient.Builder builder, AppProperties props) {
+    public RestClient metaWhatsAppRestClient(RestClient.Builder builder, AppProperties props) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(props.getWhatsApp().getConnectTimeout());
         factory.setReadTimeout(props.getWhatsApp().getReadTimeout());

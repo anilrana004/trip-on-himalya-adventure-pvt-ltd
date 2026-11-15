@@ -115,20 +115,19 @@ app:
     max-attempts: ${MESSAGING_MAX_ATTEMPTS:3}
     retry-backoff-millis: ${MESSAGING_RETRY_BACKOFF_MS:2000}
   whatsapp:
-    # SANDBOX records the send and returns a synthetic id; INTERAKT does real
-    # HTTP and needs INTERAKT_API_KEY. No live credentials yet — see
-    # docs/INTEGRATIONS.md.
+    # SANDBOX = synthetic ids; META = Meta WhatsApp Cloud API (company WABA).
     mode: ${WHATSAPP_MODE:SANDBOX}
-    base-url: ${INTERAKT_BASE_URL:https://api.interakt.ai/v1/public}
-    api-key: ${INTERAKT_API_KEY:}
-    webhook-secret: ${INTERAKT_WEBHOOK_SECRET:dev-interakt-webhook-secret-change-me}
-    # Quoted: bare +91 is parsed by YAML as the integer 91, which would send
-    # "91" to Interakt instead of "+91" and fail recipient matching.
+    graph-base-url: ${META_WA_GRAPH_BASE_URL:https://graph.facebook.com}
+    graph-api-version: ${META_WA_GRAPH_VERSION:v21.0}
+    phone-number-id: ${META_WA_PHONE_NUMBER_ID:}
+    access-token: ${META_WA_ACCESS_TOKEN:}
+    app-secret: ${META_WA_APP_SECRET:}
+    webhook-verify-token: ${META_WA_WEBHOOK_VERIFY_TOKEN:}
+    # Quoted: bare +91 is YAML integer 91 — keep quotes.
     country-code: "${WHATSAPP_COUNTRY_CODE:+91}"
-    connect-timeout: ${INTERAKT_CONNECT_TIMEOUT:5s}
-    read-timeout: ${INTERAKT_READ_TIMEOUT:10s}
-    rate-limit-per-minute: ${INTERAKT_RATE_LIMIT_PER_MINUTE:300}
-    # Catch Hook URL for bulk WhatsApp campaigns (deliveryMode=ZAPIER).
+    connect-timeout: ${META_WA_CONNECT_TIMEOUT:5s}
+    read-timeout: ${META_WA_READ_TIMEOUT:15s}
+    rate-limit-per-minute: ${META_WA_RATE_LIMIT_PER_MINUTE:80}
     zapier-hook-url: ${ZAPIER_WHATSAPP_HOOK_URL:}
   email:
     webhook-secret: ${EMAIL_WEBHOOK_SECRET:}
@@ -137,15 +136,8 @@ app:
   sms:
     webhook-secret: ${SMS_WEBHOOK_SECRET:}
   ai:
-    # Small automation messaging agent. Off by default.
-    # STUB composes deterministic copy without an API key (safe for sandbox).
-    # OPENAI needs AI_AGENT_API_KEY (OpenAI-compatible Chat Completions).
+    # In-house messaging agent (no third-party LLM). Off by default.
     enabled: ${AI_AGENT_ENABLED:false}
-    provider: ${AI_AGENT_PROVIDER:STUB}
-    api-key: ${AI_AGENT_API_KEY:}
-    model: ${AI_AGENT_MODEL:gpt-4o-mini}
-    base-url: ${AI_AGENT_BASE_URL:https://api.openai.com/v1}
-    timeout: ${AI_AGENT_TIMEOUT:20s}
   automation:
     # Phase 6 Module 1 — hard bounds the validator applies to every definition.
     max-steps-per-workflow: ${AUTOMATION_MAX_STEPS_PER_WORKFLOW:30}

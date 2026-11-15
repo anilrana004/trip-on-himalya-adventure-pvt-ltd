@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Runs in INLINE mode against the sandbox gateway, so the assertions are about
  * our own guarantees — the state machine, the timeline, idempotency, and access
  * control — not about Interakt being reachable. Interakt's own contract is pinned
- * separately in {@code InteraktWhatsAppGatewayTest}.
+ * separately in {@code MetaWhatsAppGatewayTest}.
  */
 class WhatsAppCommunicationIT extends BaseIT {
 
@@ -273,7 +273,7 @@ class WhatsAppCommunicationIT extends BaseIT {
         assertThat(captured.getConsentScope()).contains("NOT marketing");
 
         InboundMessage stored = inboundMessages
-                .findByProviderAndProviderMessageId(InteraktWhatsAppGateway.PROVIDER, "inbound-3")
+                .findByProviderAndProviderMessageId("INTERAKT", "inbound-3")
                 .orElseThrow();
         assertThat(stored.getLeadId()).isEqualTo(captured.getId());
         assertThat(stored.getBody()).isEqualTo("random spam");

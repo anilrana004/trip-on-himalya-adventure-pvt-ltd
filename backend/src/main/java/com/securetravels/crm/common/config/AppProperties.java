@@ -278,41 +278,44 @@ public class AppProperties {
     }
 
     /**
-     * Module 4 — Interakt (company-owned WhatsApp WABA).
+     * WhatsApp via Meta Cloud API (company WABA) — no Interakt / BSP dependency.
      *
-     * <p>{@link Mode#SANDBOX} is the default and is the reason this module is
-     * buildable and testable without live credentials: it records the send and
-     * returns a synthetic provider id. {@link Mode#INTERAKT} performs real HTTP.
-     *
-     * <p>See {@code docs/INTEGRATIONS.md} for the verified endpoint contract
-     * and the fields that remain unconfirmed until a live key is available.
+     * <p>{@link Mode#SANDBOX} records sends with a synthetic id (default).
+     * {@link Mode#META} posts template messages to Graph
+     * {@code /{phone-number-id}/messages}.
      */
     public static class WhatsApp {
-        public enum Mode { SANDBOX, INTERAKT }
+        public enum Mode { SANDBOX, META }
 
         private Mode mode = Mode.SANDBOX;
-        private String baseUrl = "https://api.interakt.ai/v1/public";
-        private String apiKey = "";
-        private String webhookSecret = "dev-interakt-webhook-secret-change-me";
+        private String graphBaseUrl = "https://graph.facebook.com";
+        private String graphApiVersion = "v21.0";
+        private String phoneNumberId = "";
+        private String accessToken = "";
+        /** Optional: Meta app secret for future WhatsApp webhook signature checks. */
+        private String appSecret = "";
+        private String webhookVerifyToken = "";
         private String countryCode = "+91";
         private Duration connectTimeout = Duration.ofSeconds(5);
-        private Duration readTimeout = Duration.ofSeconds(10);
-        /** Interakt plan quota (300/min Growth, 600/min Advanced). */
-        private int rateLimitPerMinute = 300;
-        /**
-         * Zapier Catch Hook for bulk WhatsApp (HTTPS). When set, campaigns with
-         * deliveryMode=ZAPIER POST each recipient here with HMAC header.
-         */
+        private Duration readTimeout = Duration.ofSeconds(15);
+        private int rateLimitPerMinute = 80;
+        /** Deprecated Zap Catch Hook (unused; campaigns are SendGate-only). */
         private String zapierHookUrl = "";
 
         public Mode getMode() { return mode; }
         public void setMode(Mode mode) { this.mode = mode; }
-        public String getBaseUrl() { return baseUrl; }
-        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-        public String getApiKey() { return apiKey; }
-        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-        public String getWebhookSecret() { return webhookSecret; }
-        public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
+        public String getGraphBaseUrl() { return graphBaseUrl; }
+        public void setGraphBaseUrl(String graphBaseUrl) { this.graphBaseUrl = graphBaseUrl; }
+        public String getGraphApiVersion() { return graphApiVersion; }
+        public void setGraphApiVersion(String graphApiVersion) { this.graphApiVersion = graphApiVersion; }
+        public String getPhoneNumberId() { return phoneNumberId; }
+        public void setPhoneNumberId(String phoneNumberId) { this.phoneNumberId = phoneNumberId; }
+        public String getAccessToken() { return accessToken; }
+        public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
+        public String getAppSecret() { return appSecret; }
+        public void setAppSecret(String appSecret) { this.appSecret = appSecret; }
+        public String getWebhookVerifyToken() { return webhookVerifyToken; }
+        public void setWebhookVerifyToken(String webhookVerifyToken) { this.webhookVerifyToken = webhookVerifyToken; }
         public String getCountryCode() { return countryCode; }
         public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
         public Duration getConnectTimeout() { return connectTimeout; }
@@ -324,15 +327,12 @@ public class AppProperties {
         public String getZapierHookUrl() { return zapierHookUrl; }
         public void setZapierHookUrl(String zapierHookUrl) { this.zapierHookUrl = zapierHookUrl; }
 
-        public boolean live() { return mode == Mode.INTERAKT; }
+        public boolean live() { return mode == Mode.META; }
 
-        /**
-         * Interakt's API key is already {@code base64(accessToken + ":")} as
-         * pasted from the dashboard, so the header is a verbatim copy. Building
-         * it from parts is the documented mistake — see
-         * {@code InteraktWhatsAppGateway}.
-         */
-        public boolean configured() { return apiKey != null && !apiKey.isBlank(); }
+        public boolean configured() {
+            return phoneNumberId != null && !phoneNumberId.isBlank()
+                    && accessToken != null && !accessToken.isBlank();
+        }
     }
 
     /**
@@ -483,44 +483,22 @@ public class AppProperties {
     }
 
     /**
-     * Small messaging AI agent used by automation {@code AI_SEND_MESSAGE}.
-     * {@link Provider#STUB} composes deterministic copy (no API key) so
-     * sandbox automations can be proven; {@link Provider#OPENAI} calls an
-     * OpenAI-compatible Chat Completions API when a key is set.
+     * In-house messaging AI agent for automation {@code AI_SEND_MESSAGE}.
+     * No third-party LLM — compose rules live in {@code AiMessagingAgent}.
      */
     public static class Ai {
-        public enum Provider { STUB, OPENAI }
-
         private boolean enabled = false;
-        private Provider provider = Provider.STUB;
-        private String apiKey = "";
-        private String model = "gpt-4o-mini";
-        private String baseUrl = "https://api.openai.com/v1";
-        private Duration timeout = Duration.ofSeconds(20);
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
-        public Provider getProvider() { return provider; }
-        public void setProvider(Provider provider) { this.provider = provider; }
-        public String getApiKey() { return apiKey; }
-        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-        public String getModel() { return model; }
-        public void setModel(String model) { this.model = model; }
-        public String getBaseUrl() { return baseUrl; }
-        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-        public Duration getTimeout() { return timeout; }
-        public void setTimeout(Duration timeout) { this.timeout = timeout; }
 
-        public boolean openAiConfigured() {
-            return provider == Provider.OPENAI && apiKey != null && !apiKey.isBlank();
+        public boolean ready() {
+            return enabled;
         }
 
-        /** Agent can compose: enabled and either STUB or a configured OpenAI key. */
-        public boolean ready() {
-            if (!enabled) {
-                return false;
-            }
-            return provider == Provider.STUB || openAiConfigured();
+        /** Status label for desks / APIs. */
+        public String providerLabel() {
+            return "OWN";
         }
     }
 
