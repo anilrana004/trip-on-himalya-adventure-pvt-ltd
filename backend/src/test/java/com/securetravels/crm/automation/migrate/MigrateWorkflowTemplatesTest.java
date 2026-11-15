@@ -7,7 +7,10 @@ import com.securetravels.crm.automation.validation.ValidationResult;
 import com.securetravels.crm.automation.validation.WorkflowValidator;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.communications.WhatsAppTemplate;
+import com.securetravels.crm.communications.thread.CommunicationChannel;
 import com.securetravels.crm.communications.WhatsAppTemplateRepository;
+import com.securetravels.crm.communications.consent.Purpose;
+import com.securetravels.crm.communications.template.ChannelTemplate;
 import com.securetravels.crm.communications.template.ChannelTemplateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,10 @@ class MigrateWorkflowTemplatesTest {
                 .thenReturn(Optional.of(new WhatsAppTemplate(
                         "BOOKING_CONFIRMED", "securetravels_booking_confirmed",
                         "Booking confirmed", "en", 4, true)));
+        when(channelTemplates.findByChannelAndCode(eq(CommunicationChannel.EMAIL), eq("LEAD_FOLLOW_UP")))
+                .thenReturn(Optional.of(ChannelTemplate.of(
+                        CommunicationChannel.EMAIL, "LEAD_FOLLOW_UP", "Lead follow-up",
+                        Purpose.TRANSACTIONAL, 2, ChannelTemplate.ApprovalStatus.APPROVED)));
     }
 
     @Test
@@ -53,7 +60,7 @@ class MigrateWorkflowTemplatesTest {
     }
 
     @Test
-    void libraryHasAllElevenNativeSlugs() {
+    void libraryHasAllThirteenNativeSlugs() {
         assertThat(MigrateWorkflowTemplates.all())
                 .extracting(MigrateWorkflowTemplates.Template::slug)
                 .containsExactly(
@@ -67,7 +74,17 @@ class MigrateWorkflowTemplatesTest {
                         "batch-scarcity-alert",
                         "lead-booked-cleanup",
                         "lead-lost-cleanup",
-                        "lead-soft-duplicate-callback");
+                        "lead-soft-duplicate-callback",
+                        "ai-follow-up-email",
+                        "ai-quotation-chase-email");
+    }
+
+    @Test
+    void m12AndM13UseAiSendMessage() {
+        assertThat(MigrateWorkflowTemplates.m12AiFollowUpEmail().definition().steps().get(0).action())
+                .isEqualTo(ActionType.AI_SEND_MESSAGE);
+        assertThat(MigrateWorkflowTemplates.m13AiQuotationChase().definition().trigger().event())
+                .isEqualTo("lead.quotation");
     }
 
     @Test

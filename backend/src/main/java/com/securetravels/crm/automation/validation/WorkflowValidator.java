@@ -328,6 +328,7 @@ public class WorkflowValidator {
             case ASSIGN_OWNER -> validateAssignOwner(result, step, cfg);
             case UPDATE_FIELD -> validateUpdateField(result, entity, step, cfg);
             case SEND_MESSAGE -> validateSendMessage(result, entity, step, cfg);
+            case AI_SEND_MESSAGE -> validateAiSendMessage(result, entity, step, cfg);
             case NOTIFY_USER -> validateNotifyUser(result, step, cfg);
             case REQUEST_APPROVAL -> validateRequestApproval(result, step, cfg);
             case ADD_TAG -> validateAddTag(result, step, cfg);
@@ -438,6 +439,35 @@ public class WorkflowValidator {
         } else if (!valueMatches(def.get(), ConditionOp.EQ, value)) {
             result.add(ValidationIssue.error("UPDATE_FIELD value " + describe(value)
                     + " does not match field '" + field + "' of type " + def.get().type(), step.id()));
+        }
+    }
+
+    private void validateAiSendMessage(ValidationResult result, String entity, StepDefinition step,
+                                       Map<String, Object> cfg) {
+        String channel = stringOf(cfg.get("channel"));
+        if (!"EMAIL".equals(channel) && !"WHATSAPP".equals(channel)) {
+            result.add(ValidationIssue.error("AI_SEND_MESSAGE 'channel' must be EMAIL or WHATSAPP",
+                    step.id()));
+            return;
+        }
+        if (stringOf(cfg.get("to")) == null) {
+            result.add(ValidationIssue.error("AI_SEND_MESSAGE requires 'to' field name", step.id()));
+        } else {
+            Optional<FieldDef> toDef = FieldRegistry.lookup(entity, stringOf(cfg.get("to")));
+            if (toDef.isEmpty() || toDef.get().type() != FieldType.TEXT) {
+                result.add(ValidationIssue.error("AI_SEND_MESSAGE 'to' must name a TEXT field on "
+                        + entity, step.id()));
+            }
+        }
+        String intent = stringOf(cfg.get("intent"));
+        if (intent != null && !List.of("FOLLOW_UP", "QUOTATION_CHASE", "BOOKING_NUDGE").contains(intent)) {
+            result.add(ValidationIssue.error(
+                    "AI_SEND_MESSAGE 'intent' must be FOLLOW_UP, QUOTATION_CHASE, or BOOKING_NUDGE",
+                    step.id()));
+        }
+        // Template defaults to LEAD_FOLLOW_UP at runtime; if provided, reuse SEND_MESSAGE checks.
+        if (stringOf(cfg.get("templateCode")) != null) {
+            validateSendMessage(result, entity, step, cfg);
         }
     }
 

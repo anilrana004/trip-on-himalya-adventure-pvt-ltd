@@ -848,6 +848,12 @@ export type ZapierAutomationStatus = {
     automationDryRun?: boolean;
     legacyEffectsEnabled?: boolean;
     migrateShadow?: string;
+    aiAgentEnabled?: boolean;
+    aiAgentReady?: boolean;
+    aiAgentProvider?: string;
+    aiAgentStatus?: string;
+    aiEmailWorkable?: boolean;
+    aiWhatsappWorkable?: boolean;
   };
   zapier?: {
     eventsEnabled: boolean;

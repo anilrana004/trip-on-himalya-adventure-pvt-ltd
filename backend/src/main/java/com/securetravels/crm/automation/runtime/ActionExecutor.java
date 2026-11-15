@@ -4,6 +4,8 @@ import com.securetravels.crm.automation.definition.StepDefinition;
 import com.securetravels.crm.automation.field.FieldDef;
 import com.securetravels.crm.automation.field.FieldRegistry;
 import com.securetravels.crm.automation.field.FieldType;
+import com.securetravels.crm.automation.ai.AiComposeResult;
+import com.securetravels.crm.automation.ai.AiMessagingAgent;
 import com.securetravels.crm.common.audit.AuditAction;
 import com.securetravels.crm.common.audit.AuditService;
 import com.securetravels.crm.common.config.AppProperties;
@@ -12,6 +14,7 @@ import com.securetravels.crm.communications.SendDecision;
 import com.securetravels.crm.communications.SendGateService;
 import com.securetravels.crm.communications.SendRequest;
 import com.securetravels.crm.communications.SubjectType;
+import com.securetravels.crm.communications.TimelineEvent;
 import com.securetravels.crm.communications.consent.Purpose;
 import com.securetravels.crm.notification.Notification;
 import com.securetravels.crm.notification.NotificationRepository;
@@ -64,6 +67,7 @@ public class ActionExecutor {
     private final SendGateService sendGate;
     private final NotificationRepository notifications;
     private final EmailNotifier email;
+    private final AiMessagingAgent aiAgent;
     private final WorkflowStepEffectRepository effects;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
@@ -72,6 +76,7 @@ public class ActionExecutor {
     public ActionExecutor(TaskRepository tasks, RoundRobinService roundRobin,
                           UserRepository users, SendGateService sendGate,
                           NotificationRepository notifications, EmailNotifier email,
+                          AiMessagingAgent aiAgent,
                           WorkflowStepEffectRepository effects,
                           JdbcTemplate jdbc, AuditService audit, AppProperties props) {
         this.tasks = tasks;
@@ -80,6 +85,7 @@ public class ActionExecutor {
         this.sendGate = sendGate;
         this.notifications = notifications;
         this.email = email;
+        this.aiAgent = aiAgent;
         this.effects = effects;
         this.jdbc = jdbc;
         this.audit = audit;
@@ -95,6 +101,7 @@ public class ActionExecutor {
             case ASSIGN_OWNER -> assignOwner(step, snapshot, run, ledger, attempts);
             case UPDATE_FIELD -> updateField(step, snapshot, run, ledger, attempts);
             case SEND_MESSAGE -> sendMessage(step, snapshot, run, ledger, attempts);
+            case AI_SEND_MESSAGE -> aiSendMessage(step, snapshot, run, ledger, attempts);
             case NOTIFY_USER -> notifyUser(step, snapshot, run, ledger, attempts);
             case ADD_TAG -> addTag(step, snapshot, run, ledger, attempts);
             case CALL_WEBHOOK -> callWebhook(step, snapshot, run, ledger, attempts);
@@ -353,6 +360,89 @@ public class ActionExecutor {
         }
         guard.refId(decision.messageId());
         guard.summary("sent " + channel + (templateCode == null ? " free-form" : " " + templateCode)
+                + " to " + subjectType + " " + snapshot.subjectId());
+        effects.save(guard);
+        return EffectOutcome.applied();
+    }
+
+    // -------------------------------------------------------- AI_SEND_MESSAGE
+
+    private EffectOutcome aiSendMessage(StepDefinition step, RuntimeSnapshot snapshot,
+                                        WorkflowRun run, WorkflowRunStep ledger, int attempts) {
+        WorkflowStepEffect guard = beginEffect(run, ledger, attempts, "AI_SEND_MESSAGE");
+
+        if (!aiAgent.ready()) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: agent not ready (enable AI_AGENT_ENABLED)");
+        }
+
+        String channelName = str(step.config(), "channel");
+        TimelineEvent.Channel channel;
+        try {
+            channel = TimelineEvent.Channel.valueOf(channelName);
+        } catch (Exception ex) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: channel must be EMAIL or WHATSAPP");
+        }
+        if (channel != TimelineEvent.Channel.EMAIL && channel != TimelineEvent.Channel.WHATSAPP) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: only EMAIL and WHATSAPP are supported");
+        }
+        if (!aiAgent.channelWorkable(channel)) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: " + aiAgent.channelNotWorkableReason(channel));
+        }
+
+        SubjectType subjectType = switch (snapshot.entity()) {
+            case "lead" -> SubjectType.LEAD;
+            case "customer" -> SubjectType.CUSTOMER;
+            case "booking" -> SubjectType.BOOKING;
+            default -> null;
+        };
+        if (subjectType == null) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: no subject mapping for " + snapshot.entity());
+        }
+
+        String toField = str(step.config(), "to");
+        String recipient = snapshot.asString(toField);
+        if (recipient == null || recipient.isBlank()) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: field '" + toField + "' is empty");
+        }
+
+        String intent = str(step.config(), "intent");
+        String templateCode = str(step.config(), "templateCode");
+        if (templateCode == null || templateCode.isBlank()) {
+            templateCode = "LEAD_FOLLOW_UP";
+        }
+        int slots = intOrNull(step.config(), "expectedParams") == null
+                ? 2 : intOrNull(step.config(), "expectedParams");
+
+        AiComposeResult composed;
+        try {
+            composed = aiAgent.compose(intent, channel, snapshot, slots);
+        } catch (Exception ex) {
+            throw new IllegalStateException("AI_SEND_MESSAGE compose failed: " + ex.getMessage(), ex);
+        }
+
+        List<String> bodyValues = composed.bodyValues() == null || composed.bodyValues().isEmpty()
+                ? List.of(composed.body() == null ? "" : composed.body())
+                : composed.bodyValues();
+
+        SendRequest request = switch (channel) {
+            case WHATSAPP -> SendRequest.whatsappTemplate(
+                    subjectType, snapshot.subjectId(), templateCode, recipient, bodyValues, null);
+            case EMAIL -> SendRequest.email(
+                    subjectType, snapshot.subjectId(), templateCode, recipient, bodyValues, null);
+            default -> null;
+        };
+        if (request == null) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: unsupported channel " + channel);
+        }
+
+        SendDecision decision = sendGate.request(request);
+        if (!decision.accepted()) {
+            return skipGuard(guard, "AI_SEND_MESSAGE: send gate declined (" + decision.httpStatus()
+                    + "): " + decision.reason());
+        }
+        guard.refId(decision.messageId());
+        guard.summary("AI (" + composed.provider() + ") sent " + channel + " " + templateCode
+                + " intent=" + (intent == null ? "FOLLOW_UP" : intent)
                 + " to " + subjectType + " " + snapshot.subjectId());
         effects.save(guard);
         return EffectOutcome.applied();

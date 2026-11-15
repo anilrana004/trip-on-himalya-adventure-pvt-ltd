@@ -40,7 +40,9 @@ public final class MigrateWorkflowTemplates {
                 m8BatchScarcityAlert(),
                 m9BookedCleanup(),
                 m10LostCleanup(),
-                m11SoftDuplicateCallback());
+                m11SoftDuplicateCallback(),
+                m12AiFollowUpEmail(),
+                m13AiQuotationChase());
     }
 
     /** M1 — new lead → INITIAL_CALL +5m; ads/web/storefront SLA 15m else 1h. */
@@ -248,6 +250,34 @@ public final class MigrateWorkflowTemplates {
         return new Template("lead-soft-duplicate-callback", def.name(), def.description(), def);
     }
 
+    /** M12 — INTERESTED → AI-composed follow-up email via SendGate when email workable. */
+    public static Template m12AiFollowUpEmail() {
+        WorkflowDefinition def = new WorkflowDefinition(
+                WorkflowDefinition.CURRENT_SCHEMA_VERSION,
+                "AI follow-up email",
+                "AI messaging agent composes LEAD_FOLLOW_UP email after INTERESTED; skips if agent/channel not ready.",
+                TriggerDefinition.event("lead.interested"),
+                null,
+                List.of(
+                        aiSend("ai-email-follow-up", 1, "EMAIL", "email", "FOLLOW_UP", "LEAD_FOLLOW_UP"),
+                        stop(2)));
+        return new Template("ai-follow-up-email", def.name(), def.description(), def);
+    }
+
+    /** M13 — quotation sent → AI-composed chase email. */
+    public static Template m13AiQuotationChase() {
+        WorkflowDefinition def = new WorkflowDefinition(
+                WorkflowDefinition.CURRENT_SCHEMA_VERSION,
+                "AI quotation chase email",
+                "AI messaging agent composes a quotation chase email; skips if agent/channel not ready.",
+                TriggerDefinition.event("lead.quotation"),
+                null,
+                List.of(
+                        aiSend("ai-email-quote-chase", 1, "EMAIL", "email", "QUOTATION_CHASE", "LEAD_FOLLOW_UP"),
+                        stop(2)));
+        return new Template("ai-quotation-chase-email", def.name(), def.description(), def);
+    }
+
     private static int days(int d) {
         return d * 24 * 60;
     }
@@ -325,6 +355,18 @@ public final class MigrateWorkflowTemplates {
     private static StepDefinition updateFollowUp(int order, String value) {
         return new StepDefinition("follow-up-date-" + order, order, ActionType.UPDATE_FIELD, null,
                 Map.of("field", "followUpDate", "value", value), null);
+    }
+
+    private static StepDefinition aiSend(String id, int order, String channel, String to,
+                                         String intent, String templateCode) {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("channel", channel);
+        cfg.put("to", to);
+        cfg.put("intent", intent);
+        cfg.put("templateCode", templateCode);
+        cfg.put("purpose", "TRANSACTIONAL");
+        cfg.put("expectedParams", 2);
+        return new StepDefinition(id, order, ActionType.AI_SEND_MESSAGE, null, cfg, null);
     }
 
     private static StepDefinition stop(int order) {

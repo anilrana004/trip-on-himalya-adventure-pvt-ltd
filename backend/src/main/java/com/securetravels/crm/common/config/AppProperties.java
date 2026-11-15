@@ -22,6 +22,7 @@ public class AppProperties {
   private final Email email = new Email();
   private final Sms sms = new Sms();
     private final Automation automation = new Automation();
+    private final Ai ai = new Ai();
     private final Zapier zapier = new Zapier();
     private final FeatureFlags featureFlags = new FeatureFlags();
     private final Commission commission = new Commission();
@@ -46,6 +47,7 @@ public class AppProperties {
   public Email getEmail() { return email; }
   public Sms getSms() { return sms; }
     public Automation getAutomation() { return automation; }
+    public Ai getAi() { return ai; }
     public Zapier getZapier() { return zapier; }
     public FeatureFlags getFeatureFlags() { return featureFlags; }
     public Commission getCommission() { return commission; }
@@ -478,6 +480,48 @@ public class AppProperties {
         }
         public int getCoordinateDepthCap() { return coordinateDepthCap; }
         public void setCoordinateDepthCap(int coordinateDepthCap) { this.coordinateDepthCap = coordinateDepthCap; }
+    }
+
+    /**
+     * Small messaging AI agent used by automation {@code AI_SEND_MESSAGE}.
+     * {@link Provider#STUB} composes deterministic copy (no API key) so
+     * sandbox automations can be proven; {@link Provider#OPENAI} calls an
+     * OpenAI-compatible Chat Completions API when a key is set.
+     */
+    public static class Ai {
+        public enum Provider { STUB, OPENAI }
+
+        private boolean enabled = false;
+        private Provider provider = Provider.STUB;
+        private String apiKey = "";
+        private String model = "gpt-4o-mini";
+        private String baseUrl = "https://api.openai.com/v1";
+        private Duration timeout = Duration.ofSeconds(20);
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public Provider getProvider() { return provider; }
+        public void setProvider(Provider provider) { this.provider = provider; }
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+        public String getModel() { return model; }
+        public void setModel(String model) { this.model = model; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+        public Duration getTimeout() { return timeout; }
+        public void setTimeout(Duration timeout) { this.timeout = timeout; }
+
+        public boolean openAiConfigured() {
+            return provider == Provider.OPENAI && apiKey != null && !apiKey.isBlank();
+        }
+
+        /** Agent can compose: enabled and either STUB or a configured OpenAI key. */
+        public boolean ready() {
+            if (!enabled) {
+                return false;
+            }
+            return provider == Provider.STUB || openAiConfigured();
+        }
     }
 
     /**

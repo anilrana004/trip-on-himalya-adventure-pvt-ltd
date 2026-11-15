@@ -19,6 +19,11 @@ public enum ActionType {
     UPDATE_FIELD,
     /** Send a message via the Phase 5 send-gate — never a provider directly. */
     SEND_MESSAGE,
+    /**
+     * Compose personalized guest copy with the AI messaging agent, then send
+     * through SendGate when the channel is workable (sandbox or live).
+     */
+    AI_SEND_MESSAGE,
     /** Bell + email a role or user. */
     NOTIFY_USER,
     /** Open an approval request to a role (blocks the run until decided). */

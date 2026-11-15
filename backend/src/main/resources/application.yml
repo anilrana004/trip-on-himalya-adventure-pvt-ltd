@@ -136,6 +136,16 @@ app:
     zapier-hook-url: ${ZAPIER_EMAIL_HOOK_URL:}
   sms:
     webhook-secret: ${SMS_WEBHOOK_SECRET:}
+  ai:
+    # Small automation messaging agent. Off by default.
+    # STUB composes deterministic copy without an API key (safe for sandbox).
+    # OPENAI needs AI_AGENT_API_KEY (OpenAI-compatible Chat Completions).
+    enabled: ${AI_AGENT_ENABLED:false}
+    provider: ${AI_AGENT_PROVIDER:STUB}
+    api-key: ${AI_AGENT_API_KEY:}
+    model: ${AI_AGENT_MODEL:gpt-4o-mini}
+    base-url: ${AI_AGENT_BASE_URL:https://api.openai.com/v1}
+    timeout: ${AI_AGENT_TIMEOUT:20s}
   automation:
     # Phase 6 Module 1 — hard bounds the validator applies to every definition.
     max-steps-per-workflow: ${AUTOMATION_MAX_STEPS_PER_WORKFLOW:30}

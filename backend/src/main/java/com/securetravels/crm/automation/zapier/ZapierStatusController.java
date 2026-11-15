@@ -1,11 +1,13 @@
 package com.securetravels.crm.automation.zapier;
 
 import com.securetravels.crm.automation.WorkflowService;
+import com.securetravels.crm.automation.ai.AiMessagingAgent;
 import com.securetravels.crm.automation.domain.Workflow;
 import com.securetravels.crm.automation.domain.WorkflowVersion;
 import com.securetravels.crm.automation.migrate.MigrateWorkflowTemplates;
 import com.securetravels.crm.automation.runtime.AutomationGuards;
 import com.securetravels.crm.common.config.AppProperties;
+import com.securetravels.crm.communications.TimelineEvent;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,13 +34,16 @@ public class ZapierStatusController {
     private final ZapierEventsClient eventsClient;
     private final WorkflowService workflows;
     private final AutomationGuards guards;
+    private final AiMessagingAgent aiAgent;
 
     public ZapierStatusController(AppProperties props, ZapierEventsClient eventsClient,
-                                  WorkflowService workflows, AutomationGuards guards) {
+                                  WorkflowService workflows, AutomationGuards guards,
+                                  AiMessagingAgent aiAgent) {
         this.props = props;
         this.eventsClient = eventsClient;
         this.workflows = workflows;
         this.guards = guards;
+        this.aiAgent = aiAgent;
     }
 
     @Operation(summary = "Zapier + native automation status for the Automations desk")
@@ -91,6 +96,12 @@ public class ZapierStatusController {
         nativePath.put("automationDryRun", guards.dryRun());
         nativePath.put("legacyEffectsEnabled", props.getAutomation().isLegacyEffectsEnabled());
         nativePath.put("migrateShadow", cutoverSummary());
+        nativePath.put("aiAgentEnabled", props.getAi().isEnabled());
+        nativePath.put("aiAgentReady", aiAgent.ready());
+        nativePath.put("aiAgentProvider", props.getAi().getProvider().name());
+        nativePath.put("aiAgentStatus", aiAgent.statusLabel());
+        nativePath.put("aiEmailWorkable", aiAgent.channelWorkable(TimelineEvent.Channel.EMAIL));
+        nativePath.put("aiWhatsappWorkable", aiAgent.channelWorkable(TimelineEvent.Channel.WHATSAPP));
         out.put("native", nativePath);
 
         List<Map<String, Object>> migrateTemplates = new ArrayList<>();
@@ -151,7 +162,7 @@ public class ZapierStatusController {
         boolean dry = guards.dryRun();
         boolean legacy = props.getAutomation().isLegacyEffectsEnabled();
         if (templates && !dry && !legacy) {
-            return "Native live — M1–M11 engine owns effects; hard-coded MIGRATE paths off";
+            return "Native live — M1–M13 engine owns effects (incl. AI send when ready)";
         }
         if (templates && dry) {
             return "Shadow dry-run — templates ACTIVE; effects skipped";

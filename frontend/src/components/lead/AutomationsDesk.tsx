@@ -46,6 +46,10 @@ const RULES = [
     title: "Bulk campaigns",
     body: "Managers queue email or WhatsApp campaigns; CRM delivers only through SendGate (SES/sandbox or Interakt/sandbox). Consent + suppressions enforced.",
   },
+  {
+    title: "AI messaging agent (M12/M13)",
+    body: "When AI_AGENT_ENABLED is on and email/WhatsApp is workable, INTERESTED and quotation events get an AI-composed LEAD_FOLLOW_UP via SendGate. STUB works without an API key; OPENAI needs AI_AGENT_API_KEY.",
+  },
 ];
 
 function nextStep(task: Task): { label: string; href: string } {
@@ -180,6 +184,25 @@ export function AutomationsDesk() {
             </li>
             <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
               <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-800">AI messaging agent</div>
+                <span
+                  className={`text-[11px] font-semibold ${
+                    zapier.native.aiAgentReady ? "text-emerald-700" : "text-slate-600"
+                  }`}
+                >
+                  {zapier.native.aiAgentReady ? "Ready" : zapier.native.aiAgentEnabled ? "Not ready" : "Off"}
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                {zapier.native.aiAgentStatus || "Set AI_AGENT_ENABLED to compose guest follow-ups"}
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                Email {zapier.native.aiEmailWorkable ? "workable" : "blocked"} · WhatsApp{" "}
+                {zapier.native.aiWhatsappWorkable ? "workable" : "blocked"}
+              </div>
+            </li>
+            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-medium text-slate-800">MIGRATE engine shadow</div>
                 <span
                   className={`text-[11px] font-semibold ${
@@ -213,7 +236,7 @@ export function AutomationsDesk() {
       {zapier?.migrate && (
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Native templates (M1–M11)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Native templates (M1–M13)</h2>
             <span className="text-xs text-slate-500">
               {zapier.migrate.templates.filter((t) => t.active).length}/{zapier.migrate.templates.length}{" "}
               active
