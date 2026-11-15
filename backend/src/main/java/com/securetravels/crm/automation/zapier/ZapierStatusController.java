@@ -58,21 +58,21 @@ public class ZapierStatusController {
                         "ZAPIER_EVENTS_HOOK_URL",
                         "Catch Hook → Slack / Gmail",
                         eventsEnabled ? null : "Paused by ZAPIER_EVENTS_ENABLED=false (URL kept for rollback)"),
-                hook("emailCampaigns", "Bulk email campaigns (Zap path)",
-                        emailHook, emailHook,
+                hook("emailCampaigns", "Bulk email campaigns",
+                        emailHook, false,
                         "ZAPIER_EMAIL_HOOK_URL",
-                        "Catch Hook → Gmail / Mailchimp",
-                        null),
-                hook("whatsappCampaigns", "Bulk WhatsApp campaigns (Zap path)",
-                        waHook, waHook,
+                        "Retired — CRM SendGate only",
+                        "Campaigns force INLINE; hook URL kept unused"),
+                hook("whatsappCampaigns", "Bulk WhatsApp campaigns",
+                        waHook, false,
                         "ZAPIER_WHATSAPP_HOOK_URL",
-                        "Catch Hook → WhatsApp / Interakt",
-                        null),
-                hook("facebookInbound", "Facebook Lead Ads → CRM (inbound)",
+                        "Retired — CRM SendGate only",
+                        "Campaigns force INLINE; hook URL kept unused"),
+                hook("facebookInbound", "Lead intake (HMAC webhook)",
                         leadSecret, leadSecret,
-                        "WEBHOOK_SECRET + Zap POST /api/webhook/lead",
-                        "Facebook Lead Ads → Code → CRM webhook",
-                        null)
+                        "WEBHOOK_SECRET + POST /api/webhook/lead",
+                        "Storefront / signed partners → CRM webhook",
+                        "Meta Lead Ads use /api/webhook/meta when META_* + ingest enabled")
         ));
 
         Map<String, Object> nativePath = new LinkedHashMap<>();
@@ -151,7 +151,7 @@ public class ZapierStatusController {
         boolean dry = guards.dryRun();
         boolean legacy = props.getAutomation().isLegacyEffectsEnabled();
         if (templates && !dry && !legacy) {
-            return "Cutover live — M1–M9 engine owns effects; hard-coded MIGRATE paths off";
+            return "Native live — M1–M11 engine owns effects; hard-coded MIGRATE paths off";
         }
         if (templates && dry) {
             return "Shadow dry-run — templates ACTIVE; effects skipped";

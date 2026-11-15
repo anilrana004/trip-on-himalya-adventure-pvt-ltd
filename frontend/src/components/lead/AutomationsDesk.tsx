@@ -7,52 +7,44 @@ import { TASK_TYPE_LABEL } from "@/lib/taskLabels";
 
 const RULES = [
   {
-    title: "Facebook / ads in",
-    body: "Zapier (Facebook Lead Ads) or Meta webhook posts a signed lead. CRM assigns the next sales owner and starts the 5‑minute first call.",
+    title: "Lead intake",
+    body: "Storefront and signed POST /api/webhook/lead create leads in CRM. Meta Lead Ads use native /api/webhook/meta when META_* is configured and ingest is on.",
   },
   {
-    title: "First call",
-    body: "Every new lead gets an INITIAL_CALL task due in 5 minutes. Ads / website / storefront SLA is 15 minutes, then managers are escalated.",
+    title: "First call (M1)",
+    body: "Every new lead gets an INITIAL_CALL due in 5 minutes. Ads / website / storefront SLA is 15 minutes; other sources use a 1-hour SLA, then managers escalate.",
   },
   {
     title: "Call outcomes",
-    body: "NO_ANSWER / BUSY / CALLBACK → auto CALLBACK in 2 hours. CONNECTED → closes the first-call task. WRONG_NUMBER → alerts managers. Every outcome publishes lead.call to Zapier.",
+    body: "NO_ANSWER / BUSY / CALLBACK → CALLBACK in 2 hours. CONNECTED closes the first-call task. WRONG_NUMBER alerts managers. Soft-duplicate hits schedule M11 CALLBACK when no open call exists.",
   },
   {
-    title: "Interested cadence",
-    body: "Mark Interested → clears open first-call/callback, then Follow-up 1 tomorrow, then +2 / +5 / +7 days. Open cadence tasks are replaced, not duplicated.",
+    title: "Interested cadence (M2)",
+    body: "Mark Interested → clears open first-call/callback, then Follow-up 1/3/8/15 days. Staff get in-app + email from the engine.",
   },
   {
-    title: "Quote and book",
-    body: "Quotation sent → chase in 2 days. Booking confirmed or Lost → cancel open follow-ups. Ops handoff and WhatsApp confirmation stay on the booking confirm flow.",
+    title: "Quote, book, lost (M3/M9/M10)",
+    body: "Quotation sent → chase in 2 days. Booked or Lost → cancel open follow-ups and notify the owner.",
   },
   {
-    title: "Documents before departure",
-    body: "CONFIRMED bookings inside the doc-reminder lead window get a Documents missing task when any traveller is not GREEN. Checklist going GREEN retires the task; DOCUMENT_LINK may queue to the guest.",
+    title: "Booking confirm (M4/M7)",
+    body: "Booking confirmed → WhatsApp BOOKING_CONFIRMED via SendGate, OPS prep task, and ops notify. Handoff row stays CORE.",
   },
   {
-    title: "Post-trip & re-engage",
-    body: "After return (+1…+7 days) CRM queues POST_TRIP_REVIEW (marketing consent). At last_trip_date + 90 days it sends a one-shot re-engage. Blocked sends open a REVIEW task for sales.",
+    title: "Payments (M5/M6)",
+    body: "Balance due soon → PAYMENT_REMINDER (deduped per booking). Overdue → mark OVERDUE + ops notify. Razorpay webhooks still complete gateway payments.",
   },
   {
-    title: "Payment gateway",
-    body: "Razorpay payment.captured / authorized webhooks complete the CRM payment whose gateway_ref matches the Razorpay id (HMAC). Manual transition still works.",
+    title: "Capacity (M8)",
+    body: "Batch scarcity threshold → notify OPS. Latch + min-group safety alerts stay CORE in CapacityAlertService.",
   },
   {
-    title: "Reminders & digest",
-    body: "Due-soon and overdue reminders to sales every few minutes. Morning inactive-lead nudge. 09:00 manager SLA digest. Staff emails go through EmailGateway (sandbox/SES).",
+    title: "Documents & post-trip",
+    body: "Doc-missing reminders, post-trip review, and 90-day re-engage run as native CRM sweeps with SendGate.",
   },
   {
-    title: "Zapier alerts",
-    body: "lead.created / interested / quotation / booked / lost / call / sla.breach post to ZAPIER_EVENTS_HOOK_URL for Slack or Gmail.",
-  },
-  {
-    title: "Bulk email (Zap)",
-    body: "Managers select leads → CRM queues a campaign → Zapier Catch Hook (or inline SendGate) delivers one email per recipient. Consent + suppressions enforced.",
-  },
-  {
-    title: "Bulk WhatsApp (Zap)",
-    body: "Managers select leads → CRM queues a WA campaign → Zapier Catch Hook (or inline Interakt/sandbox) delivers one template per recipient. Consent + WA suppressions enforced.",
+    title: "Bulk campaigns",
+    body: "Managers queue email or WhatsApp campaigns; CRM delivers only through SendGate (SES/sandbox or Interakt/sandbox). Consent + suppressions enforced.",
   },
 ];
 
@@ -137,8 +129,8 @@ export function AutomationsDesk() {
     <div className="space-y-4">
       {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <p className="text-sm text-slate-600">
-        Live sales automation for Trip On Himalaya. Cadence, SLA, digests, and SendGate delivery run inside this CRM.
-        Zapier pipes are optional edge routes kept for rollback. Rows below are open tasks already created.
+        Native Trip On Himalaya automations — engine templates, SendGate delivery, and staff email all run inside this
+        CRM. Rows below are open tasks already created.
       </p>
 
       {zapier?.native && (
@@ -211,7 +203,7 @@ export function AutomationsDesk() {
               </div>
               <div className="mt-1 text-[11px] text-slate-500">
                 {zapier.native.migrateShadow ||
-                  "M1–M9 templates evaluate beside hard-coded FollowUp / sweeps"}
+                  "M1–M11 native templates own journey effects when engine is live"}
               </div>
             </li>
           </ul>
@@ -221,7 +213,7 @@ export function AutomationsDesk() {
       {zapier?.migrate && (
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">MIGRATE templates (M1–M9)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Native templates (M1–M11)</h2>
             <span className="text-xs text-slate-500">
               {zapier.migrate.templates.filter((t) => t.active).length}/{zapier.migrate.templates.length}{" "}
               active
@@ -264,10 +256,10 @@ export function AutomationsDesk() {
       {zapier && (
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Zapier pipes</h2>
+            <h2 className="text-sm font-semibold text-slate-900">External pipes (retired)</h2>
             <span className="text-xs text-slate-500">
-              {zapier.hooks.filter((h) => h.active ?? h.configured).length}/{zapier.hooks.length} active
-              {zapier.zapier && !zapier.zapier.eventsEnabled ? " · lifecycle posts paused" : ""}
+              Native owns delivery
+              {zapier.zapier && !zapier.zapier.eventsEnabled ? " · Zap lifecycle posts off" : ""}
             </span>
           </div>
           <ul className="grid gap-2 sm:grid-cols-2">

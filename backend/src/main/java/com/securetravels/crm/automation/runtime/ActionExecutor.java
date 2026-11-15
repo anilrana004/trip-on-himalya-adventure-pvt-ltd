@@ -6,6 +6,8 @@ import com.securetravels.crm.automation.field.FieldRegistry;
 import com.securetravels.crm.automation.field.FieldType;
 import com.securetravels.crm.common.audit.AuditAction;
 import com.securetravels.crm.common.audit.AuditService;
+import com.securetravels.crm.common.config.AppProperties;
+import com.securetravels.crm.common.notify.EmailNotifier;
 import com.securetravels.crm.communications.SendDecision;
 import com.securetravels.crm.communications.SendGateService;
 import com.securetravels.crm.communications.SendRequest;
@@ -61,23 +63,28 @@ public class ActionExecutor {
     private final UserRepository users;
     private final SendGateService sendGate;
     private final NotificationRepository notifications;
+    private final EmailNotifier email;
     private final WorkflowStepEffectRepository effects;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
+    private final String appUrl;
 
     public ActionExecutor(TaskRepository tasks, RoundRobinService roundRobin,
                           UserRepository users, SendGateService sendGate,
-                          NotificationRepository notifications,
+                          NotificationRepository notifications, EmailNotifier email,
                           WorkflowStepEffectRepository effects,
-                          JdbcTemplate jdbc, AuditService audit) {
+                          JdbcTemplate jdbc, AuditService audit, AppProperties props) {
         this.tasks = tasks;
         this.roundRobin = roundRobin;
         this.users = users;
         this.sendGate = sendGate;
         this.notifications = notifications;
+        this.email = email;
         this.effects = effects;
         this.jdbc = jdbc;
         this.audit = audit;
+        String configured = props.getPublicUrl() == null ? "" : props.getPublicUrl().trim();
+        this.appUrl = configured.endsWith("/") ? configured.substring(0, configured.length() - 1) : configured;
     }
 
     public EffectOutcome execute(StepDefinition step, RuntimeSnapshot snapshot,
@@ -116,14 +123,35 @@ public class ActionExecutor {
             default -> null;
         };
 
+        List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
+        List<String> skipIfOpen = stringList(step.config(), "skipIfOpenTypes");
+        if (!skipIfOpen.isEmpty()) {
+            if (bookingId != null) {
+                for (String openType : skipIfOpen) {
+                    if (tasks.existsByBookingIdAndTypeAndStatusIn(
+                            bookingId, Task.Type.valueOf(openType), open)) {
+                        return skipGuard(guard, "CREATE_TASK: open " + openType
+                                + " already exists on booking " + bookingId);
+                    }
+                }
+            } else if (leadId != null) {
+                for (String openType : skipIfOpen) {
+                    if (tasks.existsByLeadIdAndTypeAndStatusIn(
+                            leadId, Task.Type.valueOf(openType), open)) {
+                        return skipGuard(guard, "CREATE_TASK: open " + openType
+                                + " already exists on lead " + leadId);
+                    }
+                }
+            }
+        }
+
         UUID assigneeId = resolveAssignee(step.config(), snapshot);
         if (assigneeId == null) {
             return skipGuard(guard, "CREATE_TASK: no assignee resolved for the subject");
         }
 
         Instant dueAt = dueAt(step.config(), snapshot);
-        Integer slaHours = intOrNull(step.config(), "slaHours");
-        Instant sla = slaHours == null ? null : dueAt.plus(Duration.ofHours(slaHours));
+        Instant sla = resolveSla(step.config(), dueAt);
 
         Task task = tasks.save(new Task(leadId, assigneeId, type, dueAt, sla));
         if (bookingId != null) {
@@ -136,6 +164,15 @@ public class ActionExecutor {
                 + " assigned to " + assigneeId + " due " + dueAt);
         effects.save(guard);
         return EffectOutcome.applied();
+    }
+
+    private Instant resolveSla(Map<String, Object> config, Instant dueAt) {
+        Integer slaMinutes = intOrNull(config, "slaMinutes");
+        if (slaMinutes != null) {
+            return dueAt.plus(Duration.ofMinutes(slaMinutes));
+        }
+        Integer slaHours = intOrNull(config, "slaHours");
+        return slaHours == null ? null : dueAt.plus(Duration.ofHours(slaHours));
     }
 
     private UUID resolveAssignee(Map<String, Object> config, RuntimeSnapshot snapshot) {
@@ -353,13 +390,32 @@ public class ActionExecutor {
         if (targets.isEmpty()) {
             return skipGuard(guard, "NOTIFY_USER: no recipients resolved");
         }
+        String link = subjectLink(snapshot, run.getId());
+        String mailBody = (body == null ? "" : body) + (appUrl.isBlank() ? "" : " " + appUrl + link);
         for (UUID recipient : targets) {
             notifications.save(new Notification(recipient, Notification.Channel.IN_APP,
-                    title, body, "/automation/runs/" + run.getId()));
+                    title, body, link));
+            users.findById(recipient).ifPresent(user -> {
+                if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                    email.send(user.getEmail(), title, mailBody);
+                }
+            });
         }
-        guard.summary("notified " + targets.size() + " user(s): " + title);
+        guard.summary("notified " + targets.size() + " user(s) in-app+email: " + title);
         effects.save(guard);
         return EffectOutcome.applied();
+    }
+
+    private String subjectLink(RuntimeSnapshot snapshot, UUID runId) {
+        return switch (snapshot.entity()) {
+            case "lead" -> "/leads/" + snapshot.subjectId();
+            case "booking" -> "/bookings/" + snapshot.subjectId();
+            case "payment" -> {
+                UUID bookingId = snapshot.asUuid("bookingId");
+                yield bookingId == null ? "/automation/runs/" + runId : "/bookings/" + bookingId;
+            }
+            default -> "/automation/runs/" + runId;
+        };
     }
 
     // ----------------------------------------------------------------- ADD_TAG

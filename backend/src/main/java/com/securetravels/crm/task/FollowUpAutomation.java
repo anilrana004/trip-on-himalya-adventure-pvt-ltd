@@ -186,23 +186,25 @@ public class FollowUpAutomation {
             }
             log.info("[automation] lead={} lost; outstanding follow-ups cancelled", lead.getId());
         } else {
-            log.info("[automation] legacy off — skip lost cleanup side effects for lead={}", lead.getId());
+            log.info("[automation] legacy off — engine owns lost cleanup for lead={}", lead.getId());
         }
         publishLeadSnapshot("lead.lost", lead);
     }
 
     /**
-     * Soft-duplicate Meta/inbound hit on an active lead: if there is no open
-     * first-call or callback, schedule a CALLBACK in 2 hours so speed-to-lead
-     * still fires. Does not create a second lead.
+     * Soft-duplicate Meta/inbound hit on an active lead: publish
+     * {@code lead.soft_duplicate} for the native engine (M11). When legacy
+     * effects are still on, also schedule CALLBACK +2h if no open first-call.
      */
     @Transactional
     public void onSoftDuplicate(Lead lead) {
-        if (!legacy.enabled()) {
-            return;
-        }
         if (lead == null || lead.getId() == null || lead.getOwnerId() == null) return;
         if (lead.getStatus() == Lead.Status.LOST) return;
+        publishLeadSnapshot("lead.soft_duplicate", lead);
+        if (!legacy.enabled()) {
+            log.info("[automation] legacy off — engine owns soft-dup callback for lead={}", lead.getId());
+            return;
+        }
         List<Task.Status> open = List.of(Task.Status.PENDING, Task.Status.OVERDUE);
         boolean hasOpenCall = tasks.existsByLeadIdAndTypeAndStatusIn(lead.getId(), Task.Type.INITIAL_CALL, open)
                 || tasks.existsByLeadIdAndTypeAndStatusIn(lead.getId(), Task.Type.CALLBACK, open);

@@ -70,7 +70,7 @@ public final class FieldRegistry {
                 FieldDef.enums("status", "leads.status",
                         "NEW", "INTERESTED", "QUOTATION_SENT", "BOOKING_CONFIRMED", "LOST"),
                 FieldDef.enums("source", "leads.source",
-                        "GOOGLE_ADS", "FACEBOOK_ADS", "INSTAGRAM", "WEBSITE", "WHATSAPP",
+                        "GOOGLE_ADS", "FACEBOOK_ADS", "INSTAGRAM", "WEBSITE", "STOREFRONT", "WHATSAPP",
                         "REFERRAL", "JUSTDIAL", "WALK_IN", "B2B", "EXISTING_CUSTOMER", "OTHER"),
                 FieldDef.enums("heat", "leads.heat", "HOT", "WARM", "COLD")));
 

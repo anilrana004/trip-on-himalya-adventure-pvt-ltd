@@ -20,7 +20,6 @@ export function BulkEmailCampaignModal({ leadIds, leads, onClose, onLaunched }: 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [templateCode, setTemplateCode] = useState("LEAD_FOLLOW_UP");
-  const [deliveryMode, setDeliveryMode] = useState<"ZAPIER" | "INLINE">("INLINE");
   const [templates, setTemplates] = useState<{ code: string; label: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +62,7 @@ export function BulkEmailCampaignModal({ leadIds, leads, onClose, onLaunched }: 
         templateCode: templateCode || "LEAD_FOLLOW_UP",
         subject: subject.trim() || undefined,
         body: body.trim() || undefined,
-        deliveryMode,
+        deliveryMode: "INLINE",
       });
       onLaunched(campaign);
     } catch (err) {
@@ -79,7 +78,7 @@ export function BulkEmailCampaignModal({ leadIds, leads, onClose, onLaunched }: 
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900">Bulk email campaign</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Queues consented leads with an email address. Zapier Catch Hook (default) or inline SendGate.
+            Queues consented leads with an email address. CRM delivers each message through SendGate (sandbox/SES).
           </p>
         </div>
 
@@ -136,49 +135,21 @@ export function BulkEmailCampaignModal({ leadIds, leads, onClose, onLaunched }: 
 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-slate-600">
-              Body note for Zapier <span className="font-normal text-slate-400">(optional)</span>
+              Body note <span className="font-normal text-slate-400">(optional)</span>
             </span>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
-              placeholder="Extra copy the Zap can map into Gmail / Mailchimp"
+              placeholder="Optional note stored on the campaign"
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ring-sky-500 focus:ring-2"
             />
           </label>
 
-          <fieldset>
-            <legend className="mb-1 text-xs font-semibold text-slate-600">Delivery</legend>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setDeliveryMode("INLINE")}
-                className={`rounded-xl px-3 py-2 text-xs font-semibold ${
-                  deliveryMode === "INLINE"
-                    ? "bg-sky-600 text-white"
-                    : "border border-slate-200 text-slate-600"
-                }`}
-              >
-                Inline (CRM SendGate)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeliveryMode("ZAPIER")}
-                className={`rounded-xl px-3 py-2 text-xs font-semibold ${
-                  deliveryMode === "ZAPIER"
-                    ? "bg-sky-600 text-white"
-                    : "border border-slate-200 text-slate-600"
-                }`}
-              >
-                Zapier Catch Hook
-              </button>
-            </div>
-            <p className="mt-2 text-[11px] text-slate-500">
-              Default is CRM SendGate (sandbox/SES). Zapier needs{" "}
-              <code className="rounded bg-slate-100 px-1">ZAPIER_EMAIL_HOOK_URL</code> and is kept for rollback.
-              Recipients without email, without consent, or email-suppressed are skipped.
-            </p>
-          </fieldset>
+          <p className="text-[11px] text-slate-500">
+            Delivery is native CRM SendGate only. Recipients without email, without consent, or email-suppressed are
+            skipped.
+          </p>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">

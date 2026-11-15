@@ -53,7 +53,7 @@ class MigrateWorkflowTemplatesTest {
     }
 
     @Test
-    void libraryHasAllNineMigrateSlugs() {
+    void libraryHasAllElevenNativeSlugs() {
         assertThat(MigrateWorkflowTemplates.all())
                 .extracting(MigrateWorkflowTemplates.Template::slug)
                 .containsExactly(
@@ -65,7 +65,21 @@ class MigrateWorkflowTemplatesTest {
                         "payment-overdue",
                         "booking-confirmed-ops",
                         "batch-scarcity-alert",
-                        "lead-booked-cleanup");
+                        "lead-booked-cleanup",
+                        "lead-lost-cleanup",
+                        "lead-soft-duplicate-callback");
+    }
+
+    @Test
+    void m1BranchesFastTrackSla() {
+        WorkflowDefinition def = MigrateWorkflowTemplates.m1SpeedToLead().definition();
+        assertThat(def.trigger().event()).isEqualTo("lead.created");
+        assertThat(def.steps().get(0).action()).isEqualTo(ActionType.BRANCH);
+        assertThat(def.steps().stream().filter(s -> "call-fast".equals(s.id())).findFirst())
+                .isPresent()
+                .get()
+                .extracting(s -> s.config().get("slaMinutes"))
+                .isEqualTo(10);
     }
 
     @Test
@@ -85,10 +99,10 @@ class MigrateWorkflowTemplatesTest {
     }
 
     @Test
-    void m7AndM8CoverOpsAndScarcity() {
-        assertThat(MigrateWorkflowTemplates.m7BookingConfirmedOps().definition().trigger().event())
-                .isEqualTo("booking.confirmed");
-        assertThat(MigrateWorkflowTemplates.m8BatchScarcityAlert().definition().trigger().event())
-                .isEqualTo("batch.scarcity_alert");
+    void m10AndM11CoverLostAndSoftDup() {
+        assertThat(MigrateWorkflowTemplates.m10LostCleanup().definition().trigger().event())
+                .isEqualTo("lead.lost");
+        assertThat(MigrateWorkflowTemplates.m11SoftDuplicateCallback().definition().trigger().event())
+                .isEqualTo("lead.soft_duplicate");
     }
 }

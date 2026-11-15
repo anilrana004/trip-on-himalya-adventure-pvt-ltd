@@ -32,7 +32,7 @@ import java.util.UUID;
 
 /**
  * Manager/Admin bulk WhatsApp to selected leads. Recipients snapshotted, then
- * a sweep delivers via Zapier Catch Hook or inline SendGate (Interakt/sandbox).
+ * a sweep delivers via native SendGate (Interakt/sandbox).
  */
 @Service
 public class BulkWhatsAppCampaignService {
@@ -45,7 +45,6 @@ public class BulkWhatsAppCampaignService {
     private final WhatsAppCampaignRecipientRepository recipients;
     private final LeadRepository leads;
     private final SendGateService sendGate;
-    private final ZapierWhatsAppHookClient zapier;
     private final ConsentService consent;
     private final AuditService audit;
 
@@ -53,14 +52,12 @@ public class BulkWhatsAppCampaignService {
                                        WhatsAppCampaignRecipientRepository recipients,
                                        LeadRepository leads,
                                        SendGateService sendGate,
-                                       ZapierWhatsAppHookClient zapier,
                                        ConsentService consent,
                                        AuditService audit) {
         this.campaigns = campaigns;
         this.recipients = recipients;
         this.leads = leads;
         this.sendGate = sendGate;
-        this.zapier = zapier;
         this.consent = consent;
         this.audit = audit;
     }
@@ -79,10 +76,11 @@ public class BulkWhatsAppCampaignService {
             template = "LEAD_FOLLOW_UP";
         }
 
-        // Native SendGate/Interakt is the default; ZAPIER remains an explicit opt-in for rollback.
-        WhatsAppCampaign.DeliveryMode mode = request.deliveryMode() == null
-                ? WhatsAppCampaign.DeliveryMode.INLINE
-                : request.deliveryMode();
+        // Native SendGate / Interakt only — Zapier campaign delivery is retired.
+        if (request.deliveryMode() == WhatsAppCampaign.DeliveryMode.ZAPIER) {
+            log.info("[bulk-wa] ignoring ZAPIER deliveryMode; forcing INLINE");
+        }
+        WhatsAppCampaign.DeliveryMode mode = WhatsAppCampaign.DeliveryMode.INLINE;
 
         WhatsAppCampaign campaign = campaigns.save(new WhatsAppCampaign(
                 request.name().trim(),
@@ -158,27 +156,21 @@ public class BulkWhatsAppCampaignService {
             }
             campaign.markRunning();
             try {
-                if (campaign.getDeliveryMode() == WhatsAppCampaign.DeliveryMode.ZAPIER) {
-                    String ref = zapier.postRecipient(campaign, row);
-                    row.markSent(ref);
-                    campaign.incrementSent();
-                } else {
-                    String code = campaign.getTemplateCode() == null ? "LEAD_FOLLOW_UP" : campaign.getTemplateCode();
-                    Lead lead = leads.findById(row.getLeadId()).orElse(null);
-                    String trek = lead != null && lead.getDestination() != null && !lead.getDestination().isBlank()
-                            ? lead.getDestination()
-                            : "your Himalayan trek";
-                    List<String> values = List.of(trek, row.getCustomerName());
+                String code = campaign.getTemplateCode() == null ? "LEAD_FOLLOW_UP" : campaign.getTemplateCode();
+                Lead lead = leads.findById(row.getLeadId()).orElse(null);
+                String trek = lead != null && lead.getDestination() != null && !lead.getDestination().isBlank()
+                        ? lead.getDestination()
+                        : "your Himalayan trek";
+                List<String> values = List.of(trek, row.getCustomerName());
 
-                    SendDecision decision = sendGate.request(SendRequest.whatsappTemplate(
-                            SubjectType.LEAD, row.getLeadId(), code, row.getMobile(), values, campaign.getCreatedBy()));
-                    if (!decision.accepted()) {
-                        row.markFailed(decision.reason());
-                        campaign.incrementFailed();
-                    } else {
-                        row.markSent(decision.messageId() == null ? "inline" : decision.messageId().toString());
-                        campaign.incrementSent();
-                    }
+                SendDecision decision = sendGate.request(SendRequest.whatsappTemplate(
+                        SubjectType.LEAD, row.getLeadId(), code, row.getMobile(), values, campaign.getCreatedBy()));
+                if (!decision.accepted()) {
+                    row.markFailed(decision.reason());
+                    campaign.incrementFailed();
+                } else {
+                    row.markSent(decision.messageId() == null ? "inline" : decision.messageId().toString());
+                    campaign.incrementSent();
                 }
             } catch (Exception ex) {
                 row.markFailed(ex.getMessage());

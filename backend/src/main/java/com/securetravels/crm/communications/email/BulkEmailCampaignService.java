@@ -31,7 +31,7 @@ import java.util.UUID;
 
 /**
  * Manager/Admin bulk email to selected leads. Recipients are snapshotted, then
- * a sweep delivers via Zapier Catch Hook or inline SendGate (SES/sandbox).
+ * a sweep delivers via native SendGate (SES/sandbox).
  */
 @Service
 public class BulkEmailCampaignService {
@@ -44,7 +44,6 @@ public class BulkEmailCampaignService {
     private final EmailCampaignRecipientRepository recipients;
     private final LeadRepository leads;
     private final SendGateService sendGate;
-    private final ZapierEmailHookClient zapier;
     private final ConsentService consent;
     private final AuditService audit;
 
@@ -52,14 +51,12 @@ public class BulkEmailCampaignService {
                                     EmailCampaignRecipientRepository recipients,
                                     LeadRepository leads,
                                     SendGateService sendGate,
-                                    ZapierEmailHookClient zapier,
                                     ConsentService consent,
                                     AuditService audit) {
         this.campaigns = campaigns;
         this.recipients = recipients;
         this.leads = leads;
         this.sendGate = sendGate;
-        this.zapier = zapier;
         this.consent = consent;
         this.audit = audit;
     }
@@ -78,10 +75,11 @@ public class BulkEmailCampaignService {
             template = "LEAD_FOLLOW_UP";
         }
 
-        // Native SendGate/SES is the default; ZAPIER remains an explicit opt-in for rollback.
-        EmailCampaign.DeliveryMode mode = request.deliveryMode() == null
-                ? EmailCampaign.DeliveryMode.INLINE
-                : request.deliveryMode();
+        // Native SendGate / SES only — Zapier campaign delivery is retired.
+        if (request.deliveryMode() == EmailCampaign.DeliveryMode.ZAPIER) {
+            log.info("[bulk-email] ignoring ZAPIER deliveryMode; forcing INLINE");
+        }
+        EmailCampaign.DeliveryMode mode = EmailCampaign.DeliveryMode.INLINE;
 
         EmailCampaign campaign = campaigns.save(new EmailCampaign(
                 request.name().trim(),
@@ -158,27 +156,21 @@ public class BulkEmailCampaignService {
             }
             campaign.markRunning();
             try {
-                if (campaign.getDeliveryMode() == EmailCampaign.DeliveryMode.ZAPIER) {
-                    String ref = zapier.postRecipient(campaign, row);
-                    row.markSent(ref);
-                    campaign.incrementSent();
-                } else {
-                    String code = campaign.getTemplateCode() == null ? "LEAD_FOLLOW_UP" : campaign.getTemplateCode();
-                    Lead lead = leads.findById(row.getLeadId()).orElse(null);
-                    String trek = lead != null && lead.getDestination() != null && !lead.getDestination().isBlank()
-                            ? lead.getDestination()
-                            : "your Himalayan trek";
-                    List<String> values = List.of(trek, row.getCustomerName());
+                String code = campaign.getTemplateCode() == null ? "LEAD_FOLLOW_UP" : campaign.getTemplateCode();
+                Lead lead = leads.findById(row.getLeadId()).orElse(null);
+                String trek = lead != null && lead.getDestination() != null && !lead.getDestination().isBlank()
+                        ? lead.getDestination()
+                        : "your Himalayan trek";
+                List<String> values = List.of(trek, row.getCustomerName());
 
-                    SendDecision decision = sendGate.request(SendRequest.email(
-                            SubjectType.LEAD, row.getLeadId(), code, row.getEmail(), values, campaign.getCreatedBy()));
-                    if (!decision.accepted()) {
-                        row.markFailed(decision.reason());
-                        campaign.incrementFailed();
-                    } else {
-                        row.markSent(decision.messageId() == null ? "inline" : decision.messageId().toString());
-                        campaign.incrementSent();
-                    }
+                SendDecision decision = sendGate.request(SendRequest.email(
+                        SubjectType.LEAD, row.getLeadId(), code, row.getEmail(), values, campaign.getCreatedBy()));
+                if (!decision.accepted()) {
+                    row.markFailed(decision.reason());
+                    campaign.incrementFailed();
+                } else {
+                    row.markSent(decision.messageId() == null ? "inline" : decision.messageId().toString());
+                    campaign.incrementSent();
                 }
             } catch (Exception ex) {
                 row.markFailed(ex.getMessage());

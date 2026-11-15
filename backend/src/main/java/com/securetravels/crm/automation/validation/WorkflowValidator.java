@@ -259,7 +259,7 @@ public class WorkflowValidator {
             return;
         }
         if (c.op() != ConditionOp.IS_NULL && c.op() != ConditionOp.NOT_NULL
-                && !valueMatches(def.get(), c.value())) {
+                && !valueMatches(def.get(), c.op(), c.value())) {
             result.add(ValidationIssue.error("Value " + describe(c.value())
                     + " does not match field '" + c.field() + "' of type " + def.get().type(), where));
         }
@@ -376,6 +376,22 @@ public class WorkflowValidator {
         if (intOf(cfg.get("slaHours")) != null && intOf(cfg.get("slaHours")) < 0) {
             result.add(ValidationIssue.error("CREATE_TASK 'slaHours' must be >= 0", step.id()));
         }
+        if (intOf(cfg.get("slaMinutes")) != null && intOf(cfg.get("slaMinutes")) < 0) {
+            result.add(ValidationIssue.error("CREATE_TASK 'slaMinutes' must be >= 0", step.id()));
+        }
+        Object skipRaw = cfg.get("skipIfOpenTypes");
+        if (skipRaw != null && !(skipRaw instanceof List<?>)) {
+            result.add(ValidationIssue.error("CREATE_TASK 'skipIfOpenTypes' must be a list of task types",
+                    step.id()));
+        } else if (skipRaw instanceof List<?> skipList) {
+            for (Object item : skipList) {
+                if (item == null || !TASK_TYPES.contains(String.valueOf(item))) {
+                    result.add(ValidationIssue.error(
+                            "CREATE_TASK 'skipIfOpenTypes' entry must be one of " + TASK_TYPES,
+                            step.id()));
+                }
+            }
+        }
     }
 
     private void validateAssignOwner(ValidationResult result, StepDefinition step,
@@ -419,7 +435,7 @@ public class WorkflowValidator {
                         + " (" + from.get().type() + ") into " + field
                         + " (" + def.get().type() + ")", step.id()));
             }
-        } else if (!valueMatches(def.get(), value)) {
+        } else if (!valueMatches(def.get(), ConditionOp.EQ, value)) {
             result.add(ValidationIssue.error("UPDATE_FIELD value " + describe(value)
                     + " does not match field '" + field + "' of type " + def.get().type(), step.id()));
         }
@@ -779,7 +795,18 @@ public class WorkflowValidator {
         return category == WhatsAppTemplate.Category.MARKETING ? Purpose.MARKETING : Purpose.TRANSACTIONAL;
     }
 
-    private static boolean valueMatches(FieldDef def, Object value) {
+    private static boolean valueMatches(FieldDef def, ConditionOp op, Object value) {
+        if (op == ConditionOp.IN || op == ConditionOp.NOT_IN) {
+            if (!(value instanceof List<?> list) || list.isEmpty()) {
+                return false;
+            }
+            for (Object item : list) {
+                if (!valueMatches(def, ConditionOp.EQ, item)) {
+                    return false;
+                }
+            }
+            return true;
+        }
         return switch (def.type()) {
             case TEXT -> value instanceof String;
             case NUMBER -> value instanceof Number

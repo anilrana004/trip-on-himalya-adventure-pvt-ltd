@@ -1,6 +1,9 @@
 package com.securetravels.crm.automation.migrate;
 
 import com.securetravels.crm.automation.definition.ActionType;
+import com.securetravels.crm.automation.definition.Condition;
+import com.securetravels.crm.automation.definition.ConditionNode;
+import com.securetravels.crm.automation.definition.ConditionOp;
 import com.securetravels.crm.automation.definition.StepDefinition;
 import com.securetravels.crm.automation.definition.TriggerDefinition;
 import com.securetravels.crm.automation.definition.WorkflowDefinition;
@@ -10,11 +13,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Phase 4 MIGRATE template library (M1–M9). Hard-coded services remain live;
- * these definitions activate in dry-run shadow so the engine can prove parity
- * without double side effects.
+ * Native CRM automation library (M1–M11). Seeded ACTIVE by
+ * {@link MigrateTemplateBootstrap}; effects apply when dry-run is off and
+ * legacy hard-coded MIGRATE paths are gated off.
  */
 public final class MigrateWorkflowTemplates {
+
+    private static final List<String> FAST_TRACK_SOURCES = List.of(
+            "FACEBOOK_ADS", "INSTAGRAM", "GOOGLE_ADS", "WEBSITE", "STOREFRONT");
 
     public record Template(String slug, String name, String description, WorkflowDefinition definition) {
     }
@@ -32,22 +38,36 @@ public final class MigrateWorkflowTemplates {
                 m6PaymentOverdue(),
                 m7BookingConfirmedOps(),
                 m8BatchScarcityAlert(),
-                m9BookedCleanup());
+                m9BookedCleanup(),
+                m10LostCleanup(),
+                m11SoftDuplicateCallback());
     }
 
-    /** M1 — new lead → INITIAL_CALL due +5m / SLA +1h + notify owner. */
+    /** M1 — new lead → INITIAL_CALL +5m; ads/web/storefront SLA 15m else 1h. */
     public static Template m1SpeedToLead() {
+        Map<String, Object> branch = new LinkedHashMap<>();
+        branch.put("cases", List.of(Map.of(
+                "when", conditionMap(ConditionNode.leaf(
+                        new Condition("source", ConditionOp.IN, FAST_TRACK_SOURCES))),
+                "goto", "call-fast")));
+        branch.put("default", "call-std");
+
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "New-lead speed-to-lead",
-                "Shadow of FollowUpAutomation.onLeadCreated. Fast-track 15m SLA for ads/web is still hard-coded.",
+                "Native speed-to-lead: first call in 5 minutes; 15-minute SLA for ads/web/storefront.",
                 TriggerDefinition.event("lead.created"),
                 null,
                 List.of(
-                        task("initial-call", 1, "INITIAL_CALL", "OWNER", 5, 1, null),
-                        notifyOwner(2, "Call within 5 minutes",
+                        new StepDefinition("route-sla", 1, ActionType.BRANCH, null, branch, null),
+                        task("call-fast", 2, "INITIAL_CALL", "OWNER", 5, null, 10, null, null),
+                        notifyOwner(3, "Call within 5 minutes",
                                 "New lead assigned to you — call the customer now."),
-                        stop(3)));
+                        stop(4),
+                        task("call-std", 5, "INITIAL_CALL", "OWNER", 5, 1, null, null, null),
+                        notifyOwner(6, "Call within 5 minutes",
+                                "New lead assigned to you — call the customer now."),
+                        stop(7)));
         return new Template("new-lead-speed-to-lead", def.name(), def.description(), def);
     }
 
@@ -56,16 +76,16 @@ public final class MigrateWorkflowTemplates {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Follow-up cadence",
-                "Shadow of FollowUpAutomation.onInterested.",
+                "Native follow-up cadence after INTERESTED.",
                 TriggerDefinition.event("lead.interested"),
                 null,
                 List.of(
                         cancelTypes(1, List.of("INITIAL_CALL", "CALLBACK",
                                 "FOLLOW_UP_1D", "FOLLOW_UP_3D", "FOLLOW_UP_8D", "FOLLOW_UP_15D")),
-                        task("fu-1d", 2, "FOLLOW_UP_1D", "OWNER", days(1), 24, null),
-                        task("fu-3d", 3, "FOLLOW_UP_3D", "OWNER", days(3), 24, null),
-                        task("fu-8d", 4, "FOLLOW_UP_8D", "OWNER", days(8), 24, null),
-                        task("fu-15d", 5, "FOLLOW_UP_15D", "OWNER", days(15), 24, null),
+                        task("fu-1d", 2, "FOLLOW_UP_1D", "OWNER", days(1), 24, null, null, null),
+                        task("fu-3d", 3, "FOLLOW_UP_3D", "OWNER", days(3), 24, null, null, null),
+                        task("fu-8d", 4, "FOLLOW_UP_8D", "OWNER", days(8), 24, null, null, null),
+                        task("fu-15d", 5, "FOLLOW_UP_15D", "OWNER", days(15), 24, null, null, null),
                         updateFollowUp(6, "today+1"),
                         notifyOwner(7, "Follow-up 1 — tomorrow",
                                 "Cadence started — first follow-up is due tomorrow."),
@@ -78,12 +98,12 @@ public final class MigrateWorkflowTemplates {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Quotation no-response chase",
-                "Shadow of FollowUpAutomation.onQuotationSent.",
+                "Native quotation chase after QUOTATION_SENT.",
                 TriggerDefinition.event("lead.quotation"),
                 null,
                 List.of(
                         cancelTypes(1, List.of("QUOTATION")),
-                        task("quotation", 2, "QUOTATION", "OWNER", days(2), 24, null),
+                        task("quotation", 2, "QUOTATION", "OWNER", days(2), 24, null, null, null),
                         updateFollowUp(3, "today+2"),
                         notifyOwner(4, "Quotation follow-up",
                                 "Send / confirm the quotation for this lead."),
@@ -103,7 +123,7 @@ public final class MigrateWorkflowTemplates {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Booking-confirmation send",
-                "Shadow of BookingConfirmationNotifier (AFTER_COMMIT SendGate).",
+                "Native WhatsApp booking confirmation via SendGate.",
                 TriggerDefinition.event("booking.confirmed"),
                 null,
                 List.of(
@@ -112,28 +132,29 @@ public final class MigrateWorkflowTemplates {
         return new Template("booking-confirmation-send", def.name(), def.description(), def);
     }
 
-    /** M5 — unpaid payment due soon → PAYMENT_REMINDER task. */
+    /** M5 — unpaid payment due soon → PAYMENT_REMINDER task (booking-deduped). */
     public static Template m5BalanceDueReminder() {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Balance-due reminder",
-                "Shadow of PaymentSweep → PaymentService.ensureReminder.",
+                "Native balance-due reminder task for unpaid receivables.",
                 TriggerDefinition.event("payment.due_soon"),
                 null,
                 List.of(
-                        task("pay-reminder", 1, "PAYMENT_REMINDER", "OWNER", 1, 24, null),
+                        task("pay-reminder", 1, "PAYMENT_REMINDER", "OWNER", 1, 24, null, null,
+                                List.of("PAYMENT_REMINDER")),
                         notifyOwner(2, "Balance payment due",
                                 "Chase the unpaid balance on this booking."),
                         stop(3)));
         return new Template("balance-due-reminder", def.name(), def.description(), def);
     }
 
-    /** M6 — payment past due → mark OVERDUE (live sweep already did; shadow records intent). */
+    /** M6 — payment past due → mark OVERDUE + notify OPS. */
     public static Template m6PaymentOverdue() {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Payment overdue marking",
-                "Shadow of PaymentSweep overdue transition + ops payment mirror.",
+                "Native payment overdue mark + ops notify (sweep still syncs CORE ops mirror).",
                 TriggerDefinition.event("payment.overdue"),
                 null,
                 List.of(
@@ -150,11 +171,12 @@ public final class MigrateWorkflowTemplates {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "OPS prep on booking confirmed",
-                "Shadow of OperationsService.openOpsPrepTask + notifyOps (handoff create stays CORE).",
+                "Native OPS prep task + notify (handoff create stays CORE).",
                 TriggerDefinition.event("booking.confirmed"),
                 null,
                 List.of(
-                        task("ops-prep", 1, "OPS", "ROLE", null, 48, "travelDate"),
+                        task("ops-prep", 1, "OPS", "ROLE", null, 48, null, "travelDate",
+                                List.of("OPS")),
                         notifyRole(2, "OPS", "New ops handoff",
                                 "Booking confirmed — arrange hotel / transport / guide."),
                         stop(3)));
@@ -166,7 +188,7 @@ public final class MigrateWorkflowTemplates {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Batch scarcity alert",
-                "Shadow of CapacityAlertService.onSeatsBooked (latched live path stays authoritative).",
+                "Native scarcity notify (latch + audit stay CORE).",
                 TriggerDefinition.event("batch.scarcity_alert"),
                 null,
                 List.of(
@@ -181,7 +203,7 @@ public final class MigrateWorkflowTemplates {
         WorkflowDefinition def = new WorkflowDefinition(
                 WorkflowDefinition.CURRENT_SCHEMA_VERSION,
                 "Lead booking-confirmed cleanup",
-                "Shadow of FollowUpAutomation.onBooked.",
+                "Native cleanup when a lead is booked.",
                 TriggerDefinition.event("lead.booked"),
                 null,
                 List.of(
@@ -192,12 +214,65 @@ public final class MigrateWorkflowTemplates {
         return new Template("lead-booked-cleanup", def.name(), def.description(), def);
     }
 
+    /** M10 — LOST lead → cancel open tasks + notify owner. */
+    public static Template m10LostCleanup() {
+        WorkflowDefinition def = new WorkflowDefinition(
+                WorkflowDefinition.CURRENT_SCHEMA_VERSION,
+                "Lead lost cleanup",
+                "Native cleanup when a lead is marked lost.",
+                TriggerDefinition.event("lead.lost"),
+                null,
+                List.of(
+                        cancelAll(1),
+                        notifyOwner(2, "Lead marked lost — follow-ups closed",
+                                "No further follow-up for this lead."),
+                        stop(3)));
+        return new Template("lead-lost-cleanup", def.name(), def.description(), def);
+    }
+
+    /** M11 — soft-duplicate inbound → CALLBACK +2h if no open first-call/callback. */
+    public static Template m11SoftDuplicateCallback() {
+        WorkflowDefinition def = new WorkflowDefinition(
+                WorkflowDefinition.CURRENT_SCHEMA_VERSION,
+                "Soft-duplicate callback",
+                "Native callback when the same mobile hits again on an active lead.",
+                TriggerDefinition.event("lead.soft_duplicate"),
+                null,
+                List.of(
+                        task("soft-dup-callback", 1, "CALLBACK", "OWNER", 120, 4, null, null,
+                                List.of("INITIAL_CALL", "CALLBACK")),
+                        updateFollowUp(2, "today"),
+                        notifyOwner(3, "Callback — lead contacted again",
+                                "Same number came in again. Call them."),
+                        stop(4)));
+        return new Template("lead-soft-duplicate-callback", def.name(), def.description(), def);
+    }
+
     private static int days(int d) {
         return d * 24 * 60;
     }
 
+    private static Map<String, Object> conditionMap(ConditionNode node) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("operator", node.operator().name());
+        List<Map<String, Object>> leaves = new java.util.ArrayList<>();
+        if (node.conditions() != null) {
+            for (Condition c : node.conditions()) {
+                Map<String, Object> leaf = new LinkedHashMap<>();
+                leaf.put("field", c.field());
+                leaf.put("op", c.op().name());
+                leaf.put("value", c.value());
+                leaves.add(leaf);
+            }
+        }
+        map.put("conditions", leaves);
+        map.put("children", List.of());
+        return map;
+    }
+
     private static StepDefinition task(String id, int order, String type, String assignee,
-                                       Integer dueInMinutes, int slaHours, String dueDateField) {
+                                       Integer dueInMinutes, Integer slaHours, Integer slaMinutes,
+                                       String dueDateField, List<String> skipIfOpenTypes) {
         Map<String, Object> cfg = new LinkedHashMap<>();
         cfg.put("type", type);
         cfg.put("assignee", assignee);
@@ -210,7 +285,15 @@ public final class MigrateWorkflowTemplates {
         if (dueDateField != null) {
             cfg.put("dueDateField", dueDateField);
         }
-        cfg.put("slaHours", slaHours);
+        if (slaHours != null) {
+            cfg.put("slaHours", slaHours);
+        }
+        if (slaMinutes != null) {
+            cfg.put("slaMinutes", slaMinutes);
+        }
+        if (skipIfOpenTypes != null && !skipIfOpenTypes.isEmpty()) {
+            cfg.put("skipIfOpenTypes", skipIfOpenTypes);
+        }
         return new StepDefinition(id, order, ActionType.CREATE_TASK, null, cfg, null);
     }
 
@@ -245,6 +328,6 @@ public final class MigrateWorkflowTemplates {
     }
 
     private static StepDefinition stop(int order) {
-        return new StepDefinition("stop", order, ActionType.STOP, null, Map.of(), null);
+        return new StepDefinition("stop-" + order, order, ActionType.STOP, null, Map.of(), null);
     }
 }
