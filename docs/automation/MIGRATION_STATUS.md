@@ -11,7 +11,7 @@
 | 4 MIGRATE templates M1–M9 | **Cutover live** | Templates ACTIVE; `legacy-effects-enabled=false`; dry-run off |
 | 5 Integration adapters | Partial | Slack native still absent |
 | 6 Automation admin desk | **Updated** | Shows Engine live / legacy / Zap paused |
-| 9 Production cutover | **Partial** | MIGRATE + Z2 flag done; Z1 Meta ingest + FB Zap pause still manual |
+| 9 Production cutover | **Partial** | Railway cutover vars + deploy done (2026-11-16); Z1 Meta ingest + FB Zap pause still manual |
 
 ## Cutover flags (defaults)
 
@@ -38,12 +38,12 @@ All M1–M9 ACTIVE. Engine applies effects. Hard-coded FollowUp task/notify, boo
 
 ## Ops checklist
 
-1. Redeploy API with cutover env (or rely on new defaults).  
+1. ~~Redeploy API with cutover env~~ — **done** (`daring-mindfulness` / `trip-on-himalya-adventure-pvt-ltd`, deploy `0f4874f3`, M1–M9 ACTIVE, `legacyEffects=false` `dryRun=false`).  
 2. Confirm Automations desk: **Engine live**, Zap lifecycle **Paused**.  
 3. ~~Pause Z2 Catch Hook Zap~~ — **done** (`Trip On Himalaya CRM lifecycle events…` Off).  
 4. Do **not** pause Facebook Lead Ads Zap until Meta dual-path tested.  
 5. Watch 24–72h: tasks, WA confirm, payment reminders, ops prep.  
-6. Railway: `railway link` then set cutover vars if prod still has old `ZAPIER_EVENTS_ENABLED=true`.
+6. ~~Railway cutover vars~~ — **done** (`ZAPIER_EVENTS_ENABLED=false`, migrate shadow on, dry-run off, legacy effects off).
 
 ## Rollback
 
