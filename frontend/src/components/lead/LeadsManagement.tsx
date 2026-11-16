@@ -192,6 +192,7 @@ export function LeadsManagement() {
   const [showFilters, setShowFilters] = useState(false);
   const [heatFilter, setHeatFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
   const [periodAll, setPeriodAll] = useState(false);
   const tripsById = useMemo(
     () => new Map((trips as (Trip & { id?: string })[]).filter((t) => t.id).map((t) => [t.id as string, t])),
@@ -209,7 +210,12 @@ export function LeadsManagement() {
     const period = searchParams.get("period");
     if (period === "all") setPeriodAll(true);
     else if (period === "month") setPeriodAll(false);
-  }, [searchParams]);
+    const ownerId = searchParams.get("ownerId");
+    if (canReassign) {
+      setOwnerFilter(ownerId || "");
+      if (ownerId) setPage(0);
+    }
+  }, [searchParams, canReassign]);
 
   useEffect(() => {
     api.getTrips().then(setTrips).catch(() => setTrips([]));
@@ -242,6 +248,7 @@ export function LeadsManagement() {
         source: tab?.source,
         heat: heatFilter || undefined,
         status: statusFilter || undefined,
+        ownerId: canReassign && ownerFilter ? ownerFilter : undefined,
         ...(periodAll
           ? {}
           : {
@@ -258,7 +265,7 @@ export function LeadsManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, tableSearch, sourceTab, heatFilter, statusFilter, range.from, range.to, periodAll]);
+  }, [page, search, tableSearch, sourceTab, heatFilter, statusFilter, ownerFilter, canReassign, range.from, range.to, periodAll]);
 
   useEffect(() => {
     const t = setTimeout(() => void load(), 200);

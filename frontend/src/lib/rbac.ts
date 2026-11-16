@@ -68,6 +68,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Overview",
     items: [
       { href: "/dashboard", label: "Dashboard", roles: CRM_STAFF, icon: "dashboard" },
+      { href: "/teams", label: "Teams", roles: MANAGERS, icon: "staff" },
     ],
   },
   {

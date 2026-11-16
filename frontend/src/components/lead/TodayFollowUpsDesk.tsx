@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { api, formatApiError, type Lead, type SalesUser } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { canManageTeam } from "@/lib/rbac";
@@ -100,9 +101,12 @@ const BUCKETS: {
 
 export function TodayFollowUpsDesk() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const canFilterOwner = canManageTeam(user?.role);
   const [bucket, setBucket] = useState<Bucket>("OVERDUE");
-  const [ownerId, setOwnerId] = useState("");
+  const [ownerId, setOwnerId] = useState(() =>
+    canManageTeam(user?.role) ? searchParams.get("ownerId") || "" : "",
+  );
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
   const [overdue, setOverdue] = useState<Lead[]>([]);
   const [dueToday, setDueToday] = useState<Lead[]>([]);
@@ -140,6 +144,12 @@ export function TodayFollowUpsDesk() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!canFilterOwner) return;
+    const fromUrl = searchParams.get("ownerId") || "";
+    setOwnerId((prev) => (prev === fromUrl ? prev : fromUrl));
+  }, [canFilterOwner, searchParams]);
 
   useEffect(() => {
     if (canFilterOwner) {
