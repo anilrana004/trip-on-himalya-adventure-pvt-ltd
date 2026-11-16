@@ -180,4 +180,38 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
                       @Param("travelTo") LocalDate travelTo,
                       @Param("search") String search,
                       Pageable pageable);
+
+    /**
+     * Leads with a usable phone for the WhatsApp numbers desk (managers).
+     * Search matches name, mobile digits, or destination.
+     */
+    @Query(value = """
+            select * from leads l
+            where l.deleted_at is null
+              and l.mobile_digits is not null
+              and length(l.mobile_digits) >= 10
+              and (CAST(:status AS varchar) is null or l.status = :status)
+              and (CAST(:search AS varchar) is null
+                   or lower(l.customer_name) like lower('%' || :search || '%')
+                   or l.mobile_digits like '%' || :search || '%'
+                   or lower(coalesce(l.destination, '')) like lower('%' || :search || '%')
+                   or lower(coalesce(l.whatsapp_number, '')) like lower('%' || :search || '%'))
+            order by l.created_at desc
+            """,
+            countQuery = """
+            select count(*) from leads l
+            where l.deleted_at is null
+              and l.mobile_digits is not null
+              and length(l.mobile_digits) >= 10
+              and (CAST(:status AS varchar) is null or l.status = :status)
+              and (CAST(:search AS varchar) is null
+                   or lower(l.customer_name) like lower('%' || :search || '%')
+                   or l.mobile_digits like '%' || :search || '%'
+                   or lower(coalesce(l.destination, '')) like lower('%' || :search || '%')
+                   or lower(coalesce(l.whatsapp_number, '')) like lower('%' || :search || '%'))
+            """,
+            nativeQuery = true)
+    Page<Lead> findWhatsAppDirectory(@Param("status") String status,
+                                     @Param("search") String search,
+                                     Pageable pageable);
 }

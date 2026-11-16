@@ -6,14 +6,18 @@ import com.securetravels.crm.communications.dto.WhatsAppTemplateResponse;
 import com.securetravels.crm.communications.whatsapp.BulkWhatsAppCampaignRequest;
 import com.securetravels.crm.communications.whatsapp.BulkWhatsAppCampaignResponse;
 import com.securetravels.crm.communications.whatsapp.BulkWhatsAppCampaignService;
+import com.securetravels.crm.communications.whatsapp.WhatsAppRecipientDirectoryService;
+import com.securetravels.crm.communications.whatsapp.WhatsAppRecipientResponse;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.security.CurrentUser;
+import com.securetravels.crm.lead.Lead;
 import com.securetravels.crm.user.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,15 +53,18 @@ public class WhatsAppController {
     private final WhatsAppTemplateRepository templates;
     private final TimelineService timeline;
     private final BulkWhatsAppCampaignService campaigns;
+    private final WhatsAppRecipientDirectoryService recipients;
 
     public WhatsAppController(SendGateService sendGate, WhatsAppMessageRepository messages,
                               WhatsAppTemplateRepository templates, TimelineService timeline,
-                              BulkWhatsAppCampaignService campaigns) {
+                              BulkWhatsAppCampaignService campaigns,
+                              WhatsAppRecipientDirectoryService recipients) {
         this.sendGate = sendGate;
         this.messages = messages;
         this.templates = templates;
         this.timeline = timeline;
         this.campaigns = campaigns;
+        this.recipients = recipients;
     }
 
     @Operation(summary = "List WhatsApp templates",
@@ -114,6 +121,27 @@ public class WhatsAppController {
                 .map(WhatsAppMessageResponse::from)
                 .orElseThrow(() -> new IllegalStateException(
                         "Accepted send left no message row for " + decision.messageId()));
+    }
+
+    @Operation(summary = "WhatsApp numbers desk — unique mobiles on leads for bulk select")
+    @GetMapping("/recipients")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public Page<WhatsAppRecipientResponse> listRecipients(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Lead.Status status,
+            @RequestParam(required = false) Boolean eligibleOnly,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @CurrentUser UserPrincipal caller) {
+        return recipients.list(caller, search, status, eligibleOnly, page, size);
+    }
+
+    @Operation(summary = "Summary counts for the WhatsApp numbers desk")
+    @GetMapping("/recipients/summary")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'CEO')")
+    public WhatsAppRecipientDirectoryService.WhatsAppRecipientSummary recipientSummary(
+            @CurrentUser UserPrincipal caller) {
+        return recipients.summary(caller);
     }
 
     @Operation(summary = "Launch a bulk WhatsApp campaign to selected leads (Zapier or inline)")

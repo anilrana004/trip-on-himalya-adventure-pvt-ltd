@@ -113,6 +113,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/landing-pages", label: "Landing Pages", roles: MANAGERS, icon: "documents" },
       { href: "/forms", label: "Forms & Lead Capture", roles: MANAGERS, icon: "ops" },
       { href: "/automations", label: "Automation", roles: MANAGERS, icon: "tasks" },
+      { href: "/whatsapp-numbers", label: "WhatsApp numbers", roles: MANAGERS, icon: "messages" },
       { href: "/messages", label: "WhatsApp & Email", roles: CRM_STAFF, icon: "messages" },
     ],
   },

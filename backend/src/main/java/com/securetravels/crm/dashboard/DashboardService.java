@@ -631,7 +631,8 @@ public class DashboardService {
         int bookings = req.targetBookings() == null ? 0 : req.targetBookings();
         BigDecimal revenue = req.targetRevenue() == null ? BigDecimal.ZERO : req.targetRevenue();
         if (bookings == 0 && (revenue == null || revenue.signum() == 0)) {
-            throw new BadRequestException("set targetBookings or targetRevenue");
+            throw new BadRequestException(
+                    "Enter at least one target — bookings or revenue (₹) — before saving");
         }
         Optional<SalesTarget> existing = targetRepo.findByUserIdAndMonth(req.userId(), start);
         SalesTarget t = existing.orElseGet(() ->

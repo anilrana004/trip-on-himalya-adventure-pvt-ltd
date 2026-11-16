@@ -821,6 +821,38 @@ export type WhatsAppCampaignSummary = {
   createdAt: string;
 };
 
+/** Manager WhatsApp numbers desk — one row per unique mobile on leads. */
+export type WhatsAppRecipient = {
+  leadId: string;
+  customerName: string;
+  mobile: string;
+  mobileDigits: string;
+  consentGiven: boolean;
+  eligible: boolean;
+  ineligibleReason?: string | null;
+  status: string;
+  heat: string;
+  source: string;
+  destination?: string | null;
+  ownerId?: string | null;
+  createdAt?: string | null;
+};
+
+export type WhatsAppRecipientPage = {
+  content: WhatsAppRecipient[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+};
+
+export type WhatsAppRecipientSummary = {
+  uniqueNumbers: number;
+  consented: number;
+  eligible: number;
+  leadRowsScanned: number;
+};
+
 export type ZapierHookStatus = {
   id: string;
   label: string;
@@ -1562,6 +1594,18 @@ export const api = {
 
   getWhatsAppCampaign: (id: string) =>
     request<WhatsAppCampaignSummary>(`/api/whatsapp/campaigns/${id}`),
+
+  getWhatsAppRecipients: (params: {
+    search?: string;
+    status?: string;
+    eligibleOnly?: boolean;
+    page?: number;
+    size?: number;
+  } = {}) =>
+    request<WhatsAppRecipientPage>(`/api/whatsapp/recipients${qs(params)}`),
+
+  getWhatsAppRecipientSummary: () =>
+    request<WhatsAppRecipientSummary>("/api/whatsapp/recipients/summary"),
 
   getZapierAutomationStatus: () =>
     request<ZapierAutomationStatus>("/api/v1/automation/zapier/status"),

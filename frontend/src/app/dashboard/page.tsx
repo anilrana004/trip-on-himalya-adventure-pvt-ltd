@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   api,
-  ApiClientError,
+  formatApiError,
   type DashboardPerformance,
   type DashboardSummary,
   type SalesUser,
@@ -181,25 +181,29 @@ function DashboardView() {
 
   const saveTarget = useCallback(async () => {
     setActionError(null);
+    const bookings = editBookings.trim() === "" ? 0 : Number(editBookings);
+    const revenue = editRevenue.trim() === "" ? 0 : Number(editRevenue);
+    if (!Number.isFinite(bookings) || bookings < 0 || !Number.isFinite(revenue) || revenue < 0) {
+      setActionError("Bookings and revenue must be zero or a positive number");
+      return;
+    }
+    if (bookings === 0 && revenue === 0) {
+      setActionError("Enter at least one target — bookings or revenue (₹) — before saving");
+      return;
+    }
     setSaving(true);
     try {
       await api.upsertTarget({
         userId: editUser === "__company__" ? null : editUser,
         month,
-        targetBookings: editBookings ? Number(editBookings) : 0,
-        targetRevenue: editRevenue ? Number(editRevenue) : 0,
+        targetBookings: bookings,
+        targetRevenue: revenue,
       });
       setEditBookings("");
       setEditRevenue("");
       reload();
     } catch (err) {
-      setActionError(
-        err instanceof ApiClientError
-          ? err.body.message || "Could not save target"
-          : err instanceof Error
-            ? err.message
-            : "Save failed",
-      );
+      setActionError(formatApiError(err, "Could not save target"));
     } finally {
       setSaving(false);
     }
@@ -453,7 +457,7 @@ function DashboardView() {
                       min={0}
                       value={editBookings}
                       onChange={(e) => setEditBookings(e.target.value)}
-                      placeholder="0"
+                      placeholder="e.g. 20"
                       className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
                     />
                   </div>
@@ -466,23 +470,29 @@ function DashboardView() {
                       min={0}
                       value={editRevenue}
                       onChange={(e) => setEditRevenue(e.target.value)}
-                      placeholder="0"
+                      placeholder="e.g. 500000"
                       className="w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-700"
                     />
                   </div>
                   <button
-                    onClick={saveTarget}
+                    type="button"
+                    onClick={() => void saveTarget()}
                     disabled={saving}
                     className="rounded-md bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                   >
                     {saving ? "Saving…" : "Set target"}
                   </button>
+                  <p className="basis-full text-[11px] text-slate-400">
+                    Set bookings, revenue, or both. Zero alone is not a target — enter a real number for the desk.
+                  </p>
                 </div>
               )}
 
               {targetRows.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">
-                  No targets set for this month.
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                  {canWrite
+                    ? "No targets for this month yet. Enter bookings or revenue above, then Set target — sales will see progress against that number."
+                    : "No targets set for this month. Ask a manager to set company or sales targets."}
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
