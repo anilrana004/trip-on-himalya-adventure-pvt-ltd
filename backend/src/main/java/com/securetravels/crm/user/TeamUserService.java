@@ -1,5 +1,7 @@
 package com.securetravels.crm.user;
 
+import com.securetravels.crm.common.audit.AuditAction;
+import com.securetravels.crm.common.audit.AuditService;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ConflictException;
 import com.securetravels.crm.common.exception.ForbiddenException;
@@ -33,6 +35,8 @@ import java.util.UUID;
 public class TeamUserService {
 
     private static final Set<Role> DIRECTORY = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO);
+    /** Soft-remove from active roster — ADMIN/CEO only (managers edit, they do not delete). */
+    private static final Set<Role> CAN_DELETE = EnumSet.of(Role.ADMIN, Role.CEO);
     private static final Set<Role> MANAGER_ASSIGNABLE =
             EnumSet.of(Role.SALES, Role.OPS, Role.TRANSPORT, Role.VENDOR);
     private static final Set<Role> PARTNERS = EnumSet.of(Role.TRANSPORT, Role.VENDOR);
@@ -40,11 +44,14 @@ public class TeamUserService {
     private final UserRepository users;
     private final VendorRepository vendors;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
-    public TeamUserService(UserRepository users, VendorRepository vendors, PasswordEncoder passwordEncoder) {
+    public TeamUserService(UserRepository users, VendorRepository vendors, PasswordEncoder passwordEncoder,
+                           AuditService auditService) {
         this.users = users;
         this.vendors = vendors;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +127,30 @@ public class TeamUserService {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
         }
         return toResponse(users.save(user), null);
+    }
+
+    /**
+     * Remove a staff login from the active team. Soft-delete: sets {@code is_active=false}
+     * so lead ownership, payroll and audit history stay intact. ADMIN/CEO only.
+     */
+    @Transactional
+    public void delete(UUID id, UserPrincipal caller) {
+        requireDirectory(caller);
+        if (!CAN_DELETE.contains(caller.role())) {
+            throw new ForbiddenException("Only admins can delete team members");
+        }
+        User user = users.findById(id).orElseThrow(() -> new NotFoundException("User not found: " + id));
+        assertCanAssign(caller, user.getRole(), user);
+        if (user.getId().equals(caller.id())) {
+            throw new BadRequestException("You cannot delete your own account");
+        }
+        if (!user.isActive()) {
+            throw new ConflictException("This login is already inactive");
+        }
+        user.setActive(false);
+        users.save(user);
+        auditService.record("USER", user.getId(), AuditAction.DELETE, "active",
+                "true", "false — removed from team by " + caller.email());
     }
 
     private void requireDirectory(UserPrincipal caller) {

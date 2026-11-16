@@ -224,7 +224,7 @@ function DashboardView() {
 
   return (
     <>
-      <AppShell className="h-dvh overflow-hidden bg-slate-50">
+      <AppShell scroll="contained" className="bg-slate-50">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-6 md:py-4">
             <div>

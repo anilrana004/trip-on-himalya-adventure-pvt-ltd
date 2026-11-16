@@ -287,6 +287,8 @@ export function assignableRoles(actorRole: string | null | undefined): Role[] {
 }
 
 export const canManageTeam = (role: string | null | undefined) => hasRole(role, MANAGERS);
+/** Soft-remove a login from the team directory — company admins only. */
+export const canDeleteTeamUsers = (role: string | null | undefined) => hasRole(role, ADMINS);
 
 function asRole(role: string | null | undefined): Role | null {
   if (!role) return null;

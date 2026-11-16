@@ -212,7 +212,7 @@ export function CustomersDesk() {
   }, [selectedId, suggestOffer, offerTags, marketingOptIn, notes, reload]);
 
   return (
-    <AppShell className="h-dvh overflow-hidden bg-slate-50">
+    <AppShell scroll="contained" className="bg-slate-50">
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-slate-200 bg-white px-6 py-4">
           <h1 className="text-lg font-semibold text-slate-900">Travelers</h1>

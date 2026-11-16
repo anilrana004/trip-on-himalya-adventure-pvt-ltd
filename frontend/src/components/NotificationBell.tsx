@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { api, type NotificationFeed, type NotificationItem } from "@/lib/api";
+import { lockBodyScroll } from "@/lib/scrollLock";
 
 function timeAgo(iso: string | undefined): string {
   if (!iso) return "";
@@ -153,11 +154,7 @@ export function NotificationBell({
 
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return lockBodyScroll();
   }, [open]);
 
   const openItem = async (item: NotificationItem) => {

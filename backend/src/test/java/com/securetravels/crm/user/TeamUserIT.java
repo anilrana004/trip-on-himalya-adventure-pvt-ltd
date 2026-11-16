@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -71,5 +72,30 @@ class TeamUserIT extends BaseIT {
         mockMvc.perform(get("/api/users").header("Authorization", authHeader(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void adminDeletesSalesLogin() throws Exception {
+        createUser("admin@toh.in", "Admin", Role.ADMIN, "admin12345");
+        UUID salesId = createUser("sales@toh.in", "Ravi", Role.SALES, "sales12345");
+        String token = login("admin@toh.in", "admin12345");
+
+        mockMvc.perform(delete("/api/users/" + salesId).header("Authorization", authHeader(token)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users").param("active", "true").header("Authorization", authHeader(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].email").value("admin@toh.in"));
+    }
+
+    @Test
+    void managerCannotDeleteTeamMember() throws Exception {
+        createUser("mgr@toh.in", "Manager", Role.MANAGER, "manager123");
+        UUID salesId = createUser("sales@toh.in", "Ravi", Role.SALES, "sales12345");
+        String token = login("mgr@toh.in", "manager123");
+
+        mockMvc.perform(delete("/api/users/" + salesId).header("Authorization", authHeader(token)))
+                .andExpect(status().isForbidden());
     }
 }

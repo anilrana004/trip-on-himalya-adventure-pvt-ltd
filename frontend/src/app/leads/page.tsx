@@ -9,7 +9,7 @@ import { LeadsManagement } from "@/components/lead/LeadsManagement";
 export default function LeadsPage() {
   return (
     <Protected allowedRoles={SALES_DESK}>
-      <AppShell>
+      <AppShell scroll="contained">
         <Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading leads…</div>}>
           <LeadsManagement />
         </Suspense>

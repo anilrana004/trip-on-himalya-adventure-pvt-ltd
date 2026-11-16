@@ -1460,6 +1460,10 @@ export const api = {
   updateTeamUser: (id: string, payload: TeamUserUpdatePayload) =>
     request<TeamUser>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
 
+  /** Soft-remove: deactivates login. ADMIN/CEO only. */
+  deleteTeamUser: (id: string) =>
+    request<void>(`/api/users/${id}`, { method: "DELETE" }),
+
   getSalesFunnel: (params: ReportFilterParams = {}) =>
     request<SalesFunnelData>(`/api/analytics/funnel${qs(params)}`),
 

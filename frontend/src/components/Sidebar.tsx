@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { NotificationBell } from "@/components/NotificationBell";
 import { NavIconMark, initialsFromName } from "@/components/NavIcons";
 import { canAccessFinance, isFinanceUser, navSectionsForRole, roleDisplayLabel } from "@/lib/rbac";
+import { lockBodyScroll } from "@/lib/scrollLock";
 
 const COLLAPSE_KEY = "toh.sidebar.collapsed";
 
@@ -31,11 +32,7 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!mobileOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return lockBodyScroll();
   }, [mobileOpen]);
 
   function toggleCollapsed() {
@@ -278,7 +275,7 @@ export function Sidebar() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-slate-800 bg-slate-950 text-slate-200 transition-transform duration-200 md:static md:z-auto md:h-screen md:shrink-0 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-slate-800 bg-slate-950 text-slate-200 transition-transform duration-200 md:static md:z-auto md:h-dvh md:max-h-dvh md:shrink-0 md:translate-x-0 ${
           collapsed ? "md:w-[72px]" : "md:w-64"
         } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >

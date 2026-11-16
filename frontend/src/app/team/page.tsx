@@ -10,7 +10,7 @@ import {
   type TeamUserUpdatePayload,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { MANAGERS, assignableRoles, type Role } from "@/lib/rbac";
+import { MANAGERS, assignableRoles, canDeleteTeamUsers, type Role } from "@/lib/rbac";
 import { Protected } from "@/components/Protected";
 import { AppShell } from "@/components/AppShell";
 
@@ -31,6 +31,7 @@ const PARTNER_ROLES = new Set<Role>(["TRANSPORT", "VENDOR"]);
 function TeamView() {
   const { user } = useAuth();
   const canAssign = assignableRoles(user?.role);
+  const canDelete = canDeleteTeamUsers(user?.role);
 
   const [rows, setRows] = useState<TeamUser[]>([]);
   const [roleFilter, setRoleFilter] = useState("");
@@ -250,6 +251,12 @@ function TeamView() {
             vendors={vendors}
             initial={editing}
             isSelf={editing.id === user?.id}
+            canDelete={
+              canDelete &&
+              editing.active &&
+              editing.id !== user?.id &&
+              (user?.role === "CEO" || editing.role !== "CEO")
+            }
             onClose={() => setEditing(null)}
             onSubmit={async (payload) => {
               const update: TeamUserUpdatePayload = {
@@ -264,6 +271,11 @@ function TeamView() {
               setEditing(null);
               await load();
               await loadVendors();
+            }}
+            onDelete={async () => {
+              await api.deleteTeamUser(editing.id);
+              setEditing(null);
+              await load();
             }}
           />
         )}
@@ -309,16 +321,20 @@ function UserForm({
   vendors,
   initial,
   isSelf,
+  canDelete,
   onClose,
   onSubmit,
+  onDelete,
 }: {
   title: string;
   roles: Role[];
   vendors: Guide[];
   initial?: TeamUser;
   isSelf?: boolean;
+  canDelete?: boolean;
   onClose: () => void;
   onSubmit: (payload: TeamUserCreatePayload & { active?: boolean }) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }) {
   const initialRole = (initial?.role as Role) ?? roles[0] ?? "SALES";
   const [form, setForm] = useState<FormState>({
@@ -333,6 +349,7 @@ function UserForm({
     partnerCategory: defaultPartnerCategory(initialRole),
   });
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEdit = !!initial;
 
@@ -561,21 +578,50 @@ function UserForm({
           <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {busy ? "Saving…" : "Save"}
-          </button>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          {canDelete && onDelete ? (
+            <button
+              type="button"
+              disabled={busy || deleting}
+              onClick={async () => {
+                const name = form.fullName.trim() || "this member";
+                const ok = window.confirm(
+                  `Remove ${name} from the team?\n\nTheir login will be deactivated. Lead ownership, bookings and payroll history stay intact.`,
+                );
+                if (!ok) return;
+                setDeleting(true);
+                setError(null);
+                try {
+                  await onDelete();
+                } catch (err) {
+                  setError(formatApiError(err, "Delete failed"));
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              className="rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              {deleting ? "Removing…" : "Delete"}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || deleting}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
       </form>
     </div>

@@ -36,7 +36,7 @@ function ReportsView() {
 
   return (
     <AppShell className="bg-slate-50">
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 p-6">
         <div className="mb-4">
           <h1 className="text-xl font-semibold text-slate-900">Reports</h1>
           <p className="text-sm text-slate-500">{current?.blurb}</p>

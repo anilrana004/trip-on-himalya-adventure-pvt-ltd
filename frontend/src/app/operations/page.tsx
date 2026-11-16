@@ -8,7 +8,7 @@ import { OpsDashboard } from "@/components/ops/OpsDashboard";
 export default function OperationsPage() {
   return (
     <Protected allowedRoles={OPS_DESK}>
-      <AppShell className="bg-slate-50">
+      <AppShell scroll="contained" className="bg-slate-50">
         <OpsDashboard />
       </AppShell>
     </Protected>

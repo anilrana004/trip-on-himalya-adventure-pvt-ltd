@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { FINANCE_ERP_TABS, financeNavForRole, homePathForRole, isFinanceUser } from "@/lib/rbac";
 import { NavIconMark } from "@/components/NavIcons";
+import { lockBodyScroll } from "@/lib/scrollLock";
 
 export function FinanceShell({
   title,
@@ -33,11 +34,7 @@ export function FinanceShell({
 
   useEffect(() => {
     if (!mobileOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return lockBodyScroll();
   }, [mobileOpen]);
 
   function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
