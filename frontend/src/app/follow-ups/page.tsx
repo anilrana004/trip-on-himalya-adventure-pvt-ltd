@@ -8,7 +8,7 @@ export default function FollowUpsPage() {
   return (
     <AdminPage
       title="Today's Follow-Ups"
-      subtitle="Customers you need to call today — overdue first, then today's scheduled times"
+      subtitle="Call queue for the sales desk — overdue first, then today's scheduled times"
       allowedRoles={SALES_DESK}
     >
       <TodayFollowUpsDesk />
