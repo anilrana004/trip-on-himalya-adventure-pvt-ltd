@@ -144,6 +144,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/attendance/rules", label: "Attendance rules", roles: ADMINS, icon: "settings" },
       { href: "/attendance/presence", label: "Sign-in board", roles: MANAGERS, icon: "attendance" },
       { href: "/attendance/hours-log", label: "Hours log", roles: MANAGERS, icon: "attendance" },
+      { href: "/attendance/face-verify", label: "Face verification", roles: MANAGERS, icon: "attendance" },
       { href: "/attendance", label: "Attendance", roles: HR_ROLES, icon: "attendance" },
       { href: "/vendors", label: "Vendors", roles: OPS_DESK, icon: "vendors" },
       { href: "/leave", label: "Leave", roles: HR_ROLES, icon: "leave" },

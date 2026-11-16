@@ -1106,6 +1106,76 @@ export const api = {
       }>;
     }>(`/api/auth/presence/hours/${encodeURIComponent(userId)}/log${qs({ from, to })}`),
 
+  listFaceRoster: () =>
+    request<
+      Array<{
+        userId: string;
+        fullName: string | null;
+        email: string | null;
+        role: string;
+        enrolled: boolean;
+        enrolledAt?: string | null;
+        sampleCount: number;
+      }>
+    >("/api/face/roster"),
+
+  enrollFace: (body: {
+    userId: string;
+    descriptors: number[][];
+    snapshotJpegBase64?: string;
+  }) =>
+    request<{
+      userId: string;
+      fullName: string | null;
+      email: string | null;
+      role: string;
+      enrolled: boolean;
+      enrolledAt?: string | null;
+      sampleCount: number;
+    }>("/api/face/enroll", { method: "POST", body: JSON.stringify(body) }),
+
+  clearFaceEnrollment: (userId: string) =>
+    request<void>(`/api/face/enroll/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+
+  verifyFace: (body: {
+    subjectUserId?: string;
+    descriptor: number[];
+    purpose: string;
+    snapshotJpegBase64?: string;
+    loginSessionId?: string;
+    note?: string;
+  }) =>
+    request<{
+      id: string;
+      subjectUserId: string | null;
+      matchedUserId: string | null;
+      matchedFullName: string | null;
+      matchedEmail: string | null;
+      purpose: string;
+      result: string;
+      score: number | null;
+      threshold: number;
+      createdAt: string;
+    }>("/api/face/verify", { method: "POST", body: JSON.stringify(body) }),
+
+  listFaceVerificationLog: (day?: string) =>
+    request<
+      Array<{
+        id: string;
+        subjectUserId: string | null;
+        subjectName: string | null;
+        matchedUserId: string | null;
+        matchedName: string | null;
+        verifiedBy: string;
+        verifiedByName: string | null;
+        purpose: string;
+        result: string;
+        score: number | null;
+        hasSnapshot: boolean;
+        createdAt: string;
+      }>
+    >(`/api/face/log${qs({ day })}`),
+
   pauseDeskHours: () =>
     request<{
       id: string;
