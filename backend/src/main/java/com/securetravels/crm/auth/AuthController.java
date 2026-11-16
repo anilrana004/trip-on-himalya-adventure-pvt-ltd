@@ -2,6 +2,7 @@ package com.securetravels.crm.auth;
 
 import com.securetravels.crm.auth.dto.DayHoursResponse;
 import com.securetravels.crm.auth.dto.PersonDayDetailResponse;
+import com.securetravels.crm.auth.dto.PersonHoursLogResponse;
 import com.securetravels.crm.auth.dto.PresenceResponse;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.security.ClientIpResolver;
@@ -111,6 +112,17 @@ public class AuthController {
             @PathVariable UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
         return presence.personDay(principal, userId, day);
+    }
+
+    @Operation(summary = "Multi-day desk hours log for one person (managers / self)",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/presence/hours/{userId}/log")
+    public PersonHoursLogResponse personHoursLog(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return presence.personHoursLog(principal, userId, from, to);
     }
 
     @Operation(summary = "Who signed in today", security = @SecurityRequirement(name = "bearerAuth"))

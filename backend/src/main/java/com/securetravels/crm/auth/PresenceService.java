@@ -4,6 +4,8 @@ import com.securetravels.crm.auth.dto.DayHoursResponse;
 import com.securetravels.crm.auth.dto.DayHoursResponse.PersonDayHours;
 import com.securetravels.crm.auth.dto.PersonDayDetailResponse;
 import com.securetravels.crm.auth.dto.PersonDayDetailResponse.SessionSegment;
+import com.securetravels.crm.auth.dto.PersonHoursLogResponse;
+import com.securetravels.crm.auth.dto.PersonHoursLogResponse.DayEntry;
 import com.securetravels.crm.auth.dto.PresenceResponse;
 import com.securetravels.crm.common.exception.NotFoundException;
 import com.securetravels.crm.common.exception.BadRequestException;
@@ -191,6 +193,80 @@ public class PresenceService {
                 summary.firstSignIn(),
                 summary.lastSignOut(),
                 segments);
+    }
+
+    /**
+     * Day-by-day sign-in / pause / sign-out log for one person across an India date range.
+     * Managers: their sales reports. Admin/CEO: any sales person. Self always.
+     */
+    @Transactional(readOnly = true)
+    public PersonHoursLogResponse personHoursLog(UserPrincipal caller, UUID userId,
+                                                 LocalDate fromDay, LocalDate toDay) {
+        User person = users.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        assertCanViewHours(caller, person);
+
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate to = toDay != null ? toDay : today;
+        LocalDate from = fromDay != null ? fromDay : to.minusDays(13);
+        if (from.isAfter(to)) {
+            throw new BadRequestException("From date must be on or before to date");
+        }
+        if (from.plusDays(62).isBefore(to)) {
+            throw new BadRequestException("Pick at most 62 India days at a time");
+        }
+
+        Instant rangeFrom = from.atStartOfDay(ZONE).toInstant();
+        Instant rangeTo = to.plusDays(1).atStartOfDay(ZONE).toInstant();
+        Instant now = Instant.now();
+
+        List<LoginSession> all = sessions.findOverlapping(List.of(userId), rangeFrom, rangeTo).stream()
+                .sorted(Comparator.comparing(LoginSession::getLoginAt))
+                .toList();
+
+        List<DayEntry> days = new ArrayList<>();
+        long totalSeconds = 0;
+        int totalSessions = 0;
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            Instant dayFrom = date.atStartOfDay(ZONE).toInstant();
+            Instant dayTo = date.plusDays(1).atStartOfDay(ZONE).toInstant();
+            Instant cap = now.isBefore(dayTo) ? now : dayTo;
+            boolean live = date.equals(today);
+            List<LoginSession> mine = all.stream()
+                    .filter(s -> overlapsDay(s, dayFrom, dayTo))
+                    .toList();
+            PersonDayHours summary = toPersonDay(person, mine, dayFrom, cap, live);
+            List<SessionSegment> segments = mine.stream().map(s -> toSegment(s, cap)).toList();
+            days.add(new DayEntry(
+                    date,
+                    summary.seconds(),
+                    summary.open(),
+                    summary.paused(),
+                    summary.sessions(),
+                    summary.firstSignIn(),
+                    summary.lastSignOut(),
+                    segments));
+            totalSeconds += summary.seconds();
+            totalSessions += summary.sessions();
+        }
+        // Newest day first — managers scan recent activity first.
+        days.sort(Comparator.comparing(DayEntry::workDate).reversed());
+        return new PersonHoursLogResponse(
+                person.getId(),
+                person.getFullName(),
+                person.getEmail(),
+                from,
+                to,
+                totalSeconds,
+                totalSessions,
+                days);
+    }
+
+    static boolean overlapsDay(LoginSession session, Instant dayFrom, Instant dayTo) {
+        if (!session.getLoginAt().isBefore(dayTo)) {
+            return false;
+        }
+        Instant end = session.getLogoutAt() != null ? session.getLogoutAt() : Instant.MAX;
+        return end.isAfter(dayFrom);
     }
 
     private void assertCanViewHours(UserPrincipal caller, User person) {

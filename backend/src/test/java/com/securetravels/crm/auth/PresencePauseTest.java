@@ -39,4 +39,19 @@ class PresencePauseTest {
         );
         assertThat(PresenceService.mergedSeconds(new java.util.ArrayList<>(spans))).isEqualTo(7200L);
     }
+
+    @Test
+    void sessionCountsOnTheIndiaDayItOverlaps() {
+        Instant dayFrom = Instant.parse("2026-11-16T00:00:00+05:30");
+        Instant dayTo = Instant.parse("2026-11-17T00:00:00+05:30");
+        LoginSession mid = new LoginSession(UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-11-16T06:30:00Z"));
+        mid.close(Instant.parse("2026-11-16T08:00:00Z"), "LOGOUT");
+        LoginSession nextDay = new LoginSession(UUID.randomUUID(), mid.getUserId(),
+                Instant.parse("2026-11-17T01:00:00Z"));
+        nextDay.close(Instant.parse("2026-11-17T02:00:00Z"), "LOGOUT");
+
+        assertThat(PresenceService.overlapsDay(mid, dayFrom, dayTo)).isTrue();
+        assertThat(PresenceService.overlapsDay(nextDay, dayFrom, dayTo)).isFalse();
+    }
 }

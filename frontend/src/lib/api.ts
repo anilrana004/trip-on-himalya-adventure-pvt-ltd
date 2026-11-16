@@ -1077,6 +1077,35 @@ export const api = {
       }>;
     }>(`/api/auth/presence/hours/${encodeURIComponent(userId)}${qs({ day })}`),
 
+  getPersonHoursLog: (userId: string, from?: string, to?: string) =>
+    request<{
+      userId: string;
+      fullName: string | null;
+      email: string | null;
+      from: string;
+      to: string;
+      totalSeconds: number;
+      totalSessions: number;
+      days: Array<{
+        workDate: string;
+        seconds: number;
+        open: boolean;
+        paused?: boolean;
+        sessions: number;
+        firstSignIn?: string | null;
+        lastSignOut?: string | null;
+        segments: Array<{
+          id: string;
+          loginAt: string;
+          logoutAt: string | null;
+          open: boolean;
+          paused: boolean;
+          logoutReason: string | null;
+          elapsedSeconds: number;
+        }>;
+      }>;
+    }>(`/api/auth/presence/hours/${encodeURIComponent(userId)}/log${qs({ from, to })}`),
+
   pauseDeskHours: () =>
     request<{
       id: string;
