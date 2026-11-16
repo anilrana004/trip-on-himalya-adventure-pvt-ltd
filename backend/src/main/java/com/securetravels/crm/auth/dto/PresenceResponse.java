@@ -12,6 +12,8 @@ public record PresenceResponse(
         Instant loginAt,
         Instant logoutAt,
         boolean open,
+        boolean paused,
+        String logoutReason,
         long elapsedSeconds
 ) {
 }

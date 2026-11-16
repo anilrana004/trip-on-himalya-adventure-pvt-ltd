@@ -3,6 +3,7 @@ package com.securetravels.crm.auth;
 import com.securetravels.crm.auth.dto.DayHoursResponse;
 import com.securetravels.crm.auth.dto.DayHoursResponse.PersonDayHours;
 import com.securetravels.crm.auth.dto.PresenceResponse;
+import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.security.JwtService;
 import com.securetravels.crm.user.Role;
@@ -31,6 +32,7 @@ public class PresenceService {
 
     static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
     private static final Set<Role> COMPANY = EnumSet.of(Role.ADMIN, Role.CEO);
+    static final String REASON_PAUSE = "PAUSE";
 
     private final LoginSessionRepository sessions;
     private final RefreshTokenRepository refreshTokens;
@@ -53,8 +55,50 @@ public class PresenceService {
                     .stream().findFirst().orElse(null);
         }
         if (session == null) {
-            return null;
+            // Away: last closed segment was a pause — still authenticated, clock stopped.
+            session = latestSession(userId);
+            if (session == null || !REASON_PAUSE.equals(session.getLogoutReason())) {
+                return null;
+            }
         }
+        User user = users.findById(userId).orElse(null);
+        return toResponse(session, user);
+    }
+
+    /**
+     * Stop the desk clock without signing out. Auth cookie stays; hours stop until resume.
+     */
+    @Transactional
+    public PresenceResponse pause(UUID userId, String rawRefresh) {
+        LoginSession session = openSession(userId, rawRefresh);
+        if (session == null) {
+            throw new BadRequestException("No open desk clock to pause — sign in first, or resume if already away");
+        }
+        Instant now = Instant.now();
+        session.close(now, REASON_PAUSE);
+        sessions.save(session);
+        User user = users.findById(userId).orElse(null);
+        return toResponse(session, user);
+    }
+
+    /**
+     * Start a new desk clock segment after Away. Keeps the same refresh token.
+     */
+    @Transactional
+    public PresenceResponse resume(UUID userId, String rawRefresh) {
+        RefreshToken token = refreshToken(rawRefresh);
+        if (token == null || token.isRevoked() || !token.getUserId().equals(userId)) {
+            throw new BadRequestException("Sign in again to resume the desk clock");
+        }
+        LoginSession open = sessions.findByUserIdAndLogoutAtIsNullOrderByLoginAtDesc(userId)
+                .stream().findFirst().orElse(null);
+        if (open != null) {
+            throw new BadRequestException("Desk clock is already running");
+        }
+        Instant now = Instant.now();
+        LoginSession session = sessions.save(new LoginSession(UUID.randomUUID(), userId, now));
+        token.setLoginSessionId(session.getId());
+        refreshTokens.save(token);
         User user = users.findById(userId).orElse(null);
         return toResponse(session, user);
     }
@@ -84,7 +128,7 @@ public class PresenceService {
     /**
      * Hours for one India day. Sales sees only their own row. A manager sees
      * the sales people who report to them. Admin and CEO see every sales person.
-     * An open session counts up to now. A finished day stops at midnight.
+     * Pause segments stop the clock; resume starts a new session row.
      */
     @Transactional(readOnly = true)
     public DayHoursResponse dayHours(UserPrincipal caller, LocalDate day) {
@@ -104,9 +148,9 @@ public class PresenceService {
                 .collect(Collectors.groupingBy(LoginSession::getUserId));
         List<PersonDayHours> rows = new ArrayList<>();
         for (User person : people) {
-            boolean open = false;
             List<LoginSession> mine = byUser.getOrDefault(person.getId(), List.of());
             List<long[]> spans = new ArrayList<>();
+            boolean open = false;
             for (LoginSession session : mine) {
                 Instant start = session.getLoginAt().isAfter(from) ? session.getLoginAt() : from;
                 Instant end = session.getLogoutAt() == null || session.getLogoutAt().isAfter(cap)
@@ -119,15 +163,15 @@ public class PresenceService {
                     open = true;
                 }
             }
+            boolean paused = live && !open && isAway(mine);
             rows.add(new PersonDayHours(
                     person.getId(), person.getFullName(), person.getEmail(),
-                    mergedSeconds(spans), open, mine.size()));
+                    mergedSeconds(spans), open, paused, mine.size()));
         }
         rows.sort(Comparator.comparing(PersonDayHours::fullName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
         return new DayHoursResponse(date, live, rows);
     }
 
-    /** Null means the whole company. A manager gets self and direct reports. */
     private List<User> salesInScope(UserPrincipal caller) {
         if (COMPANY.contains(caller.role())) {
             return users.findByIsActiveTrueAndRoleIn(List.of(Role.SALES));
@@ -137,11 +181,22 @@ public class PresenceService {
                     .filter(user -> user.isActive() && user.getRole() == Role.SALES)
                     .toList();
         }
+        // Staff see their own desk hours regardless of role (ops/sales/etc.).
         return users.findById(caller.id()).stream().toList();
     }
 
     private static PersonDayHours closed(User person, long seconds, int sessions) {
-        return new PersonDayHours(person.getId(), person.getFullName(), person.getEmail(), seconds, false, sessions);
+        return new PersonDayHours(person.getId(), person.getFullName(), person.getEmail(),
+                seconds, false, false, sessions);
+    }
+
+    /** Latest closed segment today/overall ended with PAUSE → Away. */
+    static boolean isAway(List<LoginSession> mine) {
+        return mine.stream()
+                .filter(s -> s.getLogoutAt() != null)
+                .max(Comparator.comparing(LoginSession::getLoginAt))
+                .map(s -> REASON_PAUSE.equals(s.getLogoutReason()))
+                .orElse(false);
     }
 
     /** Overlapping browsers must not count the same minute twice. */
@@ -178,19 +233,39 @@ public class PresenceService {
         return ids;
     }
 
-    private LoginSession sessionForCookie(String rawRefresh) {
+    private LoginSession openSession(UUID userId, String rawRefresh) {
+        LoginSession session = sessionForCookie(rawRefresh);
+        if (session != null && session.getUserId().equals(userId) && session.isOpen()) {
+            return session;
+        }
+        return sessions.findByUserIdAndLogoutAtIsNullOrderByLoginAtDesc(userId)
+                .stream().findFirst().orElse(null);
+    }
+
+    private LoginSession latestSession(UUID userId) {
+        return sessions.findByUserIdOrderByLoginAtDesc(userId).stream().findFirst().orElse(null);
+    }
+
+    private RefreshToken refreshToken(String rawRefresh) {
         if (rawRefresh == null || rawRefresh.isBlank()) {
             return null;
         }
-        return refreshTokens.findByTokenHash(jwtService.sha256Hex(rawRefresh))
-                .map(RefreshToken::getLoginSessionId)
-                .flatMap(sessions::findById)
-                .orElse(null);
+        return refreshTokens.findByTokenHash(jwtService.sha256Hex(rawRefresh)).orElse(null);
+    }
+
+    private LoginSession sessionForCookie(String rawRefresh) {
+        RefreshToken token = refreshToken(rawRefresh);
+        if (token == null || token.getLoginSessionId() == null) {
+            return null;
+        }
+        return sessions.findById(token.getLoginSessionId()).orElse(null);
     }
 
     private PresenceResponse toResponse(LoginSession session, User user) {
         Instant end = session.getLogoutAt() != null ? session.getLogoutAt() : Instant.now();
         long elapsed = Math.max(0, Duration.between(session.getLoginAt(), end).getSeconds());
+        boolean open = session.isOpen();
+        boolean paused = !open && REASON_PAUSE.equals(session.getLogoutReason());
         return new PresenceResponse(
                 session.getId(),
                 session.getUserId(),
@@ -199,7 +274,9 @@ public class PresenceService {
                 user == null ? null : user.getRole().name(),
                 session.getLoginAt(),
                 session.getLogoutAt(),
-                session.isOpen(),
+                open,
+                paused,
+                session.getLogoutReason(),
                 elapsed);
     }
 }

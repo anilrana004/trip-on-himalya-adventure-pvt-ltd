@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/** Hours on one India work day, added up from sign-in until sign-out. */
+/** Hours on one India work day, added up from sign-in until sign-out (pause segments excluded). */
 public record DayHoursResponse(
         LocalDate workDate,
         boolean live,
@@ -16,6 +16,7 @@ public record DayHoursResponse(
             String email,
             long seconds,
             boolean open,
+            boolean paused,
             int sessions
     ) {
     }

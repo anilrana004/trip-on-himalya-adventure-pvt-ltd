@@ -111,6 +111,20 @@ public class AuthController {
         return presence.board(principal, day);
     }
 
+    @Operation(summary = "Pause desk hours (Away) without signing out",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping("/presence/pause")
+    public PresenceResponse pauseDesk(@CurrentUser UserPrincipal principal, HttpServletRequest httpRequest) {
+        return presence.pause(principal.id(), RefreshCookie.read(httpRequest));
+    }
+
+    @Operation(summary = "Resume desk hours after Away",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @PostMapping("/presence/resume")
+    public PresenceResponse resumeDesk(@CurrentUser UserPrincipal principal, HttpServletRequest httpRequest) {
+        return presence.resume(principal.id(), RefreshCookie.read(httpRequest));
+    }
+
     @Operation(summary = "Current authenticated user", security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/me")
     public AuthResponse.UserInfo me(@CurrentUser UserPrincipal principal) {

@@ -1032,6 +1032,8 @@ export const api = {
       loginAt: string;
       logoutAt: string | null;
       open: boolean;
+      paused?: boolean;
+      logoutReason?: string | null;
       elapsedSeconds: number;
     } | null>("/api/auth/presence"),
 
@@ -1045,9 +1047,26 @@ export const api = {
         email: string | null;
         seconds: number;
         open: boolean;
+        paused?: boolean;
         sessions: number;
       }>;
     }>(`/api/auth/presence/hours${qs({ day })}`),
+
+  pauseDeskHours: () =>
+    request<{
+      id: string;
+      open: boolean;
+      paused: boolean;
+      elapsedSeconds: number;
+    }>("/api/auth/presence/pause", { method: "POST" }),
+
+  resumeDeskHours: () =>
+    request<{
+      id: string;
+      open: boolean;
+      paused: boolean;
+      elapsedSeconds: number;
+    }>("/api/auth/presence/resume", { method: "POST" }),
 
   getPresenceBoard: () =>
     request<
@@ -1060,6 +1079,8 @@ export const api = {
         loginAt: string;
         logoutAt: string | null;
         open: boolean;
+        paused?: boolean;
+        logoutReason?: string | null;
         elapsedSeconds: number;
       }>
     >("/api/auth/presence/team"),

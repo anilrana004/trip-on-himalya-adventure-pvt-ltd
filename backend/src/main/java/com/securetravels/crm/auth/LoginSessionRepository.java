@@ -13,6 +13,8 @@ public interface LoginSessionRepository extends JpaRepository<LoginSession, UUID
 
     List<LoginSession> findByUserIdAndLogoutAtIsNullOrderByLoginAtDesc(UUID userId);
 
+    List<LoginSession> findByUserIdOrderByLoginAtDesc(UUID userId);
+
     @Query("""
             select s from LoginSession s
              where s.loginAt >= :from and s.loginAt < :to
