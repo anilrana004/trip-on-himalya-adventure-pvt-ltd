@@ -112,9 +112,10 @@ function Donut({ slices }: { slices: { key: string; label: string; value: number
       pct: (slice.value / total) * 100,
     };
   });
+  // Stack chart above legend — side-by-side crushed labels in the 4-col leads grid.
   return (
-    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-      <svg viewBox="0 0 140 140" className="mx-auto h-28 w-28 shrink-0 sm:mx-0 sm:h-32 sm:w-32">
+    <div className="flex flex-col gap-4">
+      <svg viewBox="0 0 140 140" className="mx-auto h-32 w-32 shrink-0" aria-hidden>
         {paths.map((p) => (
           <path key={p.key} d={p.d} fill={p.color} opacity={0.92} />
         ))}
@@ -126,14 +127,24 @@ function Donut({ slices }: { slices: { key: string; label: string; value: number
           {total}
         </text>
       </svg>
-      <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
+      <ul className="space-y-2">
         {paths.map((p) => (
-          <li key={p.key} className="flex items-start justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-1.5 text-slate-600">
-              <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: p.color }} />
-              <span className="leading-snug">{p.label}</span>
+          <li
+            key={p.key}
+            className="grid grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-x-2 text-xs"
+          >
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ background: p.color }}
+              aria-hidden
+            />
+            <span className="truncate text-slate-600" title={p.label}>
+              {p.label}
             </span>
-            <span className="shrink-0 font-semibold text-slate-800">{formatPct(p.pct)}</span>
+            <span className="shrink-0 tabular-nums text-slate-800">
+              <span className="font-semibold">{formatPct(p.pct)}</span>
+              <span className="ml-1.5 text-slate-400">{p.value}</span>
+            </span>
           </li>
         ))}
       </ul>
