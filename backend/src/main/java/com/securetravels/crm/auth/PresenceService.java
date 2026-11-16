@@ -2,7 +2,10 @@ package com.securetravels.crm.auth;
 
 import com.securetravels.crm.auth.dto.DayHoursResponse;
 import com.securetravels.crm.auth.dto.DayHoursResponse.PersonDayHours;
+import com.securetravels.crm.auth.dto.PersonDayDetailResponse;
+import com.securetravels.crm.auth.dto.PersonDayDetailResponse.SessionSegment;
 import com.securetravels.crm.auth.dto.PresenceResponse;
+import com.securetravels.crm.common.exception.NotFoundException;
 import com.securetravels.crm.common.exception.BadRequestException;
 import com.securetravels.crm.common.exception.ForbiddenException;
 import com.securetravels.crm.common.security.JwtService;
@@ -140,7 +143,7 @@ public class PresenceService {
         List<User> people = salesInScope(caller);
         boolean live = date.equals(today);
         if (people.isEmpty() || !cap.isAfter(from)) {
-            return new DayHoursResponse(date, live, people.stream().map(person -> closed(person, 0, 0)).toList());
+            return new DayHoursResponse(date, live, people.stream().map(person -> closed(person)).toList());
         }
         Map<UUID, List<LoginSession>> byUser = sessions.findOverlapping(
                         people.stream().map(User::getId).toList(), from, to)
@@ -149,27 +152,106 @@ public class PresenceService {
         List<PersonDayHours> rows = new ArrayList<>();
         for (User person : people) {
             List<LoginSession> mine = byUser.getOrDefault(person.getId(), List.of());
-            List<long[]> spans = new ArrayList<>();
-            boolean open = false;
-            for (LoginSession session : mine) {
-                Instant start = session.getLoginAt().isAfter(from) ? session.getLoginAt() : from;
-                Instant end = session.getLogoutAt() == null || session.getLogoutAt().isAfter(cap)
-                        ? cap
-                        : session.getLogoutAt();
-                if (end.isAfter(start)) {
-                    spans.add(new long[]{start.getEpochSecond(), end.getEpochSecond()});
-                }
-                if (live && session.getLogoutAt() == null) {
-                    open = true;
-                }
-            }
-            boolean paused = live && !open && isAway(mine);
-            rows.add(new PersonDayHours(
-                    person.getId(), person.getFullName(), person.getEmail(),
-                    mergedSeconds(spans), open, paused, mine.size()));
+            rows.add(toPersonDay(person, mine, from, cap, live));
         }
         rows.sort(Comparator.comparing(PersonDayHours::fullName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
         return new DayHoursResponse(date, live, rows);
+    }
+
+    /**
+     * Full sign-in / pause / sign-out timeline for one person on an India day.
+     * Self always; managers see their sales reports; admin/CEO see any sales person in scope.
+     */
+    @Transactional(readOnly = true)
+    public PersonDayDetailResponse personDay(UserPrincipal caller, UUID userId, LocalDate day) {
+        User person = users.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        assertCanViewHours(caller, person);
+
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate date = day != null ? day : today;
+        Instant from = date.atStartOfDay(ZONE).toInstant();
+        Instant to = date.plusDays(1).atStartOfDay(ZONE).toInstant();
+        Instant cap = Instant.now().isBefore(to) ? Instant.now() : to;
+        boolean live = date.equals(today);
+
+        List<LoginSession> mine = sessions.findOverlapping(List.of(userId), from, to).stream()
+                .sorted(Comparator.comparing(LoginSession::getLoginAt))
+                .toList();
+        PersonDayHours summary = toPersonDay(person, mine, from, cap, live);
+        List<SessionSegment> segments = mine.stream().map(s -> toSegment(s, cap)).toList();
+        return new PersonDayDetailResponse(
+                date,
+                person.getId(),
+                person.getFullName(),
+                person.getEmail(),
+                summary.seconds(),
+                summary.open(),
+                summary.paused(),
+                summary.sessions(),
+                summary.firstSignIn(),
+                summary.lastSignOut(),
+                segments);
+    }
+
+    private void assertCanViewHours(UserPrincipal caller, User person) {
+        if (caller.id().equals(person.getId())) {
+            return;
+        }
+        List<User> scope = salesInScope(caller);
+        boolean allowed = scope.stream().anyMatch(u -> u.getId().equals(person.getId()));
+        if (!allowed) {
+            throw new ForbiddenException("You cannot open that person's desk hours");
+        }
+    }
+
+    private static PersonDayHours toPersonDay(User person, List<LoginSession> mine,
+                                              Instant from, Instant cap, boolean live) {
+        List<long[]> spans = new ArrayList<>();
+        boolean open = false;
+        Instant firstSignIn = null;
+        Instant lastSignOut = null;
+        for (LoginSession session : mine) {
+            if (firstSignIn == null || session.getLoginAt().isBefore(firstSignIn)) {
+                firstSignIn = session.getLoginAt();
+            }
+            Instant start = session.getLoginAt().isAfter(from) ? session.getLoginAt() : from;
+            Instant end = session.getLogoutAt() == null || session.getLogoutAt().isAfter(cap)
+                    ? cap
+                    : session.getLogoutAt();
+            if (end.isAfter(start)) {
+                spans.add(new long[]{start.getEpochSecond(), end.getEpochSecond()});
+            }
+            if (session.getLogoutAt() != null) {
+                if (lastSignOut == null || session.getLogoutAt().isAfter(lastSignOut)) {
+                    lastSignOut = session.getLogoutAt();
+                }
+            }
+            if (live && session.getLogoutAt() == null) {
+                open = true;
+            }
+        }
+        boolean paused = live && !open && isAway(mine);
+        if (open) {
+            lastSignOut = null; // still on the desk
+        }
+        return new PersonDayHours(
+                person.getId(), person.getFullName(), person.getEmail(),
+                mergedSeconds(spans), open, paused, mine.size(), firstSignIn, lastSignOut);
+    }
+
+    private static SessionSegment toSegment(LoginSession session, Instant cap) {
+        Instant end = session.getLogoutAt() != null ? session.getLogoutAt() : cap;
+        long elapsed = Math.max(0, Duration.between(session.getLoginAt(), end).getSeconds());
+        boolean open = session.isOpen();
+        boolean paused = !open && REASON_PAUSE.equals(session.getLogoutReason());
+        return new SessionSegment(
+                session.getId(),
+                session.getLoginAt(),
+                session.getLogoutAt(),
+                open,
+                paused,
+                session.getLogoutReason(),
+                elapsed);
     }
 
     private List<User> salesInScope(UserPrincipal caller) {
@@ -185,9 +267,9 @@ public class PresenceService {
         return users.findById(caller.id()).stream().toList();
     }
 
-    private static PersonDayHours closed(User person, long seconds, int sessions) {
+    private static PersonDayHours closed(User person) {
         return new PersonDayHours(person.getId(), person.getFullName(), person.getEmail(),
-                seconds, false, false, sessions);
+                0, false, false, 0, null, null);
     }
 
     /** Latest closed segment today/overall ended with PAUSE → Away. */

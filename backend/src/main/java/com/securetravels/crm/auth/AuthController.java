@@ -1,6 +1,7 @@
 package com.securetravels.crm.auth;
 
 import com.securetravels.crm.auth.dto.DayHoursResponse;
+import com.securetravels.crm.auth.dto.PersonDayDetailResponse;
 import com.securetravels.crm.auth.dto.PresenceResponse;
 import com.securetravels.crm.common.config.AppProperties;
 import com.securetravels.crm.common.security.ClientIpResolver;
@@ -100,6 +101,16 @@ public class AuthController {
             @CurrentUser UserPrincipal principal,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
         return presence.dayHours(principal, day);
+    }
+
+    @Operation(summary = "One person's sign-in / pause / sign-out segments for a day",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @GetMapping("/presence/hours/{userId}")
+    public PersonDayDetailResponse personDayHours(
+            @CurrentUser UserPrincipal principal,
+            @PathVariable UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        return presence.personDay(principal, userId, day);
     }
 
     @Operation(summary = "Who signed in today", security = @SecurityRequirement(name = "bearerAuth"))

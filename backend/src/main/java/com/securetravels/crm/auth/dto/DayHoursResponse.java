@@ -1,5 +1,6 @@
 package com.securetravels.crm.auth.dto;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -17,7 +18,9 @@ public record DayHoursResponse(
             long seconds,
             boolean open,
             boolean paused,
-            int sessions
+            int sessions,
+            Instant firstSignIn,
+            Instant lastSignOut
     ) {
     }
 }

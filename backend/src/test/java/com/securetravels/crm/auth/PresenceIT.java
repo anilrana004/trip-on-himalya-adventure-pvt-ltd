@@ -164,6 +164,30 @@ class PresenceIT extends BaseIT {
         assertThat(person.get("email").asText()).isEqualTo("hours-sales@toh.test");
         assertThat(person.get("open").asBoolean()).isFalse();
         assertThat(person.get("seconds").asLong()).isEqualTo(9 * 60 * 60);
+        assertThat(person.get("firstSignIn").isNull()).isFalse();
+        assertThat(person.get("lastSignOut").isNull()).isFalse();
+
+        String detailBody = mockMvc.perform(get("/api/auth/presence/hours/" + salesId)
+                        .param("day", yesterday.toString())
+                        .header("Authorization", authHeader(manager)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode detail = objectMapper.readTree(detailBody);
+        assertThat(detail.get("email").asText()).isEqualTo("hours-sales@toh.test");
+        assertThat(detail.get("segments")).hasSize(1);
+        assertThat(detail.get("segments").get(0).get("loginAt").isNull()).isFalse();
+        assertThat(detail.get("segments").get(0).get("logoutAt").isNull()).isFalse();
+        assertThat(detail.get("segments").get(0).get("elapsedSeconds").asLong()).isEqualTo(9 * 60 * 60);
+
+        mockMvc.perform(get("/api/auth/presence/hours/" + salesId)
+                        .param("day", yesterday.toString())
+                        .header("Authorization", authHeader(tokens.access())))
+                .andExpect(status().isOk());
+
+        UUID otherId = userRepository.findByEmailIgnoreCase("hours-other@toh.test").orElseThrow().getId();
+        mockMvc.perform(get("/api/auth/presence/hours/" + otherId)
+                        .header("Authorization", authHeader(manager)))
+                .andExpect(status().isForbidden());
     }
 
     private JsonNode hours(String token, String day) throws Exception {

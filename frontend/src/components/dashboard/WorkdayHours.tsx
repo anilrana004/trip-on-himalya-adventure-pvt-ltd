@@ -11,12 +11,38 @@ type Person = {
   open: boolean;
   paused?: boolean;
   sessions: number;
+  firstSignIn?: string | null;
+  lastSignOut?: string | null;
 };
 
 type DayHours = {
   workDate: string;
   live: boolean;
   people: Person[];
+};
+
+type Segment = {
+  id: string;
+  loginAt: string;
+  logoutAt: string | null;
+  open: boolean;
+  paused: boolean;
+  logoutReason: string | null;
+  elapsedSeconds: number;
+};
+
+type PersonDetail = {
+  workDate: string;
+  userId: string;
+  fullName: string | null;
+  email: string | null;
+  seconds: number;
+  open: boolean;
+  paused?: boolean;
+  sessions: number;
+  firstSignIn?: string | null;
+  lastSignOut?: string | null;
+  segments: Segment[];
 };
 
 function pad(value: number) {
@@ -57,6 +83,27 @@ function statusClass(person: Person) {
   return "bg-slate-100 text-slate-600";
 }
 
+function formatTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
+function segmentLabel(seg: Segment) {
+  if (seg.open) return "Working";
+  if (seg.paused || seg.logoutReason === "PAUSE") return "Away (paused)";
+  if (seg.logoutReason === "LOGOUT") return "Signed out";
+  if (seg.logoutReason === "EXPIRED" || seg.logoutReason === "ROTATED") return seg.logoutReason;
+  return seg.logoutReason || "Closed";
+}
+
 export function WorkdayHours({ team, company = false }: { team: boolean; company?: boolean }) {
   const [day, setDay] = useState("");
   const [data, setData] = useState<DayHours | null>(null);
@@ -64,6 +111,9 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
   const [tick, setTick] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [detail, setDetail] = useState<PersonDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api
@@ -92,6 +142,20 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
     return () => window.clearInterval(id);
   }, [data?.live, data?.people]);
 
+  async function openPerson(userId: string, workDate?: string) {
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const row = await api.getPersonDayHours(userId, workDate || (team && day ? day : undefined));
+      setDetail(row);
+    } catch (e) {
+      setDetailError(formatApiError(e, "Could not load sign-in history"));
+      setDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   async function pause() {
     setBusy(true);
     setError(null);
@@ -118,6 +182,104 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
     }
   }
 
+  const drawer = (detail || detailLoading || detailError) && (
+    <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/30" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={() => { setDetail(null); setDetailError(null); }} />
+      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Sign-in history</div>
+            <div className="mt-0.5 text-base font-semibold text-slate-900">
+              {detail?.fullName ?? (detailLoading ? "Loading…" : "—")}
+            </div>
+            <div className="text-xs text-slate-500">{detail?.email}</div>
+            {detail?.workDate && (
+              <div className="mt-1 text-xs text-slate-400">India day {detail.workDate}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => { setDetail(null); setDetailError(null); }}
+            className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
+
+        {detailLoading && <p className="px-4 py-6 text-sm text-slate-500">Loading segments…</p>}
+        {detailError && <p className="px-4 py-4 text-sm text-red-600">{detailError}</p>}
+
+        {detail && !detailLoading && (
+          <>
+            <div className="grid grid-cols-3 gap-2 border-b border-slate-100 px-4 py-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">First in</div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">{formatTime(detail.firstSignIn)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Last out</div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">
+                  {detail.open ? "Still in" : formatTime(detail.lastSignOut)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Hours</div>
+                <div className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900">
+                  {shortHours(detail.seconds)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {detail.segments.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-slate-500">
+                  No sign-in on this day. They need to sign in to start a desk segment.
+                </p>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Sign in</th>
+                      <th className="px-3 py-2 font-medium">Sign out</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-4 py-2 text-right font-medium">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.segments.map((seg) => (
+                      <tr key={seg.id} className="border-t border-slate-100">
+                        <td className="px-4 py-2.5 tabular-nums text-slate-900">{formatTime(seg.loginAt)}</td>
+                        <td className="px-3 py-2.5 tabular-nums text-slate-700">
+                          {seg.open ? "—" : formatTime(seg.logoutAt)}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              seg.open
+                                ? "bg-emerald-50 text-emerald-800"
+                                : seg.paused
+                                  ? "bg-amber-50 text-amber-900"
+                                  : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {segmentLabel(seg)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-900">
+                          {shortHours(seg.elapsedSeconds)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+      </aside>
+    </div>
+  );
+
   if (!team) {
     const person = data?.people[0];
     const seconds = person ? shownSeconds(person, !!data?.live, fetchedAt, tick) : 0;
@@ -140,20 +302,28 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
             </span>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sign-ins</div>
               <div className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">{sessions}</div>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sign in</div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">
+                {formatTime(person?.firstSignIn)}
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Sign out</div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">
+                {working ? "Still in" : formatTime(person?.lastSignOut)}
+              </div>
             </div>
             <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Desk clock</div>
               <div className="mt-0.5 text-sm font-semibold text-slate-900">
                 {working ? "Running" : away ? "Paused" : "Stopped"}
               </div>
-            </div>
-            <div className="col-span-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 sm:col-span-1">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Manager view</div>
-              <div className="mt-0.5 text-sm font-semibold text-slate-900">Same total</div>
             </div>
           </div>
 
@@ -189,6 +359,15 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
             {!working && !away && (
               <p className="text-xs font-medium text-slate-500">Use Sign out / Sign in in the sidebar to close or open a desk day.</p>
             )}
+            {person && (
+              <button
+                type="button"
+                onClick={() => void openPerson(person.userId, data?.workDate)}
+                className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                All sign-ins / sign-outs
+              </button>
+            )}
             <button
               type="button"
               onClick={load}
@@ -199,6 +378,7 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
           </div>
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         </div>
+        {drawer}
       </section>
     );
   }
@@ -211,8 +391,8 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
           <div className="text-sm font-medium text-slate-700">Sales hours</div>
           <p className="text-xs text-slate-500">
             {data?.live
-              ? "Today counts while Working. Away pauses the clock. Each Pause→Resume is another sign-in segment."
-              : `Finished day ${data?.workDate ?? ""}. Totals stay after sign-out.`}
+              ? "Today counts while Working. Click a name for every sign-in and sign-out."
+              : `Finished day ${data?.workDate ?? ""}. Click a name for that day's full login log.`}
           </p>
         </div>
         <input
@@ -229,6 +409,8 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
             <tr>
               <th className="px-4 py-2.5 font-medium">Sales</th>
               <th className="px-3 py-2.5 font-medium">Status</th>
+              <th className="px-3 py-2.5 font-medium">Sign in</th>
+              <th className="px-3 py-2.5 font-medium">Sign out</th>
               <th className="px-3 py-2.5 text-right font-medium">Sign-ins</th>
               <th className="px-4 py-2.5 text-right font-medium">Hours</th>
             </tr>
@@ -236,7 +418,7 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
           <tbody>
             {people.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
                   {company
                     ? "No active sales people."
                     : "No sales people report to you yet. Set who reports to you, then their daily hours show up here."}
@@ -244,15 +426,27 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
               </tr>
             )}
             {people.map((person) => (
-              <tr key={person.userId} className="border-t border-slate-100">
+              <tr key={person.userId} className="border-t border-slate-100 hover:bg-slate-50/80">
                 <td className="px-4 py-2.5">
-                  <div className="font-medium text-slate-900">{person.fullName ?? "—"}</div>
-                  <div className="text-xs text-slate-400">{person.email}</div>
+                  <button
+                    type="button"
+                    onClick={() => void openPerson(person.userId, day || data?.workDate)}
+                    className="text-left"
+                  >
+                    <div className="font-medium text-sky-800 underline-offset-2 hover:underline">
+                      {person.fullName ?? "—"}
+                    </div>
+                    <div className="text-xs text-slate-400">{person.email}</div>
+                  </button>
                 </td>
                 <td className="px-3 py-2.5">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(person)}`}>
                     {statusLabel(person)}
                   </span>
+                </td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-700">{formatTime(person.firstSignIn)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-slate-700">
+                  {person.open ? "Still in" : formatTime(person.lastSignOut)}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{person.sessions}</td>
                 <td className="px-4 py-2.5 text-right font-mono tabular-nums text-slate-900">
@@ -265,6 +459,7 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
           </tbody>
         </table>
       </div>
+      {drawer}
     </section>
   );
 }
