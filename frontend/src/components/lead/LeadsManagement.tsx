@@ -693,20 +693,18 @@ export function LeadsManagement() {
                       <span>·</span>
                       <span className="truncate">{trip?.name || lead.destination || "No trek yet"}</span>
                     </div>
-                    {lead.followUpDate && (
-                      {(lead.followUpAt || lead.followUpDate) && (
-                        <div className="mt-2 text-xs font-medium text-amber-700">
-                          Follow-up{" "}
-                          {lead.followUpAt
-                            ? new Date(lead.followUpAt).toLocaleString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : lead.followUpDate}
-                        </div>
-                      )}
+                    {(lead.followUpAt || lead.followUpDate) && (
+                      <div className="mt-2 text-xs font-medium text-amber-700">
+                        Follow-up{" "}
+                        {lead.followUpAt
+                          ? new Date(lead.followUpAt).toLocaleString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : lead.followUpDate}
+                      </div>
                     )}
                     <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <a href={`tel:${lead.mobileNumber}`} className="rounded-lg border px-3 py-2 text-xs font-semibold text-slate-700">
