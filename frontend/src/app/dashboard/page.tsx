@@ -65,26 +65,83 @@ function Progress({ pct }: { pct: number | undefined }) {
   );
 }
 
-function Card({ label, value, big }: { label: string; value: string; big?: boolean }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+function Card({
+  label,
+  value,
+  big,
+  href,
+}: {
+  label: string;
+  value: string;
+  big?: boolean;
+  href?: string;
+}) {
+  const inner = (
+    <>
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
       <div className={`mt-1 font-semibold tabular-nums text-slate-900 ${big ? "text-xl" : "text-base"}`}>
         {value}
       </div>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-lg border border-slate-200 bg-white px-4 py-3 transition hover:border-sky-300 hover:bg-sky-50/40"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">{inner}</div>;
 }
 
-function HeroKpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+function HeroKpi({
+  label,
+  value,
+  hint,
+  href,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  href?: string;
+}) {
+  const inner = (
+    <>
       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</div>
       {hint && <div className="mt-1 text-xs text-slate-400">{hint}</div>}
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/40"
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">{inner}</div>;
 }
+
+const CARD_HREF: Record<string, string> = {
+  interested: "/leads?status=INTERESTED&period=all",
+  quotationSent: "/leads?status=QUOTATION_SENT&period=all",
+  bookingConfirmed: "/leads?status=BOOKING_CONFIRMED&period=all",
+  lost: "/leads?status=LOST&period=all",
+  followUpDue: "/follow-ups",
+  followUpOverdue: "/follow-ups",
+  hotUncalled: "/leads?status=NEW&period=all",
+  firstCallPending: "/follow-ups",
+  firstCallOverdue: "/follow-ups",
+  slaBreached: "/sales-tracking",
+};
+
+/** Qualified = INTERESTED; Converted = BOOKING_CONFIRMED (CRM status model). */
 
 function DashboardView() {
   const { user } = useAuth();
@@ -214,35 +271,51 @@ function DashboardView() {
               user?.role === "FINANCE") && <MySalaryCard />}
 
             <section className="p-4 pb-2 md:p-6">
-              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <HeroKpi
-                  label="Total bookings"
-                  value={n(summary?.confirmedBookings ?? summary?.newBookings)}
-                  hint={period === "today" ? "Today" : "This month"}
+                  label="Total leads"
+                  value={n(summary?.totalLeads)}
+                  hint="Open full book"
+                  href="/leads?period=all"
                 />
                 <HeroKpi
                   label="New leads"
                   value={n(summary?.newLeads)}
-                  hint={`${n(summary?.totalLeads)} in pipeline`}
+                  hint={period === "today" ? "Created today · status NEW" : "This month · status NEW"}
+                  href="/leads?status=NEW"
+                />
+                <HeroKpi
+                  label="Total bookings"
+                  value={n(summary?.confirmedBookings ?? summary?.newBookings)}
+                  hint={period === "today" ? "Today" : "This month"}
+                  href="/bookings"
                 />
                 <HeroKpi
                   label="Hot uncalled"
                   value={n(summary?.hotUncalled)}
                   hint="Ads / website / storefront waiting first call"
+                  href="/leads?status=NEW&period=all"
                 />
                 <HeroKpi
                   label="Follow-up SLA"
                   value={n(summary?.slaBreached)}
-                  hint={`${n(summary?.followUpOverdue)} overdue · ${n(summary?.firstCallOverdue)} first-call late`}
+                  hint={`${n(summary?.followUpOverdue)} overdue · ${n(summary?.followUpDue)} due`}
+                  href="/follow-ups"
                 />
               </div>
               {(user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO" || user?.role === "SALES") && (
-                <div className="mt-3">
+                <div className="mt-3 flex flex-wrap gap-4">
+                  <Link
+                    href="/follow-ups"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-sky-700 hover:text-sky-900"
+                  >
+                    Today&apos;s Follow-Ups →
+                  </Link>
                   <Link
                     href="/sales-tracking"
                     className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900"
                   >
-                    Open Sales Tracking → see who is late on follow-ups
+                    Sales Tracking → late follow-ups
                   </Link>
                 </div>
               )}
@@ -259,7 +332,12 @@ function DashboardView() {
               {summary ? (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
                   {CARD_FIELDS.filter((f) => !["revenue", "newBookings", "confirmedBookings", "newLeads", "totalLeads"].includes(f.key)).map((f) => (
-                    <Card key={f.key} label={f.label} value={n(summary[f.key as keyof DashboardSummary] as number)} />
+                    <Card
+                      key={f.key}
+                      label={f.label}
+                      value={n(summary[f.key as keyof DashboardSummary] as number)}
+                      href={CARD_HREF[f.key]}
+                    />
                   ))}
                 </div>
               ) : (

@@ -46,6 +46,10 @@ public class Notification {
     @Column(length = 300)
     private String link;
 
+    /** Optional idempotency key per user (due follow-up, inbound message id, …). */
+    @Column(name = "dedupe_key", length = 160)
+    private String dedupeKey;
+
     @Column(name = "is_read", nullable = false)
     private boolean read;
 
@@ -58,11 +62,16 @@ public class Notification {
     protected Notification() {}
 
     public Notification(UUID userId, Channel channel, String title, String body, String link) {
+        this(userId, channel, title, body, link, null);
+    }
+
+    public Notification(UUID userId, Channel channel, String title, String body, String link, String dedupeKey) {
         this.userId = userId;
         this.channel = channel;
         this.title = title;
         this.body = body;
         this.link = link;
+        this.dedupeKey = dedupeKey;
     }
 
     public UUID getId() { return id; }
@@ -71,6 +80,7 @@ public class Notification {
     public String getTitle() { return title; }
     public String getBody() { return body; }
     public String getLink() { return link; }
+    public String getDedupeKey() { return dedupeKey; }
     public boolean isRead() { return read; }
     public Instant getReadAt() { return readAt; }
     public Instant getCreatedAt() { return createdAt; }

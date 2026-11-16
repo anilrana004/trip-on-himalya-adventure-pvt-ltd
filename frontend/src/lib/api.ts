@@ -1047,6 +1047,30 @@ export const api = {
 
   getLead: (id: string) => request<Lead>(`/api/leads/${id}`),
 
+  getTodayFollowUps: (ownerId?: string) =>
+    request<{
+      overdueCount: number;
+      dueTodayCount: number;
+      upcomingCount: number;
+      completedCount: number;
+      overdue: Lead[];
+      dueToday: Lead[];
+      upcoming: Lead[];
+      completed: Lead[];
+    }>(`/api/leads/follow-ups/today${qs({ ownerId })}`),
+
+  completeLeadFollowUp: (id: string, payload?: { notes?: string }) =>
+    request<Lead>(`/api/leads/${id}/follow-ups/complete`, {
+      method: "POST",
+      body: JSON.stringify(payload ?? {}),
+    }),
+
+  rescheduleLeadFollowUp: (id: string, payload: { followUpAt: string; notes?: string }) =>
+    request<Lead>(`/api/leads/${id}/follow-ups/reschedule`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   logLeadCall: (id: string, payload: { outcome: string; notes?: string }) =>
     request<{ id: string; outcome: string; notes?: string | null; actorName?: string | null; createdAt: string }>(
       `/api/leads/${id}/calls`,
@@ -1066,6 +1090,15 @@ export const api = {
 
   updateLeadStatus: (id: string, payload: LeadStatusPayload) =>
     request<Lead>(`/api/leads/${id}/status`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteLead: (id: string, reason?: string) =>
+    request<void>(`/api/leads/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify(reason ? { reason } : {}),
+    }),
+
+  restoreLead: (id: string) =>
+    request<Lead>(`/api/leads/${id}/restore`, { method: "POST", body: "{}" }),
 
   getLeadActivity: (id: string) => request<LeadActivity[]>(`/api/leads/${id}/activity`),
 

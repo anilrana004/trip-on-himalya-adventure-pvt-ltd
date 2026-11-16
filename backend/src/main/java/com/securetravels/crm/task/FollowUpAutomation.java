@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
@@ -132,7 +131,7 @@ public class FollowUpAutomation {
                         titles[i] + " for " + lead.getCustomerName() + ".");
             }
             if (firstDue != null) {
-                lead.setFollowUpDate(LocalDate.ofInstant(firstDue, ZONE));
+                lead.scheduleFollowUp(firstDue);
             }
         } else {
             log.info("[automation] legacy off — engine owns cadence for lead={}", lead.getId());
@@ -148,7 +147,7 @@ public class FollowUpAutomation {
             scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.QUOTATION,
                     due, 24, "Quotation follow-up",
                     "Send / confirm the quotation for " + lead.getCustomerName() + ".");
-            lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+            lead.scheduleFollowUp(due);
         } else {
             log.info("[automation] legacy off — engine owns quotation chase for lead={}", lead.getId());
         }
@@ -159,7 +158,7 @@ public class FollowUpAutomation {
     public void onBooked(Lead lead) {
         if (legacy.enabled()) {
             cancelAllOpen(lead.getId());
-            lead.setFollowUpDate(null);
+            lead.scheduleFollowUp((Instant) null);
             String title = "Booking confirmed — follow-up closed";
             String body = "No further follow-up needed for " + lead.getCustomerName() + ".";
             notifications.save(new Notification(lead.getOwnerId(), Notification.Channel.IN_APP, title, body,
@@ -177,7 +176,7 @@ public class FollowUpAutomation {
         if (lead == null || lead.getId() == null) return;
         if (legacy.enabled()) {
             cancelAllOpen(lead.getId());
-            lead.setFollowUpDate(null);
+            lead.scheduleFollowUp((Instant) null);
             if (lead.getOwnerId() != null) {
                 String title = "Lead marked lost — follow-ups closed";
                 String body = "No further follow-up for " + lead.getCustomerName() + ".";
@@ -216,7 +215,7 @@ public class FollowUpAutomation {
         scheduleOne(lead.getId(), lead.getOwnerId(), Task.Type.CALLBACK, due, 4,
                 "Callback — lead contacted again",
                 lead.getCustomerName() + " came in again on the same number. Call them.");
-        lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+        lead.scheduleFollowUp(due);
         log.info("[automation] lead={} soft-dup scheduled CALLBACK due={}", lead.getId(), due);
     }
 
@@ -250,7 +249,7 @@ public class FollowUpAutomation {
                         "Callback in 2 hours",
                         "Could not finish the call with " + lead.getCustomerName()
                                 + " (" + outcome.name() + "). Call again.");
-                lead.setFollowUpDate(LocalDate.ofInstant(due, ZONE));
+                lead.scheduleFollowUp(due);
             }
             case WRONG_NUMBER -> {
                 List<User> managers = users.findByIsActiveTrueAndRoleIn(
@@ -405,6 +404,13 @@ public class FollowUpAutomation {
         for (Task existing : tasks.findByLeadIdAndStatusIn(leadId, open)) {
             existing.cancel();
         }
+    }
+
+    /** Hard-delete / cleanup path — cancel every open task on the lead. */
+    @Transactional
+    public void clearOpenTasks(UUID leadId) {
+        if (leadId == null) return;
+        cancelAllOpen(leadId);
     }
 
     private void scheduleOne(UUID leadId, UUID assigneeId, Task.Type type, Instant dueAt,

@@ -70,7 +70,9 @@ export function NotificationBell({
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 60_000);
+    // Faster poll so due follow-ups / inbound messages reach the bell quickly
+    // (CRM has no WebSocket; LiveAlerts also polls for toasts/sound).
+    const timer = setInterval(load, 20_000);
     return () => clearInterval(timer);
   }, [load]);
 

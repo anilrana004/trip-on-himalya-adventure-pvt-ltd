@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   api,
   formatApiError,
@@ -47,6 +48,7 @@ function subjectHref(t: InboxThread) {
 function MessagesView() {
   const { user } = useAuth();
   const canManage = hasRole(user?.role, MANAGERS);
+  const searchParams = useSearchParams();
 
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [total, setTotal] = useState(0);
@@ -117,6 +119,11 @@ function MessagesView() {
       setTimelineLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const threadId = searchParams.get("thread");
+    if (threadId) void openThread(threadId);
+  }, [searchParams, openThread]);
 
   const unreadTotal = useMemo(
     () => threads.reduce((n, t) => n + (t.unreadCount || 0), 0),
@@ -439,7 +446,9 @@ function MessagesView() {
 export default function MessagesPage() {
   return (
     <Protected>
-      <MessagesView />
+      <Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading inbox…</div>}>
+        <MessagesView />
+      </Suspense>
     </Protected>
   );
 }

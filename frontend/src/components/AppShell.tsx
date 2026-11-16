@@ -1,6 +1,7 @@
 "use client";
 
 import { Sidebar } from "@/components/Sidebar";
+import { LiveAlerts } from "@/components/LiveAlerts";
 
 /** Phone: stack with a top bar. Desktop: side nav + main. */
 export function AppShell({
@@ -14,6 +15,7 @@ export function AppShell({
     <div className={`flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden ${className}`}>
       <Sidebar />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <LiveAlerts />
     </div>
   );
 }

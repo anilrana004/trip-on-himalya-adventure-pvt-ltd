@@ -201,7 +201,20 @@ export default function LeadDetailPage() {
                   <Field label="Travel date" value={lead.travelDate ?? "—"} />
                   <Field label="Travelers" value={String(lead.numPersons ?? "—")} />
                   <Field label="Budget" value={lead.budget != null ? `₹${Number(lead.budget).toLocaleString("en-IN")}` : "—"} />
-                  <Field label="Follow-up" value={lead.followUpDate ?? "—"} />
+                  <Field
+                    label="Follow-up"
+                    value={
+                      lead.followUpAt
+                        ? new Date(lead.followUpAt).toLocaleString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : (lead.followUpDate ?? "—")
+                    }
+                  />
                   <Field label="Owner" value={lead.ownerName ?? "Unassigned"} />
                   <Field label="Consent" value={lead.consentGiven ? "Given ✓" : "Not given"} />
                 </dl>

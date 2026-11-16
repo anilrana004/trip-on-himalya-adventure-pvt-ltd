@@ -22,7 +22,12 @@ import com.securetravels.crm.lead.dto.LeadResponse;
 import com.securetravels.crm.lead.dto.LeadSourceSummary;
 import com.securetravels.crm.lead.dto.LeadStatusRequest;
 import com.securetravels.crm.lead.dto.LeadUpdateRequest;
+import com.securetravels.crm.booking.BookingRepository;
+import com.securetravels.crm.lead.dto.FollowUpActionRequest;
+import com.securetravels.crm.lead.dto.TodayFollowUpsResponse;
 import com.securetravels.crm.task.FollowUpAutomation;
+import com.securetravels.crm.task.Task;
+import com.securetravels.crm.task.TaskRepository;
 import com.securetravels.crm.user.Role;
 import com.securetravels.crm.user.User;
 import com.securetravels.crm.user.UserPrincipal;
@@ -31,12 +36,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +55,7 @@ import java.util.UUID;
 public class LeadService {
 
     private static final Set<Role> SEES_ALL = EnumSet.of(Role.MANAGER, Role.ADMIN, Role.CEO);
+    private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(LeadService.class);
@@ -72,13 +80,17 @@ public class LeadService {
     private final AccountService accounts;
     private final OpportunityService opportunities;
     private final LeadCallAttemptRepository callAttempts;
+    private final BookingRepository bookings;
+    private final TaskRepository tasks;
+    private final JdbcTemplate jdbc;
 
     public LeadService(LeadRepository leads, UserRepository users, Customer360Repository customers,
                        AuditLogRepository auditLogRepository, AuditService auditService,
                        LeadScoringService scoringService, FollowUpAutomation automation,
                        com.securetravels.crm.webhook.RoundRobinService roundRobin,
                        AccountService accounts, OpportunityService opportunities,
-                       LeadCallAttemptRepository callAttempts) {
+                       LeadCallAttemptRepository callAttempts,
+                       BookingRepository bookings, TaskRepository tasks, JdbcTemplate jdbc) {
         this.leads = leads;
         this.users = users;
         this.customers = customers;
@@ -90,6 +102,9 @@ public class LeadService {
         this.accounts = accounts;
         this.opportunities = opportunities;
         this.callAttempts = callAttempts;
+        this.bookings = bookings;
+        this.tasks = tasks;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -173,7 +188,9 @@ public class LeadService {
         lead.setTravelDate(request.travelDate());
         lead.setNumPersons(request.numPersons() == null ? 1 : request.numPersons());
         lead.setBudget(request.budget());
-        lead.setFollowUpDate(request.followUpDate());
+        if (request.followUpDate() != null) {
+            lead.scheduleFollowUp(request.followUpDate());
+        }
         lead.setRemarks(request.remarks());          // OWASP-sanitized inside the setter
         lead.setOwnerId(ownerId);
         lead.setCreatedBy(createdBy);
@@ -342,6 +359,9 @@ public class LeadService {
     @Transactional(readOnly = true)
     public LeadResponse get(UUID id, UserPrincipal caller) {
         Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        if (lead.isDeleted() && !SEES_ALL.contains(caller.role())) {
+            throw new NotFoundException("Lead not found: " + id);
+        }
         assertCanAccess(lead, caller);
         return toResponse(lead);
     }
@@ -361,7 +381,17 @@ public class LeadService {
         auditChanged(lead, "travelDate", toStr(lead.getTravelDate()), toStr(request.travelDate()), v -> lead.setTravelDate(v == null ? null : LocalDate.parse(v)));
         auditChanged(lead, "numPersons", String.valueOf(lead.getNumPersons()), toStr(request.numPersons()), v -> lead.setNumPersons(Integer.parseInt(v)));
         auditChanged(lead, "budget", toStr(lead.getBudget()), toStr(request.budget()), v -> lead.setBudget(v == null ? null : new BigDecimal(v)));
-        auditChanged(lead, "followUpDate", toStr(lead.getFollowUpDate()), toStr(request.followUpDate()), v -> lead.setFollowUpDate(v == null ? null : LocalDate.parse(v)));
+        if (request.followUpAt() != null || request.followUpDate() != null) {
+            Instant next = request.followUpAt() != null
+                    ? request.followUpAt()
+                    : request.followUpDate().atTime(10, 0).atZone(IST).toInstant();
+            Instant previous = lead.getFollowUpAt();
+            if (previous == null || !previous.equals(next)) {
+                lead.scheduleFollowUp(next);
+                auditService.record("LEAD", lead.getId(), AuditAction.UPDATE,
+                        "followUpAt", toStr(previous), next.toString());
+            }
+        }
         auditChanged(lead, "remarks", lead.getRemarks(), request.remarks(), v -> lead.setRemarks(v));
 
         // Rule-based scoring recomputes whenever enquiry fields change.
@@ -547,6 +577,110 @@ public class LeadService {
         return account.getId();
     }
 
+    @Transactional(readOnly = true)
+    public TodayFollowUpsResponse todayFollowUps(UUID ownerId, UserPrincipal caller) {
+        requireRole(caller.role(), Role.SALES, Role.MANAGER, Role.ADMIN, Role.CEO, Role.OPS);
+        UUID ownerScope = resolveFollowUpOwnerScope(ownerId, caller);
+        LocalDate today = LocalDate.now(IST);
+        Instant dayStart = today.atStartOfDay(IST).toInstant();
+        Instant dayEnd = today.plusDays(1).atStartOfDay(IST).toInstant();
+        Instant upcomingEnd = today.plusDays(7).atStartOfDay(IST).toInstant();
+        Instant completedFrom = today.minusDays(14).atStartOfDay(IST).toInstant();
+        List<LeadResponse> overdue = leads.findFollowUpsOverdue(dayStart, ownerScope).stream()
+                .map(this::toResponse).toList();
+        List<LeadResponse> dueToday = leads.findFollowUpsBetween(dayStart, dayEnd, ownerScope).stream()
+                .map(this::toResponse).toList();
+        List<LeadResponse> upcoming = leads.findFollowUpsBetween(dayEnd, upcomingEnd, ownerScope).stream()
+                .map(this::toResponse).toList();
+        List<LeadResponse> completed = leads.findFollowUpsCompleted(completedFrom, dayEnd, ownerScope).stream()
+                .map(this::toResponse).toList();
+        return new TodayFollowUpsResponse(
+                overdue.size(), dueToday.size(), upcoming.size(), completed.size(),
+                overdue, dueToday, upcoming, completed);
+    }
+
+    @Transactional
+    public LeadResponse completeFollowUp(UUID id, FollowUpActionRequest request, UserPrincipal caller) {
+        requireRole(caller.role(), Role.SALES, Role.MANAGER, Role.ADMIN, Role.CEO);
+        Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        assertCanAccess(lead, caller);
+        if (lead.getFollowUpAt() == null && lead.getFollowUpDate() == null) {
+            throw new BadRequestException("No pending follow-up to complete on this lead");
+        }
+        Instant previous = lead.getFollowUpAt();
+        if (request != null && request.notes() != null && !request.notes().isBlank()) {
+            lead.setFollowUpNotes(request.notes());
+        }
+        lead.completeFollowUp(Instant.now());
+        leads.save(lead);
+        auditService.record("LEAD", lead.getId(), AuditAction.UPDATE, "followUpCompleted",
+                toStr(previous), Instant.now().toString());
+        return toResponse(lead);
+    }
+
+    @Transactional
+    public LeadResponse rescheduleFollowUp(UUID id, FollowUpActionRequest request, UserPrincipal caller) {
+        requireRole(caller.role(), Role.SALES, Role.MANAGER, Role.ADMIN, Role.CEO);
+        Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        assertCanAccess(lead, caller);
+        if (request == null || request.followUpAt() == null) {
+            throw new BadRequestException("followUpAt is required to reschedule");
+        }
+        Instant previous = lead.getFollowUpAt();
+        lead.scheduleFollowUp(request.followUpAt());
+        if (request.notes() != null) {
+            lead.setFollowUpNotes(request.notes().isBlank() ? null : request.notes());
+        }
+        leads.save(lead);
+        auditService.record("LEAD", lead.getId(), AuditAction.UPDATE, "followUpAt",
+                toStr(previous), request.followUpAt().toString());
+        return toResponse(lead);
+    }
+
+    private UUID resolveFollowUpOwnerScope(UUID ownerId, UserPrincipal caller) {
+        if (!SEES_ALL.contains(caller.role())) {
+            return caller.id();
+        }
+        return ownerId;
+    }
+
+    /**
+     * Soft-delete (archive) a lead. Managers/admins/CEO only.
+     * Bookings and payments stay linked; lead leaves active lists and dashboard counts.
+     * Pending follow-up reminders are cleared.
+     */
+    @Transactional
+    public void delete(UUID id, String reason, UserPrincipal caller) {
+        requireRole(caller.role(), Role.MANAGER, Role.ADMIN, Role.CEO);
+        Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        if (lead.isDeleted()) {
+            throw new ConflictException("Lead is already archived");
+        }
+        automation.clearOpenTasks(id);
+        String label = lead.getCustomerName() + " / " + lead.getMobileNumber();
+        lead.softDelete(caller.id(), reason);
+        leads.save(lead);
+        opportunities.closeOpenForLead(id, Opportunity.Status.LOST,
+                "Lead archived" + (reason == null || reason.isBlank() ? "" : ": " + reason), caller.id());
+        auditService.record("LEAD", id, AuditAction.DELETE, "archived", label,
+                reason == null ? null : reason.trim());
+        log.info("[leads] archived id={} by={} name={}", id, caller.id(), label);
+    }
+
+    /** Restore an archived lead. Admin/CEO only. */
+    @Transactional
+    public LeadResponse restore(UUID id, UserPrincipal caller) {
+        requireRole(caller.role(), Role.ADMIN, Role.CEO);
+        Lead lead = leads.findById(id).orElseThrow(() -> new NotFoundException("Lead not found: " + id));
+        if (!lead.isDeleted()) {
+            throw new ConflictException("Lead is not archived");
+        }
+        lead.restore();
+        leads.save(lead);
+        auditService.record("LEAD", id, AuditAction.UPDATE, "restored", null, caller.id().toString());
+        return toResponse(lead);
+    }
+
     private LeadResponse toResponse(Lead lead) {
         String ownerName = lead.getOwnerId() == null ? null
                 : users.findById(lead.getOwnerId()).map(User::getFullName).orElse(null);
@@ -556,7 +690,9 @@ public class LeadService {
                 lead.getTravelDate(), lead.getNumPersons(), lead.getBudget(), lead.getOwnerId(), ownerName,
                 lead.getCustomer360Id(),
                 lead.getAccountId(),
-                lead.getStatus(), lead.getHeat(), lead.getFollowUpDate(), lead.getRemarks(),
+                lead.getStatus(), lead.getHeat(), lead.getFollowUpDate(), lead.getFollowUpAt(),
+                lead.getFollowUpNotes(), lead.getFollowUpCompletedAt(),
+                lead.getRemarks(),
                 lead.isConsentGiven(), lead.getConsentScope(), lead.getConsentCapturedAt(),
                 lead.getLostReason(), lead.getDuplicateOfLeadId(), lead.getLastContactedAt(),
                 lead.getCallCount(),

@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { NotificationBell } from "@/components/NotificationBell";
 import { NavIconMark, initialsFromName } from "@/components/NavIcons";
-import { SessionTimer } from "@/components/SessionTimer";
 import { canAccessFinance, isFinanceUser, navSectionsForRole, roleDisplayLabel } from "@/lib/rbac";
 
 const COLLAPSE_KEY = "toh.sidebar.collapsed";
@@ -233,7 +232,6 @@ export function Sidebar() {
             <NotificationBell placement="bottom" />
           </div>
         </div>
-        {user?.role === "SALES" && <SessionTimer compact={!showLabels} />}
         {showLabels && (
           <button
             onClick={logout}
@@ -267,7 +265,6 @@ export function Sidebar() {
             {roleDisplayLabel(user?.role)} desk
           </div>
         </div>
-        {user?.role === "SALES" && <SessionTimer compact />}
         <NotificationBell placement="top" />
       </header>
 

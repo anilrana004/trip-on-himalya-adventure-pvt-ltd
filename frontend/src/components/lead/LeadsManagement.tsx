@@ -17,7 +17,7 @@ import {
 } from "@/lib/api";
 import { pickLostReason } from "@/lib/lostReasons";
 import { useAuth } from "@/lib/auth";
-import { canManageTeam, canWriteLeads } from "@/lib/rbac";
+import { canDeleteLeads, canManageTeam, canWriteLeads } from "@/lib/rbac";
 import { LeadForm } from "@/components/lead/LeadForm";
 import { LeadDetailDrawer } from "@/components/lead/LeadDetailDrawer";
 import { LeadImportModal } from "@/components/lead/LeadImportModal";
@@ -167,6 +167,7 @@ export function LeadsManagement() {
   const searchParams = useSearchParams();
   const canWrite = canWriteLeads(user?.role);
   const canReassign = canManageTeam(user?.role);
+  const canDelete = canDeleteLeads(user?.role);
   const canBulkEmail = canManageTeam(user?.role);
   const range = useMemo(() => monthRange(), []);
   const [search, setSearch] = useState("");
@@ -191,6 +192,7 @@ export function LeadsManagement() {
   const [showFilters, setShowFilters] = useState(false);
   const [heatFilter, setHeatFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [periodAll, setPeriodAll] = useState(false);
   const tripsById = useMemo(
     () => new Map((trips as (Trip & { id?: string })[]).filter((t) => t.id).map((t) => [t.id as string, t])),
     [trips],
@@ -199,6 +201,14 @@ export function LeadsManagement() {
   useEffect(() => {
     const focus = searchParams.get("focus");
     if (focus) setSelectedId(focus);
+    const status = searchParams.get("status");
+    if (status) {
+      setStatusFilter(status.toUpperCase());
+      setPage(0);
+    }
+    const period = searchParams.get("period");
+    if (period === "all") setPeriodAll(true);
+    else if (period === "month") setPeriodAll(false);
   }, [searchParams]);
 
   useEffect(() => {
@@ -232,8 +242,12 @@ export function LeadsManagement() {
         source: tab?.source,
         heat: heatFilter || undefined,
         status: statusFilter || undefined,
-        from: `${range.from}T00:00:00Z`,
-        to: `${range.to}T23:59:59Z`,
+        ...(periodAll
+          ? {}
+          : {
+              from: `${range.from}T00:00:00Z`,
+              to: `${range.to}T23:59:59Z`,
+            }),
       };
       const res = await api.getLeads(params);
       setLeads(res.content);
@@ -244,7 +258,7 @@ export function LeadsManagement() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, tableSearch, sourceTab, heatFilter, statusFilter, range.from, range.to]);
+  }, [page, search, tableSearch, sourceTab, heatFilter, statusFilter, range.from, range.to, periodAll]);
 
   useEffect(() => {
     const t = setTimeout(() => void load(), 200);
@@ -325,15 +339,51 @@ export function LeadsManagement() {
   const revenue = Number(summary?.revenue ?? 0);
 
   const kpis = [
-    { label: "Total Leads", value: totalLeads.toLocaleString("en-IN"), note: "In the current book" },
-    { label: "New Leads (This Month)", value: newLeads.toLocaleString("en-IN"), note: "Status NEW" },
-    { label: "Qualified Leads", value: qualified.toLocaleString("en-IN"), note: "Status interested" },
+    {
+      label: "Total Leads",
+      value: totalLeads.toLocaleString("en-IN"),
+      note: "In the current book",
+      onClick: () => {
+        setStatusFilter("");
+        setPeriodAll(true);
+        setPage(0);
+      },
+    },
+    {
+      label: "New Leads (This Month)",
+      value: newLeads.toLocaleString("en-IN"),
+      note: "Status NEW",
+      onClick: () => {
+        setStatusFilter("NEW");
+        setPeriodAll(false);
+        setPage(0);
+      },
+    },
+    {
+      label: "Qualified Leads",
+      value: qualified.toLocaleString("en-IN"),
+      note: "Status interested",
+      onClick: () => {
+        setStatusFilter("INTERESTED");
+        setPeriodAll(true);
+        setPage(0);
+      },
+    },
     {
       label: "Converted to Bookings",
       value: booked.toLocaleString("en-IN"),
       note: `${formatPct(conv)} of these leads`,
+      onClick: () => {
+        setStatusFilter("BOOKING_CONFIRMED");
+        setPeriodAll(true);
+        setPage(0);
+      },
     },
-    { label: "Total Revenue from Leads", value: inr(revenue), note: summary?.revenue == null ? "No revenue recorded" : "Recorded on the book" },
+    {
+      label: "Total Revenue from Leads",
+      value: inr(revenue),
+      note: summary?.revenue == null ? "No revenue recorded" : "Recorded on the book",
+    },
   ];
 
   function toggleAll() {
@@ -435,13 +485,40 @@ export function LeadsManagement() {
             </div>
           </div>
 
+          {(statusFilter || periodAll) && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+              <span className="font-semibold">Active list filter:</span>
+              {statusFilter && <span>Status = {STAGE_LABEL[statusFilter] || statusFilter}</span>}
+              {periodAll && <span>Period = all dates</span>}
+              <button
+                type="button"
+                className="ml-auto font-semibold underline"
+                onClick={() => {
+                  setStatusFilter("");
+                  setPeriodAll(false);
+                  setPage(0);
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {kpis.map((k) => (
-              <div key={k.label} className="flex min-h-[7.25rem] flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <button
+                key={k.label}
+                type="button"
+                disabled={!k.onClick}
+                onClick={k.onClick}
+                className={`flex min-h-[7.25rem] flex-col rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm ${
+                  k.onClick ? "cursor-pointer transition hover:border-sky-300 hover:bg-sky-50/40" : ""
+                }`}
+              >
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{k.label}</div>
                 <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{k.value}</div>
                 <div className="mt-auto pt-2 text-xs leading-snug text-slate-500">{k.note}</div>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -617,7 +694,19 @@ export function LeadsManagement() {
                       <span className="truncate">{trip?.name || lead.destination || "No trek yet"}</span>
                     </div>
                     {lead.followUpDate && (
-                      <div className="mt-2 text-xs font-medium text-amber-700">Follow-up {lead.followUpDate}</div>
+                      {(lead.followUpAt || lead.followUpDate) && (
+                        <div className="mt-2 text-xs font-medium text-amber-700">
+                          Follow-up{" "}
+                          {lead.followUpAt
+                            ? new Date(lead.followUpAt).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : lead.followUpDate}
+                        </div>
+                      )}
                     )}
                     <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <a href={`tel:${lead.mobileNumber}`} className="rounded-lg border px-3 py-2 text-xs font-semibold text-slate-700">
@@ -813,6 +902,7 @@ export function LeadsManagement() {
           salesUsers={salesUsers}
           canWrite={canWrite}
           canReassign={canReassign}
+          canDelete={canDelete}
           onClose={() => setSelectedId(null)}
           onChanged={load}
           onStatusChange={handleStatusChange}

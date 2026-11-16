@@ -27,12 +27,25 @@ import {
 const STATUSES = ["NEW", "INTERESTED", "QUOTATION_SENT", "BOOKING_CONFIRMED", "LOST"] as const;
 const DEAL_STAGES = new Set(["INTERESTED", "QUOTATION_SENT"]);
 
+function toDateTimeLocal(iso?: string | null, dateOnly?: string | null) {
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+  if (dateOnly) return `${dateOnly}T10:00`;
+  return "";
+}
+
 type Props = {
   leadId: string;
   trips: Trip[];
   salesUsers: SalesUser[];
   canWrite: boolean;
   canReassign?: boolean;
+  canDelete?: boolean;
   onClose: () => void;
   onChanged: () => void;
   onStatusChange: (id: string, payload: LeadStatusPayload) => Promise<void>;
@@ -44,6 +57,7 @@ export function LeadDetailDrawer({
   salesUsers,
   canWrite,
   canReassign = false,
+  canDelete = false,
   onClose,
   onChanged,
   onStatusChange,
@@ -58,6 +72,7 @@ export function LeadDetailDrawer({
   const [remarks, setRemarks] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setError(null);
@@ -66,7 +81,7 @@ export function LeadDetailDrawer({
       .then((l) => {
         setLead(l);
         setStatus(l.status ?? "NEW");
-        setFollowUp(l.followUpDate ?? "");
+        setFollowUp(toDateTimeLocal(l.followUpAt, l.followUpDate));
         setRemarks(l.remarks ?? "");
         setOwnerId(l.ownerId ?? "");
       })
@@ -96,7 +111,7 @@ export function LeadDetailDrawer({
         await onStatusChange(lead.id, { status: status as LeadStatusPayload["status"] });
       }
       await api.updateLead(lead.id, {
-        followUpDate: followUp || undefined,
+        followUpAt: followUp ? new Date(followUp).toISOString() : undefined,
         remarks: remarks || undefined,
         ...(canReassign && ownerId && ownerId !== lead.ownerId ? { ownerId } : {}),
       });
@@ -108,12 +123,33 @@ export function LeadDetailDrawer({
       }
       const fresh = await api.getLead(lead.id);
       setLead(fresh);
+      setFollowUp(toDateTimeLocal(fresh.followUpAt, fresh.followUpDate));
       setOwnerId(fresh.ownerId ?? "");
       onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function removeLead() {
+    if (!lead?.id || !canDelete) return;
+    const ok = window.confirm(
+      `Archive lead “${lead.customerName}”? It leaves active lists and counts. Bookings and payments stay linked. Admins can restore later.`,
+    );
+    if (!ok) return;
+    const reason = window.prompt("Optional reason for archive:", "") ?? undefined;
+    setDeleting(true);
+    setError(null);
+    try {
+      await api.deleteLead(lead.id, reason?.trim() || undefined);
+      onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not archive lead");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -333,9 +369,9 @@ export function LeadDetailDrawer({
                 <p className="text-xs font-medium text-amber-700">Hot · waiting on first call (5 min SLA)</p>
               )}
               <label className="block text-sm">
-                <span className="text-xs font-semibold text-slate-500">Next follow up</span>
+                <span className="text-xs font-semibold text-slate-500">Next follow-up (date &amp; time)</span>
                 <input
-                  type="date"
+                  type="datetime-local"
                   disabled={!canWrite}
                   value={followUp}
                   onChange={(e) => setFollowUp(e.target.value)}
@@ -345,10 +381,20 @@ export function LeadDetailDrawer({
               {canWrite && (
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || deleting}
                   className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save changes"}
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  disabled={deleting || saving}
+                  onClick={() => void removeLead()}
+                  className="w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                >
+                  {deleting ? "Archiving…" : "Archive lead"}
                 </button>
               )}
             </section>

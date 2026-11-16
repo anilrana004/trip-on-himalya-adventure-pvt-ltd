@@ -46,8 +46,8 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
   const [day, setDay] = useState("");
   const [data, setData] = useState<DayHours | null>(null);
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
+  const now = fetchedAt;
 
   useEffect(() => {
     let cancelled = false;
@@ -64,12 +64,11 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
         });
     };
     load();
-    const poll = window.setInterval(load, 30_000);
-    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    // Refresh snapshot periodically — no live second-by-second countdown (client ask).
+    const poll = window.setInterval(load, 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(poll);
-      window.clearInterval(tick);
     };
   }, [day, team]);
 
@@ -83,8 +82,8 @@ export function WorkdayHours({ team, company = false }: { team: boolean; company
           <div className="mt-1 font-mono text-3xl font-semibold tabular-nums text-slate-900">{clock(seconds)}</div>
           <p className="mt-1 text-xs text-slate-500">
             {person?.open
-              ? "Counting from sign-in. This total is what your manager and admin see for the day."
-              : "Signed out. The hours already worked stay on this day for your manager and admin."}
+              ? "Hours logged today (refreshes each minute). Same total your manager sees."
+              : "Signed out. Hours already worked stay on this day for your manager and admin."}
           </p>
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         </div>

@@ -61,13 +61,16 @@ public class InboundMessageService {
     private final CommunicationThreadService threads;
     private final CustomerContactDirectory customers;
     private final LeadService leadService;
+    private final InboundStaffNotifier staffNotifier;
 
     public InboundMessageService(InboundMessageRepository inbound, CommunicationThreadService threads,
-                                 CustomerContactDirectory customers, LeadService leadService) {
+                                 CustomerContactDirectory customers, LeadService leadService,
+                                 InboundStaffNotifier staffNotifier) {
         this.inbound = inbound;
         this.threads = threads;
         this.customers = customers;
         this.leadService = leadService;
+        this.staffNotifier = staffNotifier;
     }
 
     /**
@@ -114,12 +117,15 @@ public class InboundMessageService {
                 .orElseThrow(() -> new IllegalStateException(
                         "inbound message " + providerMessageId + " vanished immediately after insert"));
 
-        attach(message, at);
+        CommunicationThread thread = attach(message, at);
+        if (thread != null) {
+            staffNotifier.notifyNewInbound(message, thread);
+        }
         return Optional.of(message);
     }
 
     /** Resolve the sender to a person and open/advance their inbox thread. */
-    private void attach(InboundMessage message, Instant receivedAt) {
+    private CommunicationThread attach(InboundMessage message, Instant receivedAt) {
         String mobile = message.getFromMobile();
         String email = message.getFromEmail();
         Instant at = receivedAt == null ? Instant.now() : receivedAt;
@@ -134,7 +140,7 @@ public class InboundMessageService {
                     message.getChannel(), mobile, email, preview(message.getBody()), at);
             message.attach(thread, SubjectType.CUSTOMER, customerId.get(), null);
             inbound.save(message);
-            return;
+            return thread;
         }
 
         // 2) An existing lead for this number. Found by number rather than by
@@ -150,7 +156,7 @@ public class InboundMessageService {
                     message.getChannel(), mobile, email, preview(message.getBody()), at);
             message.attach(thread, SubjectType.LEAD, leadId, leadId);
             inbound.save(message);
-            return;
+            return thread;
         }
 
         // 3) A stranger. The person contacted us, so a lead is warranted — and
@@ -159,7 +165,7 @@ public class InboundMessageService {
         if (mobile == null) {
             log.info("[inbound] {} message from {} with no resolvable identity; stored without a thread",
                     message.getChannel(), email);
-            return;
+            return null;
         }
         Lead created = leadService.findOrCreateFromInbound(mobile, sourceFor(message.getChannel()),
                 "Inbound " + message.getChannel().name().toLowerCase()
@@ -168,6 +174,7 @@ public class InboundMessageService {
                 message.getChannel(), mobile, email, preview(message.getBody()), at);
         message.attach(thread, SubjectType.LEAD, created.getId(), created.getId());
         inbound.save(message);
+        return thread;
     }
 
     /**

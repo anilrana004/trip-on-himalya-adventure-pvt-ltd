@@ -90,42 +90,79 @@ public class DashboardService {
         LocalDate anchor = today ? LocalDate.now(zone()) : LocalDate.now(zone()).withDayOfMonth(1);
         LocalDate asOf = LocalDate.now(zone());
         java.sql.Timestamp from = java.sql.Timestamp.from(anchor.atStartOfDay(zone()).toInstant());
+        // Same RBAC as LeadService: managers/admins/CEO see the team; sales/ops see own book.
+        boolean seesAll = caller.role() == Role.MANAGER || caller.role() == Role.ADMIN || caller.role() == Role.CEO;
+        UUID ownerScope = seesAll ? null : caller.id();
 
         Map<String, Object> row = jdbc.queryForMap("""
                 SELECT
-                  (SELECT count(*) FROM leads)                                            AS total_leads,
-                  (SELECT count(*) FROM leads WHERE status = 'NEW'
-                       AND created_at >= CAST(? AS timestamptz))                          AS new_leads,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS total_leads,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL
+                          AND status = 'NEW'
+                          AND created_at >= CAST(? AS timestamptz)
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS new_leads,
                   (SELECT count(*) FROM tasks
                         WHERE status IN ('PENDING','OVERDUE')
                           AND type IN ('FOLLOW_UP_1D','FOLLOW_UP_3D','FOLLOW_UP_8D','FOLLOW_UP_15D','QUOTATION')
-                          AND due_at::date <= ?)                                         AS follow_up_due,
-                  (SELECT count(*) FROM leads WHERE status = 'INTERESTED')                AS interested,
-                  (SELECT count(*) FROM leads WHERE status = 'QUOTATION_SENT')            AS quotation_sent,
-                  (SELECT count(*) FROM leads WHERE status = 'BOOKING_CONFIRMED')          AS booking_confirmed,
-                  (SELECT count(*) FROM leads WHERE status = 'LOST')                      AS lost,
-                  (SELECT count(*) FROM leads WHERE status = 'BOOKING_CONFIRMED'
-                       AND created_at >= CAST(? AS timestamptz))                          AS new_bookings,
+                          AND due_at::date <= ?
+                          AND (CAST(? AS uuid) IS NULL OR assignee_id = CAST(? AS uuid))) AS follow_up_due,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL AND status = 'INTERESTED'
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS interested,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL AND status = 'QUOTATION_SENT'
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS quotation_sent,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL AND status = 'BOOKING_CONFIRMED'
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS booking_confirmed,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL AND status = 'LOST'
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS lost,
+                  (SELECT count(*) FROM leads
+                        WHERE deleted_at IS NULL AND status = 'BOOKING_CONFIRMED'
+                          AND created_at >= CAST(? AS timestamptz)
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS new_bookings,
                   (SELECT count(*) FROM bookings WHERE status IN ('CONFIRMED','COMPLETED')) AS confirmed_bookings,
                   (SELECT COALESCE(sum(amount), 0) FROM payments
                        WHERE status IN ('COMPLETED','PARTIAL'))                           AS revenue,
                   (SELECT count(*) FROM tasks
-                        WHERE type = 'INITIAL_CALL' AND status IN ('PENDING','OVERDUE')) AS first_call_pending,
+                        WHERE type = 'INITIAL_CALL' AND status IN ('PENDING','OVERDUE')
+                          AND (CAST(? AS uuid) IS NULL OR assignee_id = CAST(? AS uuid))) AS first_call_pending,
                   (SELECT count(*) FROM tasks
                         WHERE type = 'INITIAL_CALL' AND status IN ('PENDING','OVERDUE')
-                          AND due_at < now())                                            AS first_call_overdue,
+                          AND due_at < now()
+                          AND (CAST(? AS uuid) IS NULL OR assignee_id = CAST(? AS uuid))) AS first_call_overdue,
                   (SELECT count(*) FROM leads
-                        WHERE status = 'NEW'
+                        WHERE deleted_at IS NULL
+                          AND status = 'NEW'
                           AND last_contacted_at IS NULL
-                          AND source IN ('FACEBOOK_ADS','INSTAGRAM','GOOGLE_ADS','WEBSITE','STOREFRONT')) AS hot_uncalled,
+                          AND source IN ('FACEBOOK_ADS','INSTAGRAM','GOOGLE_ADS','WEBSITE','STOREFRONT')
+                          AND (CAST(? AS uuid) IS NULL OR owner_id = CAST(? AS uuid)))   AS hot_uncalled,
                   (SELECT count(*) FROM tasks
                         WHERE status = 'OVERDUE'
-                          AND type IN ('FOLLOW_UP_1D','FOLLOW_UP_3D','FOLLOW_UP_8D','FOLLOW_UP_15D','QUOTATION','INITIAL_CALL'))
-                                                                                         AS follow_up_overdue,
+                          AND type IN ('FOLLOW_UP_1D','FOLLOW_UP_3D','FOLLOW_UP_8D','FOLLOW_UP_15D','QUOTATION','INITIAL_CALL')
+                          AND (CAST(? AS uuid) IS NULL OR assignee_id = CAST(? AS uuid))) AS follow_up_overdue,
                   (SELECT count(*) FROM tasks
                         WHERE status IN ('PENDING','OVERDUE')
-                          AND sla_deadline IS NOT NULL AND sla_deadline < now())         AS sla_breached
-                """, from, asOf, from);
+                          AND sla_deadline IS NOT NULL AND sla_deadline < now()
+                          AND (CAST(? AS uuid) IS NULL OR assignee_id = CAST(? AS uuid))) AS sla_breached
+                """,
+                ownerScope, ownerScope,
+                from, ownerScope, ownerScope,
+                asOf, ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                from, ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope,
+                ownerScope, ownerScope);
 
         return new DashboardSummaryResponse(
                 today ? "today" : "month",

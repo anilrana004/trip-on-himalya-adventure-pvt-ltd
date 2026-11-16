@@ -95,14 +95,16 @@ export function formatPct(n: number): string {
 }
 
 /** Derive a 0–100 lead score from heat + enrichment fields (no separate score column in DB). */
-export function leadScore(lead: Pick<Lead, "heat" | "budget" | "numPersons" | "status" | "followUpDate" | "email">): number {
+export function leadScore(
+  lead: Pick<Lead, "heat" | "budget" | "numPersons" | "status" | "followUpDate" | "followUpAt" | "email">,
+): number {
   let score = lead.heat === "HOT" ? 82 : lead.heat === "WARM" ? 58 : 34;
   if (lead.budget != null && Number(lead.budget) >= 15000) score += 8;
   else if (lead.budget != null && Number(lead.budget) >= 8000) score += 4;
   if ((lead.numPersons ?? 0) >= 4) score += 5;
   else if ((lead.numPersons ?? 0) >= 2) score += 2;
   if (lead.email) score += 3;
-  if (lead.followUpDate) score += 2;
+  if (lead.followUpDate || lead.followUpAt) score += 2;
   if (lead.status === "QUOTATION_SENT") score += 6;
   if (lead.status === "BOOKING_CONFIRMED") score = Math.max(score, 92);
   if (lead.status === "LOST") score = Math.min(score, 25);

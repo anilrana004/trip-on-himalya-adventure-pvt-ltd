@@ -87,6 +87,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     long countByAccountId(UUID accountId);
 
+    boolean existsByLeadId(UUID leadId);
+
     long countByAccountIdAndStatusIn(UUID accountId, List<Booking.Status> statuses);
 
     List<Booking> findTop5ByAccountIdOrderByCreatedAtDesc(UUID accountId);

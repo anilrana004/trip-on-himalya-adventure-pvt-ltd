@@ -177,7 +177,15 @@ export function LeadForm({ lead, trips = [], onCreated, onUpdated, onClose }: Le
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Follow-up date
-            <input type="date" value={form.followUpDate} onChange={(e) => set("followUpDate", e.target.value)} className={input} />
+            <input
+              type="date"
+              value={form.followUpDate}
+              onChange={(e) => set("followUpDate", e.target.value)}
+              className={input}
+            />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              Defaults to 10:00. Set exact time later on the lead card.
+            </span>
           </label>
           <label className="col-span-2 block text-sm font-medium text-slate-700">
             Remarks

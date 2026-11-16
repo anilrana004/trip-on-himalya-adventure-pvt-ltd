@@ -75,6 +75,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Leads & Sales",
     items: [
       { href: "/leads", label: "Leads", roles: SALES_DESK, icon: "leads" },
+      { href: "/follow-ups", label: "Today's Follow-Ups", roles: SALES_DESK, icon: "tasks" },
       { href: "/deals", label: "Deals / Opportunities", roles: SALES_DESK, icon: "payments" },
       { href: "/activities", label: "Activities", roles: SALES_DESK, icon: "tasks" },
       { href: "/sales-tracking", label: "Sales Tracking", roles: SALES_DESK, icon: "analytics" },
@@ -383,6 +384,7 @@ export function hasRole(role: string | null | undefined, allowed: Role[]): boole
 }
 
 export const canWriteLeads = (role: string | null | undefined) => hasRole(role, SALES_DESK);
+export const canDeleteLeads = (role: string | null | undefined) => hasRole(role, MANAGERS);
 export const canWritePayments = (role: string | null | undefined) =>
   hasRole(role, [...SALES_DESK, "FINANCE"]);
 export const canWriteOperations = (role: string | null | undefined) => hasRole(role, OPS_DESK);

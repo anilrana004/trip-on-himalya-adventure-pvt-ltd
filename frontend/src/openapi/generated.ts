@@ -1423,6 +1423,11 @@ export interface components {
             heat?: "HOT" | "WARM" | "COLD";
             /** Format: date */
             followUpDate?: string;
+            /** Format: date-time */
+            followUpAt?: string;
+            followUpNotes?: string;
+            /** Format: date-time */
+            followUpCompletedAt?: string;
             remarks?: string;
             consentGiven?: boolean;
             consentScope?: string;
@@ -1718,6 +1723,8 @@ export interface components {
             ownerId?: string;
             /** Format: date */
             followUpDate?: string;
+            /** Format: date-time */
+            followUpAt?: string;
             remarks?: string;
         };
         LeadStatusRequest: {

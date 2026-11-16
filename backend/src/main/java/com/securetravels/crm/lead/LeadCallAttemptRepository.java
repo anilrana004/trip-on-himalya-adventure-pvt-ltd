@@ -10,4 +10,6 @@ public interface LeadCallAttemptRepository extends JpaRepository<LeadCallAttempt
     List<LeadCallAttempt> findTop50ByLeadIdOrderByCreatedAtDesc(UUID leadId);
 
     long countByLeadId(UUID leadId);
+
+    void deleteByLeadId(UUID leadId);
 }

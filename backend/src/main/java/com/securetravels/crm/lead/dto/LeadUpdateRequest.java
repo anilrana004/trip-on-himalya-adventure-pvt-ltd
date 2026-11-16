@@ -10,14 +10,13 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
 /**
  * Lead field update (PATCH semantics: only provided fields are changed).
- * The enquiry fields a consultant may correct on the Lead Detail page.
- * Mobile number stays immutable (it is the verified dedup identity — a
- * number change is a new enquiry). Heat is recomputed by the service.
+ * Prefer {@code followUpAt} (date+time). {@code followUpDate} alone schedules 10:00 IST.
  */
 public record LeadUpdateRequest(
         @Size(max = 200, message = "customerName too long")
@@ -51,8 +50,11 @@ public record LeadUpdateRequest(
         /** Manager/admin reassignment only — ignored for sales self-edits. */
         UUID ownerId,
 
-        @Future(message = "followUpDate must be in the future")
+        /** Calendar day only — stored as 10:00 Asia/Kolkata when followUpAt is absent. */
         LocalDate followUpDate,
+
+        /** Exact follow-up instant (date + time). Wins over followUpDate when both sent. */
+        Instant followUpAt,
 
         @Size(max = 5000, message = "remarks too long")
         String remarks

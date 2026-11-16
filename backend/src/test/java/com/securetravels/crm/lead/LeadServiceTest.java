@@ -46,6 +46,9 @@ class LeadServiceTest {
     @Mock private com.securetravels.crm.accounts.AccountService accounts;
     @Mock private com.securetravels.crm.accounts.OpportunityService opportunities;
     @Mock private LeadCallAttemptRepository callAttempts;
+    @Mock private com.securetravels.crm.booking.BookingRepository bookings;
+    @Mock private com.securetravels.crm.task.TaskRepository tasks;
+    @Mock private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private LeadService service;
     private UUID principalId;
@@ -54,7 +57,8 @@ class LeadServiceTest {
     @BeforeEach
     void setUp() {
         service = new LeadService(leads, users, customers, auditLogRepository, auditService,
-                scoringService, automation, roundRobin, accounts, opportunities, callAttempts);
+                scoringService, automation, roundRobin, accounts, opportunities, callAttempts,
+                bookings, tasks, jdbc);
         principalId = UUID.randomUUID();
         principal = new UserPrincipal(principalId, "sales@securetravels.in", "Ravi", Role.SALES, true);
     }

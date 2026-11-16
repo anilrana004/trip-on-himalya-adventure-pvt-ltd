@@ -96,6 +96,20 @@ public class Lead extends Auditable {
     @Column(name = "follow_up_date")
     private LocalDate followUpDate;
 
+    /** Exact follow-up instant (date+time). {@link #followUpDate} stays the calendar day badge. */
+    @Column(name = "follow_up_at")
+    private Instant followUpAt;
+
+    @Column(name = "follow_up_notes", columnDefinition = "text")
+    private String followUpNotes;
+
+    @Column(name = "follow_up_completed_at")
+    private Instant followUpCompletedAt;
+
+    /** When a due-now reminder was last sent for the current {@link #followUpAt}. */
+    @Column(name = "follow_up_notified_at")
+    private Instant followUpNotifiedAt;
+
     @Column(columnDefinition = "text")
     private String remarks;
 
@@ -126,6 +140,16 @@ public class Lead extends Auditable {
     /** Meta Lead Ads id (ADR 0008). Unique when present for webhook idempotency. */
     @Column(name = "meta_lead_id", length = 64)
     private String metaLeadId;
+
+    /** Soft-delete / archive. Null = active in CRM lists and dashboard counts. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by")
+    private UUID deletedBy;
+
+    @Column(name = "deletion_reason", length = 500)
+    private String deletionReason;
 
     @Column(name = "created_by")
     private UUID createdBy;
@@ -163,6 +187,10 @@ public class Lead extends Auditable {
     public Status getStatus() { return status; }
     public Heat getHeat() { return heat; }
     public LocalDate getFollowUpDate() { return followUpDate; }
+    public Instant getFollowUpAt() { return followUpAt; }
+    public String getFollowUpNotes() { return followUpNotes; }
+    public Instant getFollowUpCompletedAt() { return followUpCompletedAt; }
+    public Instant getFollowUpNotifiedAt() { return followUpNotifiedAt; }
     public String getRemarks() { return remarks; }
     public boolean isConsentGiven() { return consentGiven; }
     public Instant getConsentCapturedAt() { return consentCapturedAt; }
@@ -172,6 +200,10 @@ public class Lead extends Auditable {
     public Instant getLastContactedAt() { return lastContactedAt; }
     public int getCallCount() { return callCount; }
     public String getMetaLeadId() { return metaLeadId; }
+    public Instant getDeletedAt() { return deletedAt; }
+    public UUID getDeletedBy() { return deletedBy; }
+    public String getDeletionReason() { return deletionReason; }
+    public boolean isDeleted() { return deletedAt != null; }
     public UUID getCreatedBy() { return createdBy; }
 
     public void setMobileNumber(String mobileNumber) { this.mobileNumber = mobileNumber; }
@@ -190,6 +222,43 @@ public class Lead extends Auditable {
     public void setStatus(Status status) { this.status = status; }
     public void setHeat(Heat heat) { this.heat = heat; }
     public void setFollowUpDate(LocalDate followUpDate) { this.followUpDate = followUpDate; }
+    public void setFollowUpAt(Instant followUpAt) { this.followUpAt = followUpAt; }
+    public void setFollowUpNotes(String followUpNotes) {
+        this.followUpNotes = followUpNotes == null ? null : XssSanitizer.text(followUpNotes);
+    }
+    public void setFollowUpCompletedAt(Instant followUpCompletedAt) { this.followUpCompletedAt = followUpCompletedAt; }
+    public void setFollowUpNotifiedAt(Instant followUpNotifiedAt) { this.followUpNotifiedAt = followUpNotifiedAt; }
+
+    /**
+     * Sets follow-up date+time together. Date-only schedules default to 10:00 Asia/Kolkata.
+     * Clears completion/notified flags when a new time is set.
+     */
+    public void scheduleFollowUp(Instant at) {
+        Instant previous = this.followUpAt;
+        this.followUpAt = at;
+        this.followUpDate = at == null ? null
+                : java.time.LocalDate.ofInstant(at, java.time.ZoneId.of("Asia/Kolkata"));
+        if (at != null && (previous == null || !previous.equals(at))) {
+            this.followUpCompletedAt = null;
+            this.followUpNotifiedAt = null;
+        }
+    }
+
+    public void scheduleFollowUp(LocalDate date) {
+        if (date == null) {
+            scheduleFollowUp((Instant) null);
+            return;
+        }
+        scheduleFollowUp(date.atTime(10, 0).atZone(java.time.ZoneId.of("Asia/Kolkata")).toInstant());
+    }
+
+    public void completeFollowUp(Instant at) {
+        this.followUpCompletedAt = at == null ? Instant.now() : at;
+        this.followUpAt = null;
+        this.followUpDate = null;
+        this.followUpNotifiedAt = null;
+    }
+
     public void setConsentGiven(boolean consentGiven) { this.consentGiven = consentGiven; }
     public void setConsentCapturedAt(Instant consentCapturedAt) { this.consentCapturedAt = consentCapturedAt; }
     public void setConsentScope(String consentScope) { this.consentScope = consentScope; }
@@ -199,5 +268,21 @@ public class Lead extends Auditable {
     public void setCallCount(int callCount) { this.callCount = Math.max(0, callCount); }
     public void incrementCallCount() { this.callCount = this.callCount + 1; }
     public void setMetaLeadId(String metaLeadId) { this.metaLeadId = metaLeadId; }
+
+    public void softDelete(UUID actorId, String reason) {
+        this.deletedAt = Instant.now();
+        this.deletedBy = actorId;
+        this.deletionReason = reason == null || reason.isBlank() ? null : XssSanitizer.text(reason);
+        this.followUpAt = null;
+        this.followUpDate = null;
+        this.followUpNotifiedAt = null;
+    }
+
+    public void restore() {
+        this.deletedAt = null;
+        this.deletedBy = null;
+        this.deletionReason = null;
+    }
+
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
 }
