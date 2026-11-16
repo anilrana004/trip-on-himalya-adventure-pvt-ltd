@@ -261,7 +261,7 @@ function DashboardView() {
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
             {error && <p className="m-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             {(user?.role === "SALES" || user?.role === "MANAGER" || user?.role === "ADMIN" || user?.role === "CEO") && (
               <WorkdayHours team={user.role !== "SALES"} company={user.role === "ADMIN" || user.role === "CEO"} />

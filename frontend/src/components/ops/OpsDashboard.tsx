@@ -256,7 +256,7 @@ export function OpsDashboard() {
       </header>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain p-4 [-webkit-overflow-scrolling:touch] lg:p-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Operations Dashboard</h1>

@@ -419,8 +419,8 @@ export function LeadsManagement() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <div className="min-w-0 flex-1 overflow-y-auto bg-slate-50">
+    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain bg-slate-50 [-webkit-overflow-scrolling:touch]">
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-3 py-3 backdrop-blur md:px-5">
           <div className="flex flex-wrap items-center gap-3">
             <input

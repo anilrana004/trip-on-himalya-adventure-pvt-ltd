@@ -243,7 +243,7 @@ export function Sidebar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-slate-800 bg-slate-950 px-3 text-slate-100 md:hidden">
+      <header className="z-40 flex h-14 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-950 px-3 text-slate-100 md:hidden">
         <button
           type="button"
           onClick={() => setMobileOpen(true)}

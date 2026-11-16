@@ -6,13 +6,15 @@
 
 html {
   height: 100%;
-  /* Stop document rubber-band from fighting the CRM desk scrollport. */
+  /* Document itself does not scroll — AppShell / FinanceShell own the scrollport. */
   overscroll-behavior-y: none;
 }
 
 body {
-  @apply min-h-full bg-slate-50 text-slate-900 antialiased;
+  @apply h-full min-h-0 bg-slate-50 text-slate-900 antialiased;
   overscroll-behavior-y: none;
+  /* Avoid iOS rubber-band fighting nested desk panes. */
+  touch-action: manipulation;
 }
 
 /* Stop iOS zooming form fields when the desk is opened on a phone. */

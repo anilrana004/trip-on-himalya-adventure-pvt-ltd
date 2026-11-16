@@ -4,13 +4,12 @@ import { Sidebar } from "@/components/Sidebar";
 import { LiveAlerts } from "@/components/LiveAlerts";
 
 /**
- * Phone: stack with a top bar. Desktop: side nav + main.
+ * Phone + desktop share one viewport-locked shell so touch scroll always has a
+ * real scrollport (iOS breaks when parents only use min-height + overflow-hidden).
  *
- * `scroll="page"` (default) — the main column is the scrollport. Use for Team,
- * Bookings, Reports, and other long desks that do not manage their own pane.
- *
- * `scroll="contained"` — outer column is clipped; the page owns nested scroll
- * regions (Dashboard, Messages, Customers split panes).
+ * `scroll="page"` (default) — the main column scrolls. Team, Bookings, AdminPage desks.
+ * `scroll="contained"` — main column is clipped; the page owns nested overflow-y-auto panes
+ * (Dashboard, Leads, Messages, Customers, Ops).
  */
 export function AppShell({
   children,
@@ -24,11 +23,11 @@ export function AppShell({
   const contentOverflow =
     scroll === "contained"
       ? "overflow-hidden"
-      : "overflow-y-auto overscroll-y-contain";
+      : "overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]";
 
   return (
     <div
-      className={`flex min-h-dvh flex-col md:h-dvh md:max-h-dvh md:flex-row md:overflow-hidden ${className}`}
+      className={`flex h-dvh max-h-dvh flex-col overflow-hidden md:flex-row ${className}`}
     >
       <Sidebar />
       <div

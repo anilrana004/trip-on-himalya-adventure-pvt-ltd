@@ -177,9 +177,9 @@ function MessagesView() {
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* Thread list */}
-          <aside className="flex w-full max-w-md flex-col border-r border-slate-200 bg-white">
+          <aside className="flex min-h-0 w-full max-w-md flex-1 flex-col border-r border-slate-200 bg-white md:flex-none">
             <div className="flex flex-wrap gap-2 border-b border-slate-100 p-3">
               <select
                 value={channel}
@@ -224,7 +224,7 @@ function MessagesView() {
               <p className="m-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
               {loading ? (
                 <p className="py-12 text-center text-sm text-slate-400">Loading inbox…</p>
               ) : threads.length === 0 ? (
@@ -318,9 +318,9 @@ function MessagesView() {
           </aside>
 
           {/* Conversation pane */}
-          <section className="flex min-w-0 flex-1 flex-col bg-slate-50">
+          <section className={`min-h-0 min-w-0 flex-1 flex-col bg-slate-50 ${selected ? "flex" : "hidden md:flex"}`}>
             {!selected ? (
-              <div className="flex flex-1 overflow-y-auto">
+              <div className="flex min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
                 <LeadMessageComposer onSent={() => void loadList()} />
               </div>
             ) : (
@@ -396,7 +396,7 @@ function MessagesView() {
                     <LeadMessageComposer leadId={selected.subjectId} onSent={() => void openThread(selected.id)} />
                   </div>
                 )}
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain p-5 [-webkit-overflow-scrolling:touch]">
                   {timelineLoading ? (
                     <p className="py-10 text-center text-sm text-slate-400">Loading messages…</p>
                   ) : timeline.length === 0 ? (

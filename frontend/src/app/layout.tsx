@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-dvh antialiased">
+      <body className="h-full min-h-0 antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

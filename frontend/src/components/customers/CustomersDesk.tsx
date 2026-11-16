@@ -213,7 +213,7 @@ export function CustomersDesk() {
 
   return (
     <AppShell scroll="contained" className="bg-slate-50">
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-slate-200 bg-white px-6 py-4">
           <h1 className="text-lg font-semibold text-slate-900">Travelers</h1>
           <p className="text-xs text-slate-500">
@@ -261,7 +261,7 @@ export function CustomersDesk() {
                 ))}
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
               {loading ? (
                 <p className="p-4 text-sm text-slate-400">Loading…</p>
               ) : error ? (
@@ -326,7 +326,7 @@ export function CustomersDesk() {
             </div>
           </div>
 
-          <div className="min-w-0 flex-1 overflow-y-auto bg-white">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch]">
             {detailLoading ? (
               <p className="p-6 text-sm text-slate-400">Loading…</p>
             ) : prospect ? (
